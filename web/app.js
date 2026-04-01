@@ -8,6 +8,7 @@ let fechaPendienteEdicion = null;
 let configDefaultDate  = 'today';
 let configModoEntrada  = 'cantidad';
 let configSede         = 'Principal';
+let configDataDir      = '';
 let debounceTimer      = null;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -45,6 +46,19 @@ function ocultarMensaje() {
   document.getElementById('mensaje').className = 'mensaje oculto';
 }
 
+function previewExcelAnual() {
+  const year = new Date().getFullYear();
+  return `Caja_${year}.xlsx`;
+}
+
+function actualizarPreviewRutaAdmin() {
+  const input = document.getElementById('admin-data-dir');
+  const preview = document.getElementById('admin-excel-preview');
+  if (!input || !preview) return;
+  const dir = input.value.trim();
+  preview.textContent = dir ? `${dir}\\${previewExcelAnual()}` : previewExcelAnual();
+}
+
 // ─── Tabla de billetes ────────────────────────────────────────────────────────
 
 function buildTablaBilletes() {
@@ -60,6 +74,15 @@ function buildTablaBilletes() {
   });
 }
 
+function camposEditablesBilletes() {
+  // Devuelve los inputs editables de la tabla en orden, más los campos manuales
+  const prefijo = configModoEntrada === 'cantidad' ? 'cant_' : 'sub_';
+  const billetes = DENOMINACIONES.map(d => document.getElementById(prefijo + d));
+  const manuales = ['total_monedas', 'billetes_viejos', 'venta_practisistemas', 'venta_deportivas']
+    .map(id => document.getElementById(id));
+  return [...billetes, ...manuales];
+}
+
 function aplicarModoEntrada() {
   const esCantidad = configModoEntrada === 'cantidad';
   document.getElementById('th-cantidad').textContent = esCantidad ? 'Cantidad' : 'Cantidad (calc.)';
@@ -67,11 +90,22 @@ function aplicarModoEntrada() {
   DENOMINACIONES.forEach(d => {
     const cant = document.getElementById(`cant_${d}`);
     const sub  = document.getElementById(`sub_${d}`);
-    cant.readOnly = !esCantidad;
-    sub.readOnly  =  esCantidad;
+    cant.readOnly  = !esCantidad;
+    sub.readOnly   =  esCantidad;
+    cant.tabIndex  = esCantidad ? 0 : -1;
+    sub.tabIndex   = esCantidad ? -1 : 0;
     cant.classList.toggle('input-readonly', !esCantidad);
     sub.classList.toggle('input-readonly',   esCantidad);
   });
+}
+
+function moverAlSiguiente(inputActual) {
+  const campos = camposEditablesBilletes();
+  const idx    = campos.indexOf(inputActual);
+  if (idx !== -1 && idx < campos.length - 1) {
+    campos[idx + 1].focus();
+    campos[idx + 1].select();
+  }
 }
 
 function calcular() {
@@ -175,15 +209,16 @@ function exitarEdicion() {
   document.getElementById('btn-guardar').disabled    = false;
 }
 
-function activarEdicion(fecha) {
+async function activarEdicion(fecha) {
   modoEdicion = true;
   document.getElementById('banner-fecha').textContent = fecha;
   document.getElementById('banner-edicion').classList.remove('oculto');
   document.getElementById('btn-guardar').textContent  = 'Actualizar';
   document.getElementById('btn-guardar').disabled     = false;
   document.getElementById('fecha').value = fecha;
+  limpiarCampos();
+  await cargarDatosExistentes(fecha);
   verificarFecha(fecha);
-  cargarDatosExistentes(fecha);
 }
 
 function cancelarEdicion() {
@@ -235,8 +270,10 @@ function confirmarEdicion() {
     document.getElementById('editar-pass-error').classList.remove('oculto');
     return;
   }
+  const fecha = fechaPendienteEdicion;
   cerrarModalEditar();
-  activarEdicion(fechaPendienteEdicion);
+  ocultarMensaje();
+  activarEdicion(fecha);
 }
 
 // ─── Modal: admin ─────────────────────────────────────────────────────────────
@@ -270,6 +307,8 @@ async function ingresarAdmin() {
     if (radioModo) radioModo.checked = true;
 
     document.getElementById('admin-sede').value = settings.sede || '';
+    document.getElementById('admin-data-dir').value = settings.data_dir || '';
+    actualizarPreviewRutaAdmin();
   } catch { /* usar defaults */ }
 
   document.getElementById('admin-login-section').classList.add('oculto');
@@ -280,24 +319,57 @@ async function guardarAdmin() {
   const valFecha = document.querySelector('input[name="default_date"]:checked')?.value || 'today';
   const valModo  = document.querySelector('input[name="modo_entrada"]:checked')?.value  || 'cantidad';
   const valSede  = document.getElementById('admin-sede').value.trim();
+  const valDataDir = document.getElementById('admin-data-dir').value.trim();
   const msg      = document.getElementById('admin-config-msg');
   try {
     await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ default_date: valFecha, modo_entrada: valModo, sede: valSede }),
+      body: JSON.stringify({ default_date: valFecha, modo_entrada: valModo, sede: valSede, data_dir: valDataDir }),
     });
     configDefaultDate = valFecha;
     configModoEntrada = valModo;
     configSede = valSede || 'Principal';
+    configDataDir = valDataDir;
     aplicarModoEntrada();
     calcular();
+    actualizarPreviewRutaAdmin();
     msg.textContent = `Configuración guardada. Hoja activa: ${configSede}`;
     msg.className   = 'config-msg ok';
     msg.classList.remove('oculto');
     setTimeout(() => msg.classList.add('oculto'), 2000);
   } catch {
     msg.textContent = 'Error al guardar.';
+    msg.className   = 'config-msg error';
+    msg.classList.remove('oculto');
+  }
+}
+
+async function buscarCarpetaExcel() {
+  const msg = document.getElementById('admin-config-msg');
+  try {
+    const res = await fetch('/api/settings/browse-folder', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) return;
+    document.getElementById('admin-data-dir').value = data.data_dir || '';
+    actualizarPreviewRutaAdmin();
+  } catch {
+    msg.textContent = 'No se pudo abrir el selector de carpetas.';
+    msg.className   = 'config-msg error';
+    msg.classList.remove('oculto');
+  }
+}
+
+async function buscarDesdeExcel() {
+  const msg = document.getElementById('admin-config-msg');
+  try {
+    const res = await fetch('/api/settings/browse-excel', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) return;
+    document.getElementById('admin-data-dir').value = data.data_dir || '';
+    actualizarPreviewRutaAdmin();
+  } catch {
+    msg.textContent = 'No se pudo abrir el selector de archivos Excel.';
     msg.className   = 'config-msg error';
     msg.classList.remove('oculto');
   }
@@ -310,12 +382,14 @@ function validarFormulario() {
 
   for (const d of DENOMINACIONES) {
     if (configModoEntrada === 'cantidad') {
-      const val = document.getElementById(`cant_${d}`).value;
-      if (val === '' || isNaN(Number(val)) || Number(val) < 0 || !Number.isInteger(Number(val))) {
+      const raw = document.getElementById(`cant_${d}`).value;
+      const val = raw === '' ? 0 : Number(raw);
+      if (isNaN(val) || val < 0 || !Number.isInteger(val)) {
         return `Cantidad inválida para $ ${d.toLocaleString('es-CO')}. Debe ser un entero >= 0.`;
       }
     } else {
-      const val = parseFloat(document.getElementById(`sub_${d}`).value);
+      const raw = document.getElementById(`sub_${d}`).value;
+      const val = raw === '' ? 0 : parseFloat(raw);
       if (isNaN(val) || val < 0) {
         return `Total inválido para $ ${d.toLocaleString('es-CO')}. Debe ser >= 0.`;
       }
@@ -326,14 +400,16 @@ function validarFormulario() {
   }
 
   for (const id of ['total_monedas', 'billetes_viejos', 'venta_practisistemas']) {
-    const val = document.getElementById(id).value;
-    if (val === '' || isNaN(Number(val)) || Number(val) < 0) {
+    const raw = document.getElementById(id).value;
+    const val = raw === '' ? 0 : Number(raw);
+    if (isNaN(val) || val < 0) {
       return `Valor inválido en "${id.replace(/_/g, ' ')}". Debe ser >= 0.`;
     }
   }
 
-  const vd = document.getElementById('venta_deportivas').value;
-  if (vd === '' || isNaN(Number(vd))) return 'Valor inválido en "venta deportivas".';
+  const vdRaw = document.getElementById('venta_deportivas').value;
+  const vd = vdRaw === '' ? 0 : Number(vdRaw);
+  if (isNaN(vd)) return 'Valor inválido en "venta deportivas".';
 
   return null;
 }
@@ -399,13 +475,17 @@ async function guardar() {
 
 // ─── Limpiar ──────────────────────────────────────────────────────────────────
 
-function limpiar() {
+function limpiarCampos() {
   DENOMINACIONES.forEach(d => {
     document.getElementById(`cant_${d}`).value = '';
     document.getElementById(`sub_${d}`).value  = '';
   });
   ['total_monedas', 'billetes_viejos', 'venta_practisistemas', 'venta_deportivas']
     .forEach(id => { document.getElementById(id).value = ''; });
+}
+
+function limpiar() {
+  limpiarCampos();
   calcular();
   ocultarMensaje();
 }
@@ -436,6 +516,7 @@ async function init() {
     configDefaultDate = settings.default_date || 'today';
     configModoEntrada = settings.modo_entrada  || 'cantidad';
     configSede = settings.sede || 'Principal';
+    configDataDir = settings.data_dir || '';
   } catch { /* usar defaults */ }
 
   aplicarModoEntrada();
@@ -444,12 +525,24 @@ async function init() {
   document.getElementById('fecha').value = fd;
   verificarFecha(fd);
 
-  // Inputs de cálculo
-  document.querySelectorAll('.input-billete').forEach(inp =>
-    inp.addEventListener('input', calcular)
-  );
+  // Inputs de cálculo + Enter para avanzar
+  document.querySelectorAll('.input-billete').forEach(inp => {
+    inp.addEventListener('input', calcular);
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !inp.readOnly) {
+        e.preventDefault();
+        moverAlSiguiente(inp);
+      }
+    });
+  });
   ['total_monedas', 'billetes_viejos', 'venta_practisistemas', 'venta_deportivas']
-    .forEach(id => document.getElementById(id).addEventListener('input', calcular));
+    .forEach(id => {
+      const el = document.getElementById(id);
+      el.addEventListener('input', calcular);
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); moverAlSiguiente(el); }
+      });
+    });
 
   // Cambio manual de fecha
   document.getElementById('fecha').addEventListener('change', e => {
@@ -470,9 +563,12 @@ async function init() {
   document.getElementById('btn-admin-cerrar').addEventListener('click', cerrarAdmin);
   document.getElementById('btn-admin-ingresar').addEventListener('click', ingresarAdmin);
   document.getElementById('btn-admin-guardar').addEventListener('click', guardarAdmin);
+  document.getElementById('btn-admin-buscar-carpeta').addEventListener('click', buscarCarpetaExcel);
+  document.getElementById('btn-admin-buscar-excel').addEventListener('click', buscarDesdeExcel);
   document.getElementById('admin-pass').addEventListener('keydown', e => {
     if (e.key === 'Enter') ingresarAdmin();
   });
+  document.getElementById('admin-data-dir').addEventListener('input', actualizarPreviewRutaAdmin);
 
   // Modal corrección
   document.getElementById('btn-editar-ok').addEventListener('click', confirmarEdicion);
@@ -490,6 +586,7 @@ async function init() {
   });
 
   calcular();
+  actualizarPreviewRutaAdmin();
 }
 
 document.addEventListener('DOMContentLoaded', init);

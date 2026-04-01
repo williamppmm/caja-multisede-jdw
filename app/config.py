@@ -9,7 +9,7 @@ BASE_DIR = Path(__file__).parent.parent
 #   DATA_DIR = Path("C:/Users/User/Dropbox/Caja")
 DATA_DIR = BASE_DIR
 
-DENOMINACIONES = [100000, 50000, 20000, 10000, 5000, 2000, 1000]
+DENOMINACIONES = [100000, 50000, 20000, 10000, 5000, 2000]
 
 HOJA_REGISTROS = "RegistrosDiarios"
 
@@ -26,4 +26,8 @@ ENCABEZADOS = [
 
 
 def get_excel_path(year: int) -> Path:
-    return DATA_DIR / f"Caja_{year}.xlsx"
+    from app.services.settings_service import get_settings
+
+    settings = get_settings()
+    data_dir = Path(settings.get("data_dir") or DATA_DIR)
+    return data_dir / f"Caja_{year}.xlsx"

@@ -155,6 +155,15 @@
           <span class="campo-config-label">Sede / nombre de hoja en Excel</span>
           <input type="text" id="admin-sede" placeholder="Ej: Barbacoas" maxlength="31" />
         </div>
+        <div class="campo-config">
+          <span class="campo-config-label">Carpeta compartida de Excel</span>
+          <input type="text" id="admin-data-dir" placeholder="Ej: C:\\Users\\Usuario\\Dropbox\\Contabilidad\\Caja" />
+          <div class="acciones-modal acciones-modal-config">
+            <button id="btn-admin-buscar-carpeta" class="btn btn-secondary" type="button">Elegir carpeta</button>
+            <button id="btn-admin-buscar-excel" class="btn btn-secondary" type="button">Tomar desde .xlsx</button>
+          </div>
+          <p class="modal-desc">La app usará en esa carpeta archivos anuales como <strong id="admin-excel-preview">Caja_2026.xlsx</strong>.</p>
+        </div>
         <p id="admin-config-msg" class="config-msg oculto"></p>
         <div class="acciones-modal">
           <button id="btn-admin-guardar" class="btn btn-primary">Guardar</button>

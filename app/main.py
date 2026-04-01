@@ -68,3 +68,21 @@ def get_settings():
 def post_settings(body: dict):
     settings_service.save_settings(body)
     return {"ok": True}
+
+
+@app.post("/api/settings/browse-folder")
+def browse_folder():
+    settings = settings_service.get_settings()
+    selected = settings_service.select_directory_dialog(settings.get("data_dir"))
+    if not selected:
+        return {"ok": False, "cancelled": True}
+    return {"ok": True, "data_dir": selected}
+
+
+@app.post("/api/settings/browse-excel")
+def browse_excel():
+    settings = settings_service.get_settings()
+    selected = settings_service.select_excel_file_dialog(settings.get("data_dir"))
+    if not selected:
+        return {"ok": False, "cancelled": True}
+    return {"ok": True, "data_dir": selected}
