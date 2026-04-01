@@ -59,6 +59,17 @@ function actualizarPreviewRutaAdmin() {
   preview.textContent = dir ? `${dir}\\${previewExcelAnual()}` : previewExcelAnual();
 }
 
+function actualizarEstadoDeportivas() {
+  const input = document.getElementById('venta_deportivas');
+  const resumenItem = document.getElementById('resumen-deportivas')?.closest('.resumen-informativo');
+  if (!input || !resumenItem) return;
+
+  const valor = parseFloat(input.value);
+  const esNegativo = !isNaN(valor) && valor < 0;
+  input.classList.toggle('valor-negativo', esNegativo);
+  resumenItem.classList.toggle('negativo', esNegativo);
+}
+
 // ─── Tabla de billetes ────────────────────────────────────────────────────────
 
 function buildTablaBilletes() {
@@ -139,6 +150,7 @@ function calcular() {
   document.getElementById('resumen-total').textContent          = fmt(totalCaja);
   document.getElementById('resumen-practisistemas').textContent = fmt(practi);
   document.getElementById('resumen-deportivas').textContent     = fmt(deport);
+  actualizarEstadoDeportivas();
 }
 
 // ─── Verificar fecha ──────────────────────────────────────────────────────────
@@ -375,6 +387,29 @@ async function buscarDesdeExcel() {
   }
 }
 
+async function cerrarAplicacion() {
+  const confirmar = window.confirm('La capturadora se cerrará en este equipo. ¿Desea finalizar ahora?');
+  if (!confirmar) return;
+
+  const msg = document.getElementById('admin-config-msg');
+  const msgPrincipal = document.getElementById('mensaje');
+  try {
+    await fetch('/api/app/shutdown', { method: 'POST' });
+    msg.textContent = 'La aplicación se está cerrando.';
+    msg.className   = 'config-msg ok';
+    msg.classList.remove('oculto');
+    msgPrincipal.textContent = 'La aplicación se está cerrando...';
+    msgPrincipal.className = 'mensaje ok';
+    setTimeout(() => { window.close(); }, 300);
+  } catch {
+    msg.textContent = 'No se pudo cerrar la aplicación desde la interfaz.';
+    msg.className   = 'config-msg error';
+    msg.classList.remove('oculto');
+    msgPrincipal.textContent = 'No se pudo cerrar la aplicación desde la interfaz.';
+    msgPrincipal.className = 'mensaje error';
+  }
+}
+
 // ─── Validación ───────────────────────────────────────────────────────────────
 
 function validarFormulario() {
@@ -555,6 +590,7 @@ async function init() {
   document.getElementById('btn-guardar').addEventListener('click', guardar);
   document.getElementById('btn-limpiar').addEventListener('click', limpiar);
   document.getElementById('btn-ultima').addEventListener('click', ultimoRegistro);
+  document.getElementById('btn-finalizar').addEventListener('click', cerrarAplicacion);
   document.getElementById('btn-cancelar-edicion').addEventListener('click', cancelarEdicion);
 
   // Admin

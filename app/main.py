@@ -3,14 +3,17 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
 from datetime import date
+import os
+import threading
 
 from app.models.caja_models import CajaEntrada, CajaRespuesta
+from app.runtime_paths import get_web_dir
 from app.services import caja_service, excel_service
 from app.services import settings_service
 
 app = FastAPI(title="Caja Diaria")
 
-WEB_DIR = Path(__file__).parent.parent / "web"
+WEB_DIR = get_web_dir()
 app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 
 
@@ -86,3 +89,9 @@ def browse_excel():
     if not selected:
         return {"ok": False, "cancelled": True}
     return {"ok": True, "data_dir": selected}
+
+
+@app.post("/api/app/shutdown")
+def shutdown_app():
+    threading.Timer(0.3, os._exit, args=(0,)).start()
+    return {"ok": True}

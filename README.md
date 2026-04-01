@@ -58,6 +58,37 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+## Instalación rápida en Windows
+
+Si prefieres dejar el equipo listo con doble clic:
+
+1. Descargar o clonar este proyecto en una carpeta local.
+2. Ejecutar `Instalar Caja.bat`.
+3. El instalador:
+   crea `.venv`,
+   instala dependencias,
+   y crea un acceso directo `Iniciar Caja` en el escritorio.
+
+También puedes ejecutar directamente `scripts/install_windows.ps1` desde PowerShell.
+
+## Opción recomendada para usuarios finales: EXE
+
+Si el equipo no tiene Python y quieres evitar instalaciones manuales, la mejor opción es distribuir un ejecutable.
+
+Flujo recomendado:
+
+1. En un equipo de preparación, ejecutar `Instalar Caja.bat`.
+2. Luego ejecutar `Construir EXE.bat`.
+3. El ejecutable quedará en:
+
+```text
+dist\CajaJDW.exe
+```
+
+Ese archivo puede copiarse a otros equipos Windows para iniciar la capturadora sin instalar Python manualmente.
+
+Al abrir el `.exe`, la aplicación levanta el servidor local y abre la interfaz en el navegador.
+
 ## Ejecución local
 
 Iniciar el servidor:
@@ -71,6 +102,8 @@ Abrir en el navegador:
 ```text
 http://localhost:8000
 ```
+
+En Windows, después de instalar, también puedes usar `Iniciar Caja.bat`.
 
 ## Configuración inicial por equipo
 
@@ -147,8 +180,10 @@ Actualmente la aplicación ya permite:
 - configurar la carpeta compartida del Excel
 - trabajar con libros anuales por año
 
-## Próximos pasos sugeridos
+## Archivos de apoyo para Windows
 
-- crear script de instalación para Windows
-- generar archivo `.bat` para iniciar la app con doble clic
-- crear acceso directo de escritorio para la capturadora
+- `Instalar Caja.bat`: ejecuta el instalador con doble clic
+- `Iniciar Caja.bat`: abre la capturadora local
+- `Construir EXE.bat`: genera el ejecutable para distribución
+- `scripts/install_windows.ps1`: instalador en PowerShell
+- `scripts/build_windows_exe.ps1`: construye el `.exe` con PyInstaller
