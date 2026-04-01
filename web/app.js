@@ -1,6 +1,6 @@
 // ─── Constantes y estado ──────────────────────────────────────────────────────
 
-const DENOMINACIONES = [100000, 50000, 20000, 10000, 5000, 2000, 1000];
+const DENOMINACIONES = [100000, 50000, 20000, 10000, 5000, 2000];
 const CONTRASENA = '1980';
 
 let modoEdicion        = false;
