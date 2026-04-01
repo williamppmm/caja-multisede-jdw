@@ -1,6 +1,12 @@
-from pydantic import BaseModel, field_validator, model_validator
-from typing import Dict
 from datetime import date
+from typing import Dict, List
+
+from pydantic import BaseModel, field_validator
+
+
+class ConceptoValorItem(BaseModel):
+    concepto: str = ""
+    valor: float = 0
 
 
 class CajaEntrada(BaseModel):
@@ -16,6 +22,7 @@ class CajaEntrada(BaseModel):
     @classmethod
     def validar_billetes(cls, v):
         from app.config import DENOMINACIONES
+
         permitidas = {str(d) for d in DENOMINACIONES}
         for denom, cantidad in v.items():
             if denom not in permitidas:
@@ -32,10 +39,58 @@ class CajaEntrada(BaseModel):
         return v
 
 
+class ModuloItemsEntrada(BaseModel):
+    fecha: date
+    items: List[ConceptoValorItem] = []
+    forzar: bool = False
+
+
+class BonoEntrada(BaseModel):
+    fecha: date
+    cliente: str
+    valor: float
+    forzar: bool = False
+
+    @field_validator("cliente")
+    @classmethod
+    def validar_cliente(cls, v):
+        texto = str(v or "").strip()
+        if not texto:
+            raise ValueError("El nombre del cliente es obligatorio")
+        return texto
+
+    @field_validator("valor")
+    @classmethod
+    def validar_valor(cls, v):
+        if v <= 0:
+            raise ValueError("El valor del bono debe ser mayor que cero")
+        return v
+
+
 class CajaRespuesta(BaseModel):
     ok: bool
     mensaje: str
     fecha: str = ""
     total_billetes: float = 0
     total_caja_fisica: float = 0
+    fecha_hora_registro: str = ""
+
+
+class ModuloItemsRespuesta(BaseModel):
+    ok: bool
+    mensaje: str
+    fecha: str = ""
+    total: float = 0
+    cantidad_items: int = 0
+    fecha_hora_registro: str = ""
+
+
+class BonoRespuesta(BaseModel):
+    ok: bool
+    mensaje: str
+    fecha: str = ""
+    hora: str = ""
+    cliente: str = ""
+    valor: float = 0
+    total_dia: float = 0
     fecha_hora_registro: str = ""

@@ -17,6 +17,7 @@ dist/
 
 # Local data and settings
 settings.json
+bonos_clientes.json
 *.xlsx
 ~$*.xlsx
 *.lock

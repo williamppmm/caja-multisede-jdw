@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from app.runtime_paths import get_base_dir
 
@@ -26,9 +27,19 @@ ENCABEZADOS = [
 ]
 
 
+def normalizar_sede_archivo(sede: str | None) -> str:
+    raw = re.sub(r"\s+", "_", str(sede or "").strip())
+    raw = re.sub(r'[<>:"/\\|?*]+', "", raw)
+    return raw or "Principal"
+
+
+def get_excel_filename(year: int, sede: str | None = None) -> str:
+    return f"Contadores_{normalizar_sede_archivo(sede)}_{year}.xlsx"
+
+
 def get_excel_path(year: int) -> Path:
     from app.services.settings_service import get_settings
 
     settings = get_settings()
     data_dir = Path(settings.get("data_dir") or DATA_DIR)
-    return data_dir / f"Caja_{year}.xlsx"
+    return data_dir / get_excel_filename(year, settings.get("sede"))

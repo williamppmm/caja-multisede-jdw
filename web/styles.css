@@ -237,6 +237,10 @@ input[type="number"]::-webkit-outer-spin-button {
   gap: 10px 24px;
 }
 
+.resumen-grid-simple {
+  grid-template-columns: 1fr;
+}
+
 .resumen-item {
   display: flex;
   justify-content: space-between;
@@ -301,6 +305,124 @@ input[type="number"]::-webkit-outer-spin-button {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.acciones-ayuda {
+  width: 100%;
+  margin: 4px 0 0;
+  color: #5c6784;
+  font-size: 0.95rem;
+}
+
+.tabs-modulo {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tab-modulo {
+  border: 1px solid #c7d3ec;
+  background: #f4f7ff;
+  color: #2F5496;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab-modulo.activo {
+  background: #2F5496;
+  color: #fff;
+  border-color: #2F5496;
+}
+
+.modulo-panel {
+  display: block;
+}
+
+.modulo-ayuda {
+  color: #5c6784;
+  font-size: 0.92rem;
+  margin-bottom: 12px;
+}
+
+.bonos-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.bonos-meta-item {
+  padding: 10px 12px;
+  background: #f7f9ff;
+  border-radius: 6px;
+}
+
+.bonos-meta-label {
+  display: block;
+  font-size: 0.8rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bonos-meta-value {
+  display: block;
+  margin-top: 4px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #2F5496;
+}
+
+.bonos-form {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 12px;
+}
+
+.bonos-cliente input {
+  text-align: left;
+}
+
+.bonos-acciones {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.bonos-listado-wrap {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.bonos-tabla {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.bonos-tabla th,
+.bonos-tabla td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.bonos-tabla th {
+  text-align: left;
+  color: #2F5496;
+  font-size: 0.85rem;
+}
+
+.bonos-tabla td:last-child,
+.bonos-tabla th:last-child {
+  text-align: right;
+}
+
+.bonos-vacio {
+  color: #6b7280;
+  text-align: center !important;
 }
 
 .btn {
@@ -384,6 +506,42 @@ input[type="number"]::-webkit-outer-spin-button {
   background: #fffbea;
   color: #7d6608;
   border-left: 4px solid #f1c40f;
+}
+
+/* Gastos */
+.gasto-fila {
+  display: grid;
+  grid-template-columns: 1fr 140px;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.gasto-fila input[type="text"] {
+  padding: 6px 10px;
+  border: 1px solid #bbb;
+  border-radius: 5px;
+  font-size: 0.93rem;
+}
+
+.gasto-fila input[type="number"] {
+  padding: 6px 10px;
+  border: 1px solid #bbb;
+  border-radius: 5px;
+  font-size: 0.93rem;
+  text-align: right;
+  -moz-appearance: textfield;
+}
+
+.gasto-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 2px solid #eee;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #2F5496;
 }
 
 /* Header */
@@ -629,6 +787,15 @@ input[type="number"]::-webkit-outer-spin-button {
   margin-bottom: 14px;
 }
 
+.campo-config input[type="text"],
+.campo-config select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #bbb;
+  border-radius: 5px;
+  font-size: 0.95rem;
+}
+
 .campo-config-label {
   display: block;
   font-size: 0.9rem;
@@ -640,6 +807,20 @@ input[type="number"]::-webkit-outer-spin-button {
 .radio-group {
   display: flex;
   gap: 20px;
+}
+
+.check-group {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.check-group label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.92rem;
 }
 
 .radio-group label {
@@ -673,8 +854,17 @@ input[type="number"]::-webkit-outer-spin-button {
   color: #c0392b;
 }
 
+.modal-admin-wide {
+  max-width: 520px;
+}
+
 @media (max-width: 600px) {
   .resumen-grid { grid-template-columns: 1fr; }
   .grid-manuales { grid-template-columns: 1fr; }
   .resumen-total { grid-column: 1; }
+  .radio-group,
+  .check-group,
+  .tabs-modulo { flex-direction: column; }
+  .bonos-meta,
+  .bonos-form { grid-template-columns: 1fr; }
 }

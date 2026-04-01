@@ -1,14 +1,17 @@
-from datetime import datetime
+from datetime import date, datetime
+
 from app.config import DENOMINACIONES
-from app.models.caja_models import CajaEntrada
+from app.models.caja_models import CajaEntrada, ModuloItemsEntrada
 from app.services import excel_service
 
 
-def construir_filas(entrada: CajaEntrada, timestamp: datetime) -> tuple[list, float, float]:
-    """
-    Devuelve (filas, total_billetes, total_caja_fisica).
-    Cada fila es una lista lista para ws.append().
-    """
+ROW_TYPES = {
+    "gastos": "gasto",
+    "bonos": "bono",
+}
+
+
+def construir_filas_caja(entrada: CajaEntrada, timestamp: datetime) -> tuple[list, float, float]:
     fecha = entrada.fecha
     filas = []
 
@@ -28,43 +31,50 @@ def construir_filas(entrada: CajaEntrada, timestamp: datetime) -> tuple[list, fl
             timestamp,
         ])
 
-    # Manuales
     filas.append([fecha, "manual", "Total monedas", 0, 0, 0, entrada.total_monedas, timestamp])
     filas.append([fecha, "manual", "Billetes viejos", 0, 0, 0, entrada.billetes_viejos, timestamp])
-
-    # Informativos
     filas.append([fecha, "informativo", "Venta Practisistemas", 0, 0, 0, entrada.venta_practisistemas, timestamp])
     filas.append([fecha, "informativo", "Venta Deportivas", 0, 0, 0, entrada.venta_deportivas, timestamp])
 
-    # Resumen
     total_caja_fisica = total_billetes + entrada.total_monedas + entrada.billetes_viejos
     filas.append([fecha, "resumen", "Total caja fisica", 0, 0, 0, total_caja_fisica, timestamp])
-
     return filas, total_billetes, total_caja_fisica
+
+
+def construir_filas_items(modulo: str, entrada: ModuloItemsEntrada, timestamp: datetime) -> tuple[list, float, int]:
+    row_type = ROW_TYPES[modulo]
+    filas = []
+    total = 0.0
+    cantidad = 0
+    for item in entrada.items:
+        concepto = item.concepto.strip()
+        valor = item.valor
+        if not concepto or valor == 0:
+            continue
+        filas.append([entrada.fecha, row_type, concepto, 0, 0, 0, valor, timestamp])
+        total += valor
+        cantidad += 1
+    return filas, total, cantidad
 
 
 def guardar_caja(entrada: CajaEntrada) -> dict:
     year = entrada.fecha.year
 
     try:
-        if excel_service.fecha_existe(entrada.fecha, year):
+        if excel_service.fecha_existe_modulo("caja", entrada.fecha, year):
             if not entrada.forzar:
                 return {
                     "ok": False,
-                    "mensaje": f"Ya existe un registro para {entrada.fecha}.",
+                    "mensaje": f"Ya existe un registro de caja para {entrada.fecha}.",
                     "fecha": str(entrada.fecha),
                 }
-            excel_service.eliminar_fecha(entrada.fecha, year)
+            excel_service.eliminar_fecha_modulo("caja", entrada.fecha, year)
 
         timestamp = datetime.now().replace(microsecond=0)
-        filas, total_billetes, total_caja_fisica = construir_filas(entrada, timestamp)
-        excel_service.guardar_filas(filas, year)
+        filas, total_billetes, total_caja_fisica = construir_filas_caja(entrada, timestamp)
+        excel_service.guardar_filas_modulo("caja", filas, year)
     except excel_service.ArchivoCajaOcupadoError as exc:
-        return {
-            "ok": False,
-            "mensaje": str(exc),
-            "fecha": str(entrada.fecha),
-        }
+        return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
     return {
         "ok": True,
@@ -76,8 +86,52 @@ def guardar_caja(entrada: CajaEntrada) -> dict:
     }
 
 
-def consultar_fecha(fecha_str: str) -> dict:
-    from datetime import date
+def guardar_items_modulo(modulo: str, entrada: ModuloItemsEntrada) -> dict:
+    year = entrada.fecha.year
+    hoy = date.today()
+    reemplazar = None
+
+    if modulo not in ROW_TYPES:
+        return {"ok": False, "mensaje": "Modulo no soportado.", "fecha": str(entrada.fecha)}
+
+    if entrada.fecha != hoy and not entrada.forzar:
+        return {
+            "ok": False,
+            "mensaje": f"Solo puedes guardar {modulo} en la fecha actual. Para corregir otra fecha necesitas admin.",
+            "fecha": str(entrada.fecha),
+        }
+
+    if entrada.fecha != hoy and entrada.forzar:
+        reemplazar = entrada.fecha
+
+    try:
+        timestamp = datetime.now().replace(microsecond=0)
+        filas, total, cantidad = construir_filas_items(modulo, entrada, timestamp)
+        excel_service.guardar_filas_modulo(modulo, filas, year, reemplazar_fecha=reemplazar)
+    except excel_service.ArchivoCajaOcupadoError as exc:
+        return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
+
+    nombre = "Gastos" if modulo == "gastos" else "Bonos"
+    accion = "actualizados" if reemplazar else "guardados"
+    return {
+        "ok": True,
+        "mensaje": f"{nombre} {accion} correctamente",
+        "fecha": str(entrada.fecha),
+        "total": total,
+        "cantidad_items": cantidad,
+        "fecha_hora_registro": timestamp.isoformat(),
+    }
+
+
+def consultar_estado_modulo(modulo: str, fecha_str: str) -> dict:
     fecha = date.fromisoformat(fecha_str)
-    existe = excel_service.fecha_existe(fecha, fecha.year)
-    return {"fecha": fecha_str, "existe": existe}
+    existe = excel_service.fecha_existe_modulo(modulo, fecha, fecha.year)
+    requiere_admin = modulo == "caja" and existe
+    if modulo in ROW_TYPES:
+        requiere_admin = fecha != date.today()
+    return {
+        "fecha": fecha_str,
+        "existe": existe,
+        "requiere_admin": requiere_admin,
+        "editable_libre": modulo in ROW_TYPES and fecha == date.today(),
+    }

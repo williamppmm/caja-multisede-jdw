@@ -1,189 +1,159 @@
-# caja-multisede-jdw
+# CajaJDW — Capturadora Multimódulo
 
-Aplicación local para registrar arqueos de caja por sede y guardarlos en un mismo libro anual de Excel compartido.
-
-## Resumen
-
-La interfaz corre en cada equipo de forma local, por ejemplo en `http://localhost:8000`.
-
-Cada computador puede configurarse para:
-
-- usar una sede distinta, como `Barbacoas`, `SanJose` o `Satinga`
-- escribir en una hoja distinta dentro del mismo libro anual
-- apuntar a una carpeta compartida, por ejemplo en Dropbox, donde viven archivos como `Caja_2026.xlsx`, `Caja_2027.xlsx`, etc.
-
-Esto permite que varias sedes alimenten un mismo archivo por año, separadas por hoja, para luego consolidar información con Power Query u otros procesos contables.
+Aplicación local para registrar arqueos de caja, gastos y bonos por sede, guardando un archivo anual independiente por cada sede.
 
 ## Qué hace
 
-- Captura arqueos diarios desde una interfaz web local.
-- Guarda la información en archivos anuales como `Caja_2026.xlsx`, `Caja_2027.xlsx`, etc.
-- Permite configurar desde administración qué hoja del libro alimenta cada equipo.
-- Permite configurar localmente la carpeta compartida donde se guardan o consultan los libros anuales.
-- Si el libro todavía tiene la hoja antigua `RegistrosDiarios`, la app puede migrarla a la hoja configurada para la sede.
-- Muestra un mensaje amigable si el archivo está ocupado al momento de guardar.
+- Captura arqueos diarios de caja desde una interfaz web local.
+- Registra gastos del día en hoja separada por sede.
+- Registra bonos del día en hoja separada por sede.
+- Guarda la información en archivos anuales por sede, como `Contadores_Barbacoas_2026.xlsx`.
+- Soporte multi-sede: cada equipo configura su sede y escribe en su propio libro anual.
+- Configura la carpeta compartida (ej. Dropbox) desde el panel de administración.
+- Migra automáticamente hojas en formato antiguo (`RegistrosDiarios`) al nuevo esquema por sede.
+- Muestra un mensaje claro si el archivo está ocupado al momento de guardar.
+- Modo de ingreso configurable: por cantidad de billetes o por total por denominación.
+- Corrección de registros existentes protegida por contraseña de administrador.
 
 ## Tecnologías
 
-- Python
-- FastAPI
+- Python + FastAPI
 - OpenPyXL
 - Pydantic
-- HTML, CSS y JavaScript
+- HTML, CSS y JavaScript (sin dependencias externas de frontend)
+
+## Estructura del proyecto
+
+```
+app/
+  main.py                  # Punto de entrada FastAPI (factory)
+  config.py                # Constantes y rutas globales
+  runtime_paths.py         # Resolución de rutas (desarrollo / EXE)
+  models/
+    caja_models.py         # Modelos Pydantic de entrada y respuesta
+  routers/
+    modules.py             # Endpoints /api/modulos/* (caja, gastos, bonos)
+    settings.py            # Endpoints /api/settings/* y /api/app/shutdown
+  services/
+    caja_service.py        # Lógica de negocio para caja y módulos de items
+    excel_service.py       # Lectura y escritura de Excel (openpyxl)
+    settings_service.py    # Configuración local y diálogos de archivo
+    bonos_service.py       # Operaciones individuales sobre bonos
+    nombres_service.py     # Registro de nombres de clientes para autocompletar
+web/
+  index.html               # Interfaz principal
+  app.js                   # Lógica de frontend
+  styles.css               # Estilos
+  assets/
+    favicon.ico
+launcher.py                # Arranca el servidor y abre el navegador
+```
 
 ## Requisitos
 
-- Python 3.11 o superior recomendado
-- Acceso a la carpeta compartida donde estarán los archivos Excel
-- Dependencias del proyecto instaladas con `pip`
+- Python 3.11 o superior
+- Acceso a la carpeta compartida donde vivirán los archivos Excel anuales por sede
 
 ## Instalación local
 
-1. Clonar el repositorio o descargarlo como ZIP en una carpeta local del equipo.
-2. Crear entorno virtual:
-
 ```bash
 python -m venv .venv
-```
-
-3. Activar entorno virtual en Windows:
-
-```bash
-.venv\Scripts\activate
-```
-
-4. Instalar dependencias:
-
-```bash
+.venv\Scripts\activate        # Windows
 pip install -r requirements.txt
 ```
 
 ## Instalación rápida en Windows
 
-Si prefieres dejar el equipo listo con doble clic:
-
-1. Descargar o clonar este proyecto en una carpeta local.
-2. Ejecutar `Instalar Caja.bat`.
-3. El instalador:
-   crea `.venv`,
-   instala dependencias,
-   y crea un acceso directo `Iniciar Caja` en el escritorio.
+1. Descargar o clonar el proyecto en una carpeta local.
+2. Ejecutar `Instalar Caja.bat` con doble clic.
+   - Crea `.venv`, instala dependencias y crea el acceso directo `Iniciar Caja` en el escritorio.
 
 También puedes ejecutar directamente `scripts/install_windows.ps1` desde PowerShell.
 
-## Opción recomendada para usuarios finales: EXE
+## Distribuir como EXE (sin Python)
 
-Si el equipo no tiene Python y quieres evitar instalaciones manuales, la mejor opción es distribuir un ejecutable.
-
-Flujo recomendado:
+Para equipos sin Python instalado:
 
 1. En un equipo de preparación, ejecutar `Instalar Caja.bat`.
 2. Luego ejecutar `Construir EXE.bat`.
-3. El ejecutable quedará en:
+3. El ejecutable quedará en `dist\CajaJDW.exe`.
 
-```text
-dist\CajaJDW.exe
-```
+Ese archivo puede copiarse a otros equipos Windows. Al abrirlo levanta el servidor local y abre la interfaz en el navegador.
 
-Ese archivo puede copiarse a otros equipos Windows para iniciar la capturadora sin instalar Python manualmente.
-
-Al abrir el `.exe`, la aplicación levanta el servidor local y abre la interfaz en el navegador.
-
-## Ejecución local
-
-Iniciar el servidor:
+## Ejecución en desarrollo
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-Abrir en el navegador:
-
-```text
-http://localhost:8000
-```
+Abrir en el navegador: `http://localhost:8000`
 
 En Windows, después de instalar, también puedes usar `Iniciar Caja.bat`.
 
 ## Configuración inicial por equipo
 
-Después de abrir la app:
+Después de abrir la app por primera vez:
 
-1. Entrar al menú de administración.
-2. Definir la sede o nombre de hoja que usará ese equipo.
-3. Elegir la carpeta compartida donde viven los archivos anuales de Excel.
+1. Entrar al menú de administración (ícono ⚙ en la esquina superior derecha).
+2. Definir la **sede** que usará ese equipo (ej. `Barbacoas`).
+3. Elegir la carpeta donde se crearán los archivos anuales por sede.
+4. Seleccionar los módulos a habilitar (Caja, Gastos, Bonos).
 
-La configuración local se guarda en `settings.json`.
+La configuración se guarda en `settings.json` localmente en cada equipo.
 
-## Carpeta compartida y archivos anuales
+## Archivos anuales y carpeta compartida
 
-La app no queda amarrada a un archivo fijo.
+La app genera un archivo por año y por sede dentro de la carpeta configurada:
 
-Si en administración configuras una carpeta como:
-
-```text
-C:\Users\Usuario\Dropbox\Contabilidad\Caja
+```
+C:\Users\Usuario\Dropbox\Contabilidad\Caja\
+  Contadores_Barbacoas_2025.xlsx
+  Contadores_Barbacoas_2026.xlsx
+  Contadores_Magui_2026.xlsx
+  ...
 ```
 
-entonces la aplicación usará automáticamente:
-
-- `Caja_2026.xlsx` para registros del año 2026
-- `Caja_2027.xlsx` para registros del año 2027
-- y así sucesivamente
-
-Esto permite conservar el histórico por año sin tener que cambiar la configuración cada enero, siempre que la carpeta siga siendo la misma.
+El año se toma automáticamente de la fecha del registro, por lo que al cambiar de año no se necesita hacer nada.
 
 ## Uso con varias sedes
 
-Ejemplo:
+Cada equipo configura una sede distinta. Todos pueden apuntar a la misma carpeta compartida, pero cada uno escribirá en su propio archivo anual:
 
-- Equipo 1: sede `Barbacoas`
-- Equipo 2: sede `SanJose`
-- Equipo 3: sede `Satinga`
+| Sede        | Archivo anual                          | Hojas internas |
+|-------------|-----------------------------------------|----------------|
+| Barbacoas   | `Contadores_Barbacoas_2026.xlsx`        | `CajaBarbacoas`, `GastosBarbacoas`, `BonosBarbacoas` |
+| SanJose     | `Contadores_SanJose_2026.xlsx`          | `CajaSanJose`, `GastosSanJose`, `BonosSanJose` |
+| Satinga     | `Contadores_Satinga_2026.xlsx`          | `CajaSatinga`, `GastosSatinga`, `BonosSatinga` |
 
-Todos pueden apuntar a la misma carpeta compartida y al mismo archivo anual, pero cada uno escribirá en su propia hoja dentro del libro.
+Esto facilita consolidar información con Power Query u otros procesos contables y reduce conflictos de sincronización entre sedes.
 
-## Recomendación de despliegue
+## Módulos disponibles
 
-Se recomienda:
-
-- dejar el código del proyecto en una carpeta local de cada equipo
-- dejar los archivos Excel en la carpeta compartida de Dropbox
-- no ejecutar el proyecto directamente dentro de la carpeta sincronizada
-
-En otras palabras:
-
-- el programa vive localmente en cada PC
-- el libro Excel vive en la carpeta compartida
+| Módulo   | Descripción                                          | Restricción de fecha            |
+|----------|------------------------------------------------------|---------------------------------|
+| **Caja** | Arqueo de billetes + monedas + ventas informativas   | Requiere admin para corregir    |
+| **Gastos** | Lista de gastos del día con concepto y valor       | Hoy sin restricción; otro día requiere admin |
+| **Bonos**  | Lista de bonos del día con cliente y valor         | Hoy sin restricción; otro día requiere admin |
 
 ## Concurrencia y bloqueos
 
-La app incluye un bloqueo local para evitar guardados simultáneos inmediatos en el mismo equipo o cuando el archivo está momentáneamente ocupado. En esos casos mostrará un mensaje pidiendo volver a intentar.
-
-Aun así, si varios computadores escriben casi exactamente al mismo tiempo sobre un archivo sincronizado por Dropbox, puede existir riesgo de conflicto de sincronización porque no hay un servidor central coordinando escrituras. En operación normal esto debería ser poco frecuente, pero es importante tenerlo presente.
+La app incluye un bloqueo de archivo para evitar guardados simultáneos en el mismo equipo. Al usar un archivo distinto por sede, el riesgo de conflicto por Dropbox baja mucho. Aun así, si dos personas de la misma sede escriben sobre el mismo archivo al mismo tiempo, sigue existiendo posibilidad de conflicto porque no hay un servidor central coordinando escrituras.
 
 ## Archivos que no se versionan
 
-Este repositorio no incluye:
+```
+settings.json
+*.xlsx
+~$*.xlsx          # Archivos temporales de Excel
+bonos_clientes.json
+```
 
-- `settings.json`
-- archivos `*.xlsx`
-- archivos temporales de Excel como `~$Caja_2026.xlsx`
+## Archivos de apoyo en Windows
 
-## Estado actual
-
-Actualmente la aplicación ya permite:
-
-- capturar arqueos
-- editar registros existentes
-- configurar la sede por equipo
-- configurar la carpeta compartida del Excel
-- trabajar con libros anuales por año
-
-## Archivos de apoyo para Windows
-
-- `Instalar Caja.bat`: ejecuta el instalador con doble clic
-- `Iniciar Caja.bat`: abre la capturadora local
-- `Construir EXE.bat`: genera el ejecutable para distribución
-- `scripts/install_windows.ps1`: instalador en PowerShell
-- `scripts/build_windows_exe.ps1`: construye el `.exe` con PyInstaller
+| Archivo                          | Función                                     |
+|----------------------------------|---------------------------------------------|
+| `Instalar Caja.bat`              | Crea el entorno virtual e instala todo      |
+| `Iniciar Caja.bat`               | Abre la capturadora local                   |
+| `Construir EXE.bat`              | Genera `dist\CajaJDW.exe` con PyInstaller   |
+| `scripts/install_windows.ps1`    | Instalador en PowerShell                    |
+| `scripts/build_windows_exe.ps1`  | Construye el EXE con PyInstaller            |

@@ -9,122 +9,211 @@
 </head>
 <body>
   <div class="container">
-
     <div class="header-row">
-      <h1>Arqueo de Caja Diaria</h1>
+      <h1>Capturadora Multimódulo</h1>
       <button id="btn-admin" class="btn-admin-trigger" title="Administración">⚙</button>
     </div>
 
     <div id="banner-edicion" class="banner-edicion oculto">
-      ✏ Modo edición: <strong id="banner-fecha"></strong>
+      <span id="banner-texto">Modo especial activo</span>
       <button id="btn-cancelar-edicion">✕ Cancelar</button>
     </div>
 
-    <!-- Sección A: Fecha + Calendario -->
     <section class="card">
       <h2>Fecha</h2>
       <div class="fecha-row">
-        <label for="fecha">Fecha de la caja:</label>
+        <label for="fecha" id="fecha-label">Fecha del módulo</label>
         <input type="date" id="fecha" name="fecha" required />
         <span id="fecha-estado" class="fecha-estado"></span>
       </div>
     </section>
 
-    <!-- Sección B: Billetes -->
     <section class="card">
-      <h2>Billetes</h2>
-      <table class="tabla-billetes">
-        <thead>
-          <tr>
-            <th>Denominación</th>
-            <th id="th-cantidad">Cantidad</th>
-            <th id="th-subtotal">Subtotal</th>
-          </tr>
-        </thead>
-        <tbody id="tbody-billetes"></tbody>
-        <tfoot>
-          <tr class="fila-total-billetes">
-            <td colspan="2">Total billetes</td>
-            <td id="total-billetes" class="valor-resumen">0</td>
-          </tr>
-        </tfoot>
-      </table>
+      <h2>Módulos</h2>
+      <div id="modulo-tabs" class="tabs-modulo"></div>
     </section>
 
-    <!-- Sección C: Valores manuales -->
-    <section class="card">
-      <h2>Otros valores</h2>
-      <div class="grid-manuales">
-        <div class="campo-manual">
-          <label for="total_monedas">Total monedas</label>
-          <input type="number" id="total_monedas" min="0" placeholder="0" />
-        </div>
-        <div class="campo-manual">
-          <label for="billetes_viejos">Billetes viejos</label>
-          <input type="number" id="billetes_viejos" min="0" placeholder="0" />
-        </div>
-      </div>
-      <div class="separador-informativo">
-        <span class="etiqueta-informativo">Informativos (no suman a caja física)</span>
+    <section id="panel-caja" class="modulo-panel">
+      <section class="card">
+        <h2>Billetes</h2>
+        <table class="tabla-billetes">
+          <thead>
+            <tr>
+              <th>Denominación</th>
+              <th id="th-cantidad">Cantidad</th>
+              <th id="th-subtotal">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-billetes"></tbody>
+          <tfoot>
+            <tr class="fila-total-billetes">
+              <td colspan="2">Total billetes</td>
+              <td id="total-billetes" class="valor-resumen">0</td>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>Otros valores</h2>
         <div class="grid-manuales">
-          <div class="campo-manual informativo">
-            <label for="venta_practisistemas">Venta Practisistemas</label>
-            <input type="number" id="venta_practisistemas" min="0" placeholder="0" />
+          <div class="campo-manual">
+            <label for="total_monedas">Total monedas</label>
+            <input type="number" id="total_monedas" min="0" placeholder="0" />
           </div>
-          <div class="campo-manual informativo">
-            <label for="venta_deportivas">Venta Deportivas</label>
-            <input type="number" id="venta_deportivas" placeholder="0" />
+          <div class="campo-manual">
+            <label for="billetes_viejos">Billetes viejos</label>
+            <input type="number" id="billetes_viejos" min="0" placeholder="0" />
           </div>
         </div>
-      </div>
+        <div class="separador-informativo">
+          <span class="etiqueta-informativo">Informativos (no suman a caja física)</span>
+          <div class="grid-manuales">
+            <div class="campo-manual informativo">
+              <label for="venta_practisistemas">Venta Practisistemas</label>
+              <input type="number" id="venta_practisistemas" min="0" placeholder="0" />
+            </div>
+            <div class="campo-manual informativo">
+              <label for="venta_deportivas">Venta Deportivas</label>
+              <input type="number" id="venta_deportivas" placeholder="0" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card card-resumen">
+        <h2>Resumen Caja</h2>
+        <div class="resumen-grid">
+          <div class="resumen-item">
+            <span class="resumen-label">Total billetes</span>
+            <span id="resumen-billetes" class="resumen-valor">$ 0</span>
+          </div>
+          <div class="resumen-item">
+            <span class="resumen-label">Total monedas</span>
+            <span id="resumen-monedas" class="resumen-valor">$ 0</span>
+          </div>
+          <div class="resumen-item">
+            <span class="resumen-label">Billetes viejos</span>
+            <span id="resumen-viejos" class="resumen-valor">$ 0</span>
+          </div>
+          <div class="resumen-item resumen-total">
+            <span class="resumen-label">TOTAL CAJA FÍSICA</span>
+            <span id="resumen-total" class="resumen-valor">$ 0</span>
+          </div>
+          <div class="resumen-item resumen-informativo">
+            <span class="resumen-label">Venta Practisistemas</span>
+            <span id="resumen-practisistemas" class="resumen-valor">$ 0</span>
+          </div>
+          <div class="resumen-item resumen-informativo">
+            <span class="resumen-label">Venta Deportivas</span>
+            <span id="resumen-deportivas" class="resumen-valor">$ 0</span>
+          </div>
+        </div>
+      </section>
     </section>
 
-    <!-- Sección D: Resumen -->
-    <section class="card card-resumen">
-      <h2>Resumen</h2>
-      <div class="resumen-grid">
-        <div class="resumen-item">
-          <span class="resumen-label">Total billetes</span>
-          <span id="resumen-billetes" class="resumen-valor">$ 0</span>
+    <section id="panel-gastos" class="modulo-panel oculto">
+      <section class="card">
+        <h2>Gastos del día</h2>
+        <p class="modulo-ayuda">Puedes registrar varios gastos en el día actual. Para corregir otro día se requiere admin.</p>
+        <div id="lista-gastos"></div>
+        <div class="gasto-total-row">
+          <span>Total gastos</span>
+          <span id="total-gastos">$ 0</span>
         </div>
-        <div class="resumen-item">
-          <span class="resumen-label">Total monedas</span>
-          <span id="resumen-monedas" class="resumen-valor">$ 0</span>
+      </section>
+      <section class="card card-resumen">
+        <h2>Resumen Gastos</h2>
+        <div class="resumen-grid resumen-grid-simple">
+          <div class="resumen-item resumen-total">
+            <span class="resumen-label">TOTAL GASTOS</span>
+            <span id="resumen-gastos" class="resumen-valor">$ 0</span>
+          </div>
         </div>
-        <div class="resumen-item">
-          <span class="resumen-label">Billetes viejos</span>
-          <span id="resumen-viejos" class="resumen-valor">$ 0</span>
-        </div>
-        <div class="resumen-item resumen-total">
-          <span class="resumen-label">TOTAL CAJA FÍSICA</span>
-          <span id="resumen-total" class="resumen-valor">$ 0</span>
-        </div>
-        <div class="resumen-item resumen-informativo">
-          <span class="resumen-label">Venta Practisistemas</span>
-          <span id="resumen-practisistemas" class="resumen-valor">$ 0</span>
-        </div>
-        <div class="resumen-item resumen-informativo">
-          <span class="resumen-label">Venta Deportivas</span>
-          <span id="resumen-deportivas" class="resumen-valor">$ 0</span>
-        </div>
-      </div>
+      </section>
     </section>
 
-    <!-- Sección E: Acciones -->
+    <section id="panel-bonos" class="modulo-panel oculto">
+      <section class="card">
+        <h2>Bonos del día</h2>
+        <p class="modulo-ayuda">Cada bono se registra de inmediato. El último bono del día puede corregirse o eliminarse sin contraseña.</p>
+        <div class="bonos-meta">
+          <div class="bonos-meta-item">
+            <span class="bonos-meta-label">Fecha</span>
+            <span id="bonos-fecha-visual" class="bonos-meta-value">--</span>
+          </div>
+          <div class="bonos-meta-item">
+            <span class="bonos-meta-label">Hora actual</span>
+            <span id="bonos-hora-visual" class="bonos-meta-value">--</span>
+          </div>
+        </div>
+        <div class="bonos-form">
+          <div class="campo-manual bonos-cliente">
+            <label for="bono-cliente">Cliente</label>
+            <input type="text" id="bono-cliente" list="bonos-clientes-lista" autocomplete="off" placeholder="Nombre del cliente" />
+            <datalist id="bonos-clientes-lista"></datalist>
+          </div>
+          <div class="campo-manual bonos-valor">
+            <label for="bono-valor">Valor del bono</label>
+            <input type="number" id="bono-valor" min="0" placeholder="0" />
+          </div>
+        </div>
+        <div class="bonos-acciones">
+          <button id="btn-bono-registrar" class="btn btn-primary" type="button">Registrar</button>
+          <button id="btn-bono-editar-ultimo" class="btn btn-secondary" type="button">Editar último</button>
+          <button id="btn-bono-eliminar-ultimo" class="btn btn-secondary" type="button">Eliminar último</button>
+        </div>
+        <div class="gasto-total-row">
+          <span>Total bonos del día</span>
+          <span id="total-bonos">$ 0</span>
+        </div>
+      </section>
+      <section class="card card-resumen">
+        <h2>Resumen Bonos</h2>
+        <div class="resumen-grid resumen-grid-simple">
+          <div class="resumen-item resumen-total">
+            <span class="resumen-label">TOTAL BONOS</span>
+            <span id="resumen-bonos" class="resumen-valor">$ 0</span>
+          </div>
+        </div>
+      </section>
+      <section class="card">
+        <details id="bonos-detalle-dia" open>
+          <summary>Registros del día</summary>
+          <div class="bonos-listado-wrap">
+            <table class="bonos-tabla">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Hora</th>
+                  <th>Cliente</th>
+                  <th>Valor</th>
+                </tr>
+              </thead>
+              <tbody id="bonos-registros-body">
+                <tr>
+                  <td colspan="4" class="bonos-vacio">Sin registros para esta fecha.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+    </section>
+
     <section class="card card-acciones">
       <button id="btn-guardar" class="btn btn-primary">Guardar</button>
       <button id="btn-limpiar" class="btn btn-secondary">Limpiar</button>
       <button id="btn-ultima" class="btn btn-info">Último registro</button>
       <button id="btn-finalizar" class="btn btn-warn">Finalizar</button>
+      <p class="acciones-ayuda">No olvides usar <strong>Finalizar</strong> cuando termines de revisar.</p>
     </section>
 
     <div id="mensaje" class="mensaje oculto"></div>
-
   </div>
 
-  <!-- Modal: Admin -->
   <div id="modal-admin" class="modal-overlay oculto">
-    <div class="modal">
+    <div class="modal modal-admin-wide">
       <div id="admin-login-section">
         <h3>Administración</h3>
         <div class="campo-manual">
@@ -140,7 +229,7 @@
       <div id="admin-config-section" class="oculto">
         <h3>Configuración</h3>
         <div class="campo-config">
-          <span class="campo-config-label">Fecha por defecto al abrir</span>
+          <span class="campo-config-label">Fecha por defecto para Caja</span>
           <div class="radio-group">
             <label><input type="radio" name="default_date" value="today" /> Hoy</label>
             <label><input type="radio" name="default_date" value="yesterday" /> Día anterior</label>
@@ -154,17 +243,30 @@
           </div>
         </div>
         <div class="campo-config">
-          <span class="campo-config-label">Sede / nombre de hoja en Excel</span>
-          <input type="text" id="admin-sede" placeholder="Ej: Barbacoas" maxlength="31" />
+          <span class="campo-config-label">Módulos habilitados</span>
+          <div class="check-group">
+            <label><input type="checkbox" name="enabled_modules" value="caja" /> Caja</label>
+            <label><input type="checkbox" name="enabled_modules" value="gastos" /> Gastos</label>
+            <label><input type="checkbox" name="enabled_modules" value="bonos" /> Bonos</label>
+          </div>
         </div>
         <div class="campo-config">
-          <span class="campo-config-label">Carpeta compartida de Excel</span>
-          <input type="text" id="admin-data-dir" placeholder="Ej: C:\\Users\\Usuario\\Dropbox\\Contabilidad\\Caja" />
+          <span class="campo-config-label">Módulo por defecto al abrir</span>
+          <select id="admin-default-module"></select>
+        </div>
+        <div class="campo-config">
+          <span class="campo-config-label">Sede</span>
+          <input type="text" id="admin-sede" placeholder="Ej: Barbacoas" maxlength="31" />
+          <p class="modal-desc" id="admin-sheet-preview">Hoja caja: CajaPrincipal</p>
+        </div>
+        <div class="campo-config">
+          <span class="campo-config-label">Carpeta de archivos anuales</span>
+          <input type="text" id="admin-data-dir" placeholder="Ej: C:\\Users\\Usuario\\Dropbox\\Locales_Cajas" />
           <div class="acciones-modal acciones-modal-config">
             <button id="btn-admin-buscar-carpeta" class="btn btn-secondary" type="button">Elegir carpeta</button>
-            <button id="btn-admin-buscar-excel" class="btn btn-secondary" type="button">Tomar desde .xlsx</button>
+            <button id="btn-admin-importar-bonos" class="btn btn-secondary" type="button">Importar clientes bonos (.txt)</button>
           </div>
-          <p class="modal-desc">La app usará en esa carpeta archivos anuales como <strong id="admin-excel-preview">Caja_2026.xlsx</strong>.</p>
+          <p class="modal-desc">La app creará en esa carpeta un archivo anual por sede, por ejemplo <strong id="admin-excel-preview">Contadores_Principal_2026.xlsx</strong>.</p>
         </div>
         <p id="admin-config-msg" class="config-msg oculto"></p>
         <div class="acciones-modal">
@@ -175,11 +277,10 @@
     </div>
   </div>
 
-  <!-- Modal: Editar fecha existente -->
   <div id="modal-editar" class="modal-overlay oculto">
     <div class="modal">
-      <h3>Corrección de arqueo</h3>
-      <p class="modal-desc">El arqueo del <strong id="modal-editar-fecha"></strong> ya fue realizado. Ingrese la contraseña de administrador para corregirlo:</p>
+      <h3 id="modal-editar-titulo">Autorización requerida</h3>
+      <p class="modal-desc" id="modal-editar-desc">Ingrese la contraseña de administrador para continuar.</p>
       <div class="campo-manual">
         <input type="password" id="editar-pass" placeholder="••••" autocomplete="off" />
       </div>
