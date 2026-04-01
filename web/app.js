@@ -1,7 +1,5 @@
 const DENOMINACIONES = [100000, 50000, 20000, 10000, 5000, 2000];
 const CONTRASENA = '1980';
-const MAX_ITEMS = 10;
-
 const MODULE_META = {
   caja: { label: 'Caja', panelId: 'panel-caja', dateLabel: 'Fecha del arqueo', defaultDate: () => configDefaultDate === 'yesterday' ? ayerStr() : hoyStr() },
   gastos: { label: 'Gastos', panelId: 'panel-gastos', dateLabel: 'Fecha de gastos', defaultDate: () => hoyStr() },
@@ -20,13 +18,68 @@ let adminOverride = { caja: false, gastos: false, bonos: false };
 let debounceTimer = null;
 let pendingAdminAction = null;
 let bonusNames = [];
+let expenseConcepts = [];
+let bonusDayItems = [];
+let cajaLocked = false;
+let cajaDrafts = {};
 
 function fmt(n) {
   return '$ ' + Math.round(n).toLocaleString('es-CO');
 }
 
+function limpiarNumeroTexto(valor, allowNegative = false) {
+  const texto = String(valor ?? '').trim();
+  if (!texto) return '';
+  const negativo = allowNegative && texto.startsWith('-');
+  const digitos = texto.replace(/[^\d]/g, '');
+  if (!digitos) return negativo ? '-' : '';
+  return `${negativo ? '-' : ''}${digitos}`;
+}
+
+function formatNumeroTexto(valor, allowNegative = false) {
+  const limpio = limpiarNumeroTexto(valor, allowNegative);
+  if (!limpio || limpio === '-') return limpio;
+  const negativo = limpio.startsWith('-');
+  const digitos = negativo ? limpio.slice(1) : limpio;
+  const normalizado = digitos.replace(/^0+(?=\d)/, '') || '0';
+  const conMiles = normalizado.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${negativo ? '-' : ''}${conMiles}`;
+}
+
+function parseNumeroTexto(valor, allowNegative = false) {
+  const limpio = limpiarNumeroTexto(valor, allowNegative);
+  if (!limpio || limpio === '-') return NaN;
+  return Number(limpio);
+}
+
+function parseNumeroInput(id, allowNegative = false) {
+  return parseNumeroTexto(document.getElementById(id)?.value, allowNegative);
+}
+
+function setNumeroInputValue(id, valor, allowNegative = false) {
+  const input = document.getElementById(id);
+  if (!input) return;
+  input.value = valor === '' || valor === null || typeof valor === 'undefined'
+    ? ''
+    : formatNumeroTexto(valor, allowNegative);
+}
+
+function formatearInputNumerico(input, allowNegative = false, useThousands = true) {
+  if (!input) return;
+  if (!useThousands) {
+    input.value = limpiarNumeroTexto(input.value, allowNegative);
+    return;
+  }
+  input.value = formatNumeroTexto(input.value, allowNegative);
+}
+
+function limpiarFormatoInputNumerico(input, allowNegative = false) {
+  if (!input) return;
+  input.value = limpiarNumeroTexto(input.value, allowNegative);
+}
+
 function parsePositivo(id) {
-  const v = parseFloat(document.getElementById(id).value);
+  const v = parseNumeroInput(id);
   return isNaN(v) || v < 0 ? 0 : v;
 }
 
@@ -96,7 +149,7 @@ function actualizarEstadoDeportivas() {
   const input = document.getElementById('venta_deportivas');
   const resumenItem = document.getElementById('resumen-deportivas')?.closest('.resumen-informativo');
   if (!input || !resumenItem) return;
-  const valor = parseFloat(input.value);
+  const valor = parseNumeroTexto(input.value, true);
   const esNegativo = !isNaN(valor) && valor < 0;
   input.classList.toggle('valor-negativo', esNegativo);
   resumenItem.classList.toggle('negativo', esNegativo);
@@ -118,27 +171,11 @@ function buildTablaBilletes() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>$ ${d.toLocaleString('es-CO')}</td>
-      <td><input type="number" id="cant_${d}" min="0" placeholder="0" step="1" class="input-billete" /></td>
-      <td><input type="number" id="sub_${d}" min="0" placeholder="0" step="${d}" class="input-billete" /></td>
+      <td><input type="text" inputmode="numeric" id="cant_${d}" placeholder="0" class="input-billete" /></td>
+      <td><input type="text" inputmode="numeric" id="sub_${d}" placeholder="0" class="input-billete" /></td>
     `;
     tbody.appendChild(tr);
   });
-}
-
-function buildItemsList(modulo) {
-  const lista = document.getElementById(`lista-${modulo}`);
-  if (!lista) return;
-  lista.innerHTML = '';
-  for (let i = 0; i < MAX_ITEMS; i++) {
-    const row = document.createElement('div');
-    row.className = 'gasto-fila';
-    row.innerHTML = `
-      <input type="text" id="${modulo}_concepto_${i}" placeholder="Descripción" maxlength="80" />
-      <input type="number" id="${modulo}_valor_${i}" placeholder="0" min="0" />
-    `;
-    lista.appendChild(row);
-    document.getElementById(`${modulo}_valor_${i}`).addEventListener('input', () => calcularModuloItems(modulo));
-  }
 }
 
 function camposEditablesBilletes() {
@@ -149,19 +186,40 @@ function camposEditablesBilletes() {
   return [...billetes, ...manuales];
 }
 
+function setCajaEditable(editable) {
+  cajaLocked = !editable;
+  const esCantidad = configModoEntrada === 'cantidad';
+
+  DENOMINACIONES.forEach(d => {
+    const cant = document.getElementById(`cant_${d}`);
+    const sub = document.getElementById(`sub_${d}`);
+    if (!cant || !sub) return;
+
+    cant.readOnly = cajaLocked || !esCantidad;
+    sub.readOnly = cajaLocked || esCantidad;
+    cant.tabIndex = cajaLocked ? -1 : (esCantidad ? 0 : -1);
+    sub.tabIndex = cajaLocked ? -1 : (esCantidad ? -1 : 0);
+    cant.classList.toggle('input-readonly', cajaLocked || !esCantidad);
+    sub.classList.toggle('input-readonly', cajaLocked || esCantidad);
+  });
+
+  ['total_monedas', 'billetes_viejos', 'venta_practisistemas', 'venta_deportivas'].forEach(id => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.readOnly = cajaLocked;
+    input.tabIndex = cajaLocked ? -1 : 0;
+    input.classList.toggle('input-readonly', cajaLocked);
+  });
+}
+
 function aplicarModoEntrada() {
   const esCantidad = configModoEntrada === 'cantidad';
   document.getElementById('th-cantidad').textContent = esCantidad ? 'Cantidad' : 'Cantidad (calc.)';
   document.getElementById('th-subtotal').textContent = esCantidad ? 'Subtotal' : 'Total denominación';
+  setCajaEditable(!cajaLocked);
   DENOMINACIONES.forEach(d => {
-    const cant = document.getElementById(`cant_${d}`);
-    const sub = document.getElementById(`sub_${d}`);
-    cant.readOnly = !esCantidad;
-    sub.readOnly = esCantidad;
-    cant.tabIndex = esCantidad ? 0 : -1;
-    sub.tabIndex = esCantidad ? -1 : 0;
-    cant.classList.toggle('input-readonly', !esCantidad);
-    sub.classList.toggle('input-readonly', esCantidad);
+    formatearInputNumerico(document.getElementById(`cant_${d}`), false, true);
+    formatearInputNumerico(document.getElementById(`sub_${d}`), false, true);
   });
 }
 
@@ -178,23 +236,23 @@ function calcularCaja() {
   let totalBilletes = 0;
   DENOMINACIONES.forEach(d => {
     if (configModoEntrada === 'cantidad') {
-      const cant = parseInt(document.getElementById(`cant_${d}`).value, 10);
+      const cant = parseNumeroInput(`cant_${d}`);
       const c = isNaN(cant) || cant < 0 ? 0 : cant;
       const sub = c * d;
       totalBilletes += sub;
-      document.getElementById(`sub_${d}`).value = sub > 0 ? sub : '';
+      setNumeroInputValue(`sub_${d}`, sub > 0 ? sub : '');
     } else {
-      const sub = parseFloat(document.getElementById(`sub_${d}`).value) || 0;
+      const sub = parseNumeroInput(`sub_${d}`) || 0;
       const cant = sub > 0 ? sub / d : 0;
       totalBilletes += sub;
-      document.getElementById(`cant_${d}`).value = cant > 0 ? (cant % 1 === 0 ? String(cant) : cant.toFixed(2)) : '';
+      setNumeroInputValue(`cant_${d}`, cant > 0 ? Math.round(cant) : '');
     }
   });
 
   const monedas = parsePositivo('total_monedas');
   const viejos = parsePositivo('billetes_viejos');
   const practi = parsePositivo('venta_practisistemas');
-  const deport = parseFloat(document.getElementById('venta_deportivas').value) || 0;
+  const deport = parseNumeroInput('venta_deportivas', true) || 0;
   const totalCaja = totalBilletes + monedas + viejos;
 
   document.getElementById('total-billetes').textContent = fmt(totalBilletes);
@@ -207,13 +265,23 @@ function calcularCaja() {
   actualizarEstadoDeportivas();
 }
 
-function calcularModuloItems(modulo) {
-  let total = 0;
-  for (let i = 0; i < MAX_ITEMS; i++) {
-    total += parseFloat(document.getElementById(`${modulo}_valor_${i}`).value) || 0;
+function renderGastosRegistros(items = [], total = 0) {
+  const tbody = document.getElementById('gastos-registros-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="2" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
+  } else {
+    items.forEach(item => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${item.concepto || ''}</td>
+        <td>${fmt(item.valor || 0)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
   }
-  document.getElementById(`total-${modulo}`).textContent = fmt(total);
-  document.getElementById(`resumen-${modulo}`).textContent = fmt(total);
+  document.getElementById('total-gastos').textContent = fmt(total);
 }
 
 function actualizarBonosVisuales() {
@@ -235,6 +303,17 @@ function renderBonusNames() {
   });
 }
 
+function renderExpenseConcepts() {
+  const list = document.getElementById('gastos-conceptos-lista');
+  if (!list) return;
+  list.innerHTML = '';
+  expenseConcepts.forEach(concepto => {
+    const option = document.createElement('option');
+    option.value = concepto;
+    list.appendChild(option);
+  });
+}
+
 async function cargarBonusNames() {
   try {
     const res = await fetch('/api/modulos/bonos/nombres');
@@ -247,10 +326,30 @@ async function cargarBonusNames() {
   }
 }
 
+async function cargarExpenseConcepts() {
+  try {
+    const res = await fetch('/api/modulos/gastos/conceptos');
+    const data = await res.json();
+    expenseConcepts = data.conceptos || [];
+    renderExpenseConcepts();
+  } catch {
+    expenseConcepts = [];
+    renderExpenseConcepts();
+  }
+}
+
 function limpiarFormularioBonos() {
   const cliente = document.getElementById('bono-cliente');
   const valor = document.getElementById('bono-valor');
   if (cliente) cliente.value = '';
+  if (valor) valor.value = '';
+  actualizarAcumuladoBonoCliente();
+}
+
+function limpiarFormularioGastos() {
+  const concepto = document.getElementById('gasto-concepto');
+  const valor = document.getElementById('gasto-valor');
+  if (concepto) concepto.value = '';
   if (valor) valor.value = '';
 }
 
@@ -262,26 +361,101 @@ function actualizarAccionesBonos() {
   document.getElementById('btn-bono-eliminar-ultimo').disabled = !esHoy || !hayRegistros;
 }
 
+function obtenerAcumuladoClienteBonos(cliente) {
+  const nombre = String(cliente || '').trim().toLocaleLowerCase('es-CO');
+  if (!nombre) return 0;
+  return bonusDayItems.reduce((acc, item) => {
+    const actual = String(item.cliente || '').trim().toLocaleLowerCase('es-CO');
+    return acc + (actual === nombre ? Number(item.valor || 0) : 0);
+  }, 0);
+}
+
+function actualizarAcumuladoBonoCliente() {
+  const hint = document.getElementById('bono-acumulado-hint');
+  const cliente = document.getElementById('bono-cliente')?.value.trim() || '';
+  if (!hint) return;
+  if (!cliente) {
+    hint.textContent = 'Sin bonos previos para este cliente en la fecha actual.';
+    return;
+  }
+  const acumulado = obtenerAcumuladoClienteBonos(cliente);
+  hint.textContent = acumulado > 0
+    ? `Este cliente ya acumula ${fmt(acumulado)} en bonos durante esta fecha.`
+    : 'Sin bonos previos para este cliente en la fecha actual.';
+}
+
+function autocompletarClienteBono() {
+  const input = document.getElementById('bono-cliente');
+  const texto = input?.value.trim() || '';
+  if (!texto) return false;
+
+  const exacta = bonusNames.find(nombre => nombre.toLocaleLowerCase('es-CO') === texto.toLocaleLowerCase('es-CO'));
+  if (exacta) {
+    input.value = exacta;
+    actualizarAcumuladoBonoCliente();
+    return true;
+  }
+
+  const coincidencia = bonusNames.find(nombre => nombre.toLocaleLowerCase('es-CO').startsWith(texto.toLocaleLowerCase('es-CO')));
+  if (!coincidencia) return false;
+
+  input.value = coincidencia;
+  actualizarAcumuladoBonoCliente();
+  return true;
+}
+
+function autocompletarConceptoGasto() {
+  const input = document.getElementById('gasto-concepto');
+  const texto = input?.value.trim() || '';
+  if (!texto) return false;
+
+  const exacta = expenseConcepts.find(concepto => concepto.toLocaleLowerCase('es-CO') === texto.toLocaleLowerCase('es-CO'));
+  if (exacta) {
+    input.value = exacta;
+    return true;
+  }
+
+  const coincidencia = expenseConcepts.find(concepto => concepto.toLocaleLowerCase('es-CO').startsWith(texto.toLocaleLowerCase('es-CO')));
+  if (!coincidencia) return false;
+
+  input.value = coincidencia;
+  return true;
+}
+
 function renderBonosRegistros(items = [], total = 0) {
   const tbody = document.getElementById('bonos-registros-body');
+  bonusDayItems = Array.isArray(items) ? [...items] : [];
   tbody.innerHTML = '';
-  if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
+  if (!bonusDayItems.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
   } else {
-    items.forEach(item => {
+    const acumuladosPorCliente = new Map();
+    const itemsAsc = [...bonusDayItems];
+    itemsAsc.forEach(item => {
+      const cliente = (item.cliente || '').trim();
+      const valor = Number(item.valor || 0);
+      const acumuladoCliente = (acumuladosPorCliente.get(cliente) || 0) + valor;
+      item.acumulado_cliente = acumuladoCliente;
+      acumuladosPorCliente.set(cliente, acumuladoCliente);
+    });
+
+    [...itemsAsc].reverse().forEach(item => {
+      const cliente = (item.cliente || '').trim();
+      const valor = Number(item.valor || 0);
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${item.fecha_display || formatFechaVisual(item.fecha)}</td>
         <td>${item.hora_display || ''}</td>
-        <td>${item.cliente || ''}</td>
-        <td>${fmt(item.valor || 0)}</td>
+        <td>${cliente}</td>
+        <td>${fmt(valor)}</td>
+        <td>${fmt(item.acumulado_cliente || 0)}</td>
       `;
       tbody.appendChild(tr);
     });
   }
   document.getElementById('total-bonos').textContent = fmt(total);
-  document.getElementById('resumen-bonos').textContent = fmt(total);
   actualizarAccionesBonos();
+  actualizarAcumuladoBonoCliente();
 }
 
 async function cargarBonosDelDia(fecha) {
@@ -307,33 +481,6 @@ function validarBono() {
   return null;
 }
 
-function obtenerItemsModulo(modulo) {
-  const items = [];
-  for (let i = 0; i < MAX_ITEMS; i++) {
-    const concepto = document.getElementById(`${modulo}_concepto_${i}`).value.trim();
-    const valor = parseFloat(document.getElementById(`${modulo}_valor_${i}`).value) || 0;
-    if (concepto && valor !== 0) items.push({ concepto, valor });
-  }
-  return items;
-}
-
-function cargarItemsModulo(modulo, items = []) {
-  limpiarModuloItems(modulo);
-  items.slice(0, MAX_ITEMS).forEach((item, i) => {
-    document.getElementById(`${modulo}_concepto_${i}`).value = item.concepto || '';
-    document.getElementById(`${modulo}_valor_${i}`).value = item.valor || '';
-  });
-  calcularModuloItems(modulo);
-}
-
-function limpiarModuloItems(modulo) {
-  for (let i = 0; i < MAX_ITEMS; i++) {
-    document.getElementById(`${modulo}_concepto_${i}`).value = '';
-    document.getElementById(`${modulo}_valor_${i}`).value = '';
-  }
-  calcularModuloItems(modulo);
-}
-
 function limpiarCaja() {
   DENOMINACIONES.forEach(d => {
     document.getElementById(`cant_${d}`).value = '';
@@ -344,13 +491,63 @@ function limpiarCaja() {
   calcularCaja();
 }
 
+function obtenerDraftCajaActual() {
+  const fecha = document.getElementById('fecha')?.value;
+  if (!fecha) return null;
+
+  const billetes = {};
+  DENOMINACIONES.forEach(d => {
+    billetes[String(d)] = {
+      cantidad: document.getElementById(`cant_${d}`).value || '',
+      subtotal: document.getElementById(`sub_${d}`).value || '',
+    };
+  });
+
+  return {
+    billetes,
+    total_monedas: document.getElementById('total_monedas').value || '',
+    billetes_viejos: document.getElementById('billetes_viejos').value || '',
+    venta_practisistemas: document.getElementById('venta_practisistemas').value || '',
+    venta_deportivas: document.getElementById('venta_deportivas').value || '',
+  };
+}
+
+function guardarDraftCaja(fechaOverride = null) {
+  const fecha = fechaOverride || document.getElementById('fecha')?.value;
+  if (!fecha || cajaLocked) return;
+  cajaDrafts[fecha] = obtenerDraftCajaActual();
+}
+
+function eliminarDraftCaja(fecha) {
+  if (!fecha) return;
+  delete cajaDrafts[fecha];
+}
+
+function aplicarDraftCaja(fecha) {
+  const draft = cajaDrafts[fecha];
+  if (!draft) return false;
+
+  DENOMINACIONES.forEach(d => {
+    const item = draft.billetes?.[String(d)] || {};
+    setNumeroInputValue(`cant_${d}`, item.cantidad || '');
+    setNumeroInputValue(`sub_${d}`, item.subtotal || '');
+  });
+  setNumeroInputValue('total_monedas', draft.total_monedas || '');
+  setNumeroInputValue('billetes_viejos', draft.billetes_viejos || '');
+  setNumeroInputValue('venta_practisistemas', draft.venta_practisistemas || '');
+  setNumeroInputValue('venta_deportivas', draft.venta_deportivas || '', true);
+  calcularCaja();
+  return true;
+}
+
 function limpiarModuloActual() {
   if (currentModule === 'caja') {
+    eliminarDraftCaja(document.getElementById('fecha').value);
     limpiarCaja();
   } else if (currentModule === 'bonos') {
     limpiarFormularioBonos();
   } else {
-    limpiarModuloItems(currentModule);
+    limpiarFormularioGastos();
   }
   ocultarMensaje();
 }
@@ -373,7 +570,7 @@ function actualizarPaneles() {
     document.getElementById(meta.panelId).classList.toggle('oculto', modulo !== currentModule);
   });
   document.getElementById('fecha-label').textContent = MODULE_META[currentModule].dateLabel;
-  document.getElementById('btn-guardar').classList.toggle('oculto', currentModule === 'bonos');
+  document.getElementById('btn-guardar').classList.toggle('oculto', ['bonos', 'gastos'].includes(currentModule));
   document.getElementById('btn-guardar').textContent = 'Guardar';
   actualizarBonosVisuales();
 }
@@ -395,6 +592,7 @@ function resetOverride(modulo) {
 }
 
 async function activarModulo(modulo) {
+  if (currentModule === 'caja') guardarDraftCaja();
   currentModule = modulo;
   if (!enabledModules.includes(modulo)) {
     currentModule = enabledModules[0];
@@ -527,6 +725,23 @@ async function autorizarModulo() {
 
 async function cargarDatosCaja(fecha) {
   try {
+    const estadoRes = await fetch(`/api/modulos/caja/fecha/${fecha}/estado`);
+    const estado = estadoRes.ok ? await estadoRes.json() : { existe: false };
+    const mostrarDatos = adminOverride.caja;
+
+    if (estado.existe && !mostrarDatos) {
+      eliminarDraftCaja(fecha);
+      limpiarCaja();
+      setCajaEditable(false);
+      return;
+    }
+
+    setCajaEditable(true);
+    if (!estado.existe) {
+      if (!aplicarDraftCaja(fecha)) limpiarCaja();
+      return;
+    }
+
     const res = await fetch(`/api/modulos/caja/fecha/${fecha}/datos`);
     if (!res.ok) {
       limpiarCaja();
@@ -535,16 +750,17 @@ async function cargarDatosCaja(fecha) {
     const data = await res.json();
     DENOMINACIONES.forEach(d => {
       const cantidad = data.billetes?.[String(d)] ?? 0;
-      document.getElementById(`cant_${d}`).value = cantidad || '';
-      document.getElementById(`sub_${d}`).value = cantidad ? cantidad * d : '';
+      setNumeroInputValue(`cant_${d}`, cantidad || '');
+      setNumeroInputValue(`sub_${d}`, cantidad ? cantidad * d : '');
     });
-    document.getElementById('total_monedas').value = data.total_monedas || '';
-    document.getElementById('billetes_viejos').value = data.billetes_viejos || '';
-    document.getElementById('venta_practisistemas').value = data.venta_practisistemas || '';
-    document.getElementById('venta_deportivas').value = data.venta_deportivas || '';
+    setNumeroInputValue('total_monedas', data.total_monedas || '');
+    setNumeroInputValue('billetes_viejos', data.billetes_viejos || '');
+    setNumeroInputValue('venta_practisistemas', data.venta_practisistemas || '');
+    setNumeroInputValue('venta_deportivas', data.venta_deportivas || '', true);
     calcularCaja();
   } catch {
-    limpiarCaja();
+    if (!aplicarDraftCaja(fecha)) limpiarCaja();
+    setCajaEditable(true);
   }
 }
 
@@ -556,13 +772,13 @@ async function cargarDatosModuloItems(modulo, fecha) {
   try {
     const res = await fetch(`/api/modulos/${modulo}/fecha/${fecha}/datos`);
     if (!res.ok) {
-      limpiarModuloItems(modulo);
+      renderGastosRegistros([], 0);
       return;
     }
     const data = await res.json();
-    cargarItemsModulo(modulo, data.items || []);
+    renderGastosRegistros(data.items || [], data.total || 0);
   } catch {
-    limpiarModuloItems(modulo);
+    renderGastosRegistros([], 0);
   }
 }
 
@@ -583,7 +799,7 @@ async function registrarBono() {
   }
   const fecha = document.getElementById('fecha').value;
   const cliente = document.getElementById('bono-cliente').value.trim();
-  const valor = Number(document.getElementById('bono-valor').value);
+  const valor = parseNumeroInput('bono-valor');
 
   const res = await fetch('/api/modulos/bonos/registrar', {
     method: 'POST',
@@ -606,6 +822,69 @@ async function registrarBono() {
   document.getElementById('bono-cliente').focus();
 }
 
+function validarGasto() {
+  const concepto = document.getElementById('gasto-concepto').value.trim();
+  const valorRaw = document.getElementById('gasto-valor').value;
+  const valor = valorRaw === '' ? 0 : parseNumeroTexto(valorRaw);
+  if (!concepto) return 'Debes ingresar la descripción del gasto.';
+  if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de gasto mayor que cero.';
+  return null;
+}
+
+async function registrarGasto() {
+  const error = validarGasto();
+  if (error) {
+    mostrarMensaje(error, 'error');
+    return;
+  }
+  const fecha = document.getElementById('fecha').value;
+  const concepto = document.getElementById('gasto-concepto').value.trim();
+  const valor = parseNumeroInput('gasto-valor');
+
+  const res = await fetch('/api/modulos/gastos/guardar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha, items: [{ concepto, valor }], forzar: adminOverride.gastos }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    mostrarMensaje(data.mensaje, 'advertencia');
+    return;
+  }
+  limpiarFormularioGastos();
+  expenseConcepts = Array.from(new Set([...expenseConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
+  renderExpenseConcepts();
+  await cargarDatosModuloItems('gastos', fecha);
+  mostrarMensaje(`✓ ${data.mensaje} — ${concepto}: ${fmt(valor)} — Total día: ${fmt(data.total)}`, 'ok');
+  resetOverride('gastos');
+  await verificarFechaActual();
+  document.getElementById('gasto-concepto').focus();
+}
+
+function parseCatalogoTextarea(id) {
+  return (document.getElementById(id)?.value || '')
+    .split(/\r?\n/)
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function setCatalogoTextarea(id, items = []) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.value = (items || []).join('\n');
+}
+
+async function cargarCatalogosAdmin() {
+  const [bonosRes, gastosRes] = await Promise.all([
+    fetch('/api/modulos/catalogos/bonos'),
+    fetch('/api/modulos/catalogos/gastos'),
+  ]);
+  const bonosData = bonosRes.ok ? await bonosRes.json() : { nombres: [] };
+  const gastosData = gastosRes.ok ? await gastosRes.json() : { conceptos: [] };
+  setCatalogoTextarea('admin-bonos-catalogo', bonosData.nombres || []);
+  setCatalogoTextarea('admin-gastos-catalogo', gastosData.conceptos || []);
+}
+
 async function editarUltimoBono() {
   const error = validarBono();
   if (error) {
@@ -614,7 +893,7 @@ async function editarUltimoBono() {
   }
   const fecha = document.getElementById('fecha').value;
   const cliente = document.getElementById('bono-cliente').value.trim();
-  const valor = Number(document.getElementById('bono-valor').value);
+  const valor = parseNumeroInput('bono-valor');
   const confirmar = window.confirm(`Vas a editar el ultimo bono registrado para esta fecha.\n\nCliente: ${cliente}\nValor: ${fmt(valor)}\n\n¿Deseas continuar?`);
   if (!confirmar) return;
   const res = await fetch('/api/modulos/bonos/ultimo/editar', {
@@ -675,13 +954,13 @@ function validarCaja() {
   for (const d of DENOMINACIONES) {
     if (configModoEntrada === 'cantidad') {
       const raw = document.getElementById(`cant_${d}`).value;
-      const val = raw === '' ? 0 : Number(raw);
+      const val = raw === '' ? 0 : parseNumeroTexto(raw);
       if (isNaN(val) || val < 0 || !Number.isInteger(val)) {
         return `Cantidad inválida para $ ${d.toLocaleString('es-CO')}.`;
       }
     } else {
       const raw = document.getElementById(`sub_${d}`).value;
-      const val = raw === '' ? 0 : parseFloat(raw);
+      const val = raw === '' ? 0 : parseNumeroTexto(raw);
       if (isNaN(val) || val < 0) {
         return `Total inválido para $ ${d.toLocaleString('es-CO')}.`;
       }
@@ -693,30 +972,18 @@ function validarCaja() {
 
   for (const id of ['total_monedas', 'billetes_viejos', 'venta_practisistemas']) {
     const raw = document.getElementById(id).value;
-    const val = raw === '' ? 0 : Number(raw);
+    const val = raw === '' ? 0 : parseNumeroTexto(raw);
     if (isNaN(val) || val < 0) return `Valor inválido en ${id.replace(/_/g, ' ')}.`;
   }
 
   const vdRaw = document.getElementById('venta_deportivas').value;
-  const vd = vdRaw === '' ? 0 : Number(vdRaw);
+  const vd = vdRaw === '' ? 0 : parseNumeroTexto(vdRaw, true);
   if (isNaN(vd)) return 'Valor inválido en venta deportivas.';
   return null;
 }
 
 function validarModuloItems(modulo) {
-  let tieneItem = false;
-  for (let i = 0; i < MAX_ITEMS; i++) {
-    const concepto = document.getElementById(`${modulo}_concepto_${i}`).value.trim();
-    const raw = document.getElementById(`${modulo}_valor_${i}`).value;
-    const valor = raw === '' ? 0 : Number(raw);
-    if (raw !== '' && (isNaN(valor) || valor < 0)) {
-      return 'Los valores deben ser números mayores o iguales a cero.';
-    }
-    if (concepto && valor > 0) tieneItem = true;
-  }
-  if (!tieneItem) {
-    return `Debes ingresar al menos un ${MODULE_META[modulo].label.toLowerCase().slice(0, -1)} con valor.`;
-  }
+  if (modulo === 'gastos') return validarGasto();
   return null;
 }
 
@@ -748,9 +1015,9 @@ async function guardar() {
       const billetes = {};
       DENOMINACIONES.forEach(d => {
         if (configModoEntrada === 'cantidad') {
-          billetes[String(d)] = parseInt(document.getElementById(`cant_${d}`).value, 10) || 0;
+          billetes[String(d)] = parseNumeroInput(`cant_${d}`) || 0;
         } else {
-          const sub = parseFloat(document.getElementById(`sub_${d}`).value) || 0;
+          const sub = parseNumeroInput(`sub_${d}`) || 0;
           billetes[String(d)] = Math.round(sub / d);
         }
       });
@@ -764,23 +1031,18 @@ async function guardar() {
           total_monedas: parsePositivo('total_monedas'),
           billetes_viejos: parsePositivo('billetes_viejos'),
           venta_practisistemas: parsePositivo('venta_practisistemas'),
-          venta_deportivas: parseFloat(document.getElementById('venta_deportivas').value) || 0,
+          venta_deportivas: parseNumeroInput('venta_deportivas', true) || 0,
           forzar: adminOverride.caja,
         }),
       });
     } else if (currentModule === 'bonos') {
       await registrarBono();
       return;
+    } else if (currentModule === 'gastos') {
+      await registrarGasto();
+      return;
     } else {
-      res = await fetch(`/api/modulos/${currentModule}/guardar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fecha,
-          items: obtenerItemsModulo(currentModule),
-          forzar: adminOverride[currentModule],
-        }),
-      });
+      throw new Error('Modulo no soportado');
     }
 
     const data = await res.json();
@@ -796,7 +1058,9 @@ async function guardar() {
       resetOverride('caja');
       moduleDates.caja = fecha;
       document.getElementById('fecha').value = fecha;
-      await cargarVistaModulo('caja', fecha);
+      eliminarDraftCaja(fecha);
+      limpiarCaja();
+      setCajaEditable(false);
       mostrarMensaje(`✓ ${data.mensaje} — Total caja física: ${fmt(data.total_caja_fisica)} — ${data.fecha_hora_registro.slice(0, 10)} ${hora12}`, 'ok');
     } else if (currentModule === 'bonos') {
       return;
@@ -886,6 +1150,10 @@ async function ingresarAdmin() {
     actualizarPreviewHojasAdmin();
   } catch { /* defaults */ }
 
+  try {
+    await cargarCatalogosAdmin();
+  } catch { /* ignore */ }
+
   document.getElementById('admin-login-section').classList.add('oculto');
   document.getElementById('admin-config-section').classList.remove('oculto');
 }
@@ -908,12 +1176,24 @@ async function guardarAdmin() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    await fetch('/api/modulos/catalogos/bonos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: parseCatalogoTextarea('admin-bonos-catalogo') }),
+    });
+    await fetch('/api/modulos/catalogos/gastos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: parseCatalogoTextarea('admin-gastos-catalogo') }),
+    });
     configDefaultDate = body.default_date;
     configModoEntrada = body.modo_entrada;
     enabledModules = body.enabled_modules;
     defaultModule = body.default_module;
     configSede = body.sede || 'Principal';
     configDataDir = body.data_dir;
+    await cargarBonusNames();
+    await cargarExpenseConcepts();
 
     enabledModules.forEach(modulo => {
       if (!moduleDates[modulo]) moduleDates[modulo] = sugerirFechaModulo(modulo);
@@ -967,8 +1247,8 @@ async function cerrarAplicacion() {
 
 async function init() {
   buildTablaBilletes();
-  buildItemsList('gastos');
   await cargarBonusNames();
+  await cargarExpenseConcepts();
 
   try {
     const res = await fetch('/api/settings');
@@ -997,7 +1277,12 @@ async function init() {
   await verificarFechaActual();
 
   document.querySelectorAll('.input-billete').forEach(inp => {
+    formatearInputNumerico(inp, false, true);
     inp.addEventListener('input', calcularCaja);
+    inp.addEventListener('input', () => formatearInputNumerico(inp, false, true));
+    inp.addEventListener('focus', () => limpiarFormatoInputNumerico(inp));
+    inp.addEventListener('blur', () => formatearInputNumerico(inp, false, true));
+    inp.addEventListener('input', () => guardarDraftCaja());
     inp.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !inp.readOnly) {
         e.preventDefault();
@@ -1008,7 +1293,12 @@ async function init() {
 
   ['total_monedas', 'billetes_viejos', 'venta_practisistemas', 'venta_deportivas'].forEach(id => {
     const el = document.getElementById(id);
+    formatearInputNumerico(el, id === 'venta_deportivas');
     el.addEventListener('input', calcularCaja);
+    el.addEventListener('input', () => formatearInputNumerico(el, id === 'venta_deportivas'));
+    el.addEventListener('focus', () => limpiarFormatoInputNumerico(el, id === 'venta_deportivas'));
+    el.addEventListener('blur', () => formatearInputNumerico(el, id === 'venta_deportivas'));
+    el.addEventListener('input', () => guardarDraftCaja());
     el.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -1018,6 +1308,8 @@ async function init() {
   });
 
   document.getElementById('fecha').addEventListener('change', e => {
+    const fechaAnterior = moduleDates[currentModule];
+    if (currentModule === 'caja') guardarDraftCaja(fechaAnterior);
     moduleDates[currentModule] = e.target.value;
     if (currentModule !== 'caja') resetOverride(currentModule);
     if (currentModule === 'caja') resetOverride('caja');
@@ -1025,6 +1317,8 @@ async function init() {
       limpiarFormularioBonos();
       actualizarBonosVisuales();
       actualizarAccionesBonos();
+    } else if (currentModule === 'gastos') {
+      limpiarFormularioGastos();
     }
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
@@ -1072,11 +1366,35 @@ async function init() {
   });
 
   document.getElementById('btn-bono-registrar').addEventListener('click', registrarBono);
+  document.getElementById('btn-gasto-registrar').addEventListener('click', registrarGasto);
   document.getElementById('btn-bono-editar-ultimo').addEventListener('click', editarUltimoBono);
   document.getElementById('btn-bono-eliminar-ultimo').addEventListener('click', eliminarUltimoBono);
-  document.getElementById('bono-cliente').addEventListener('keydown', e => {
+  ['bono-valor', 'gasto-valor'].forEach(id => {
+    const el = document.getElementById(id);
+    formatearInputNumerico(el);
+    el.addEventListener('input', () => formatearInputNumerico(el));
+    el.addEventListener('focus', () => limpiarFormatoInputNumerico(el));
+    el.addEventListener('blur', () => formatearInputNumerico(el));
+  });
+  document.getElementById('bono-cliente').addEventListener('input', actualizarAcumuladoBonoCliente);
+  document.getElementById('gasto-concepto').addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      autocompletarConceptoGasto();
+      document.getElementById('gasto-valor').focus();
+      document.getElementById('gasto-valor').select();
+    }
+  });
+  document.getElementById('gasto-valor').addEventListener('keydown', e => {
     if (e.key === 'Enter') {
       e.preventDefault();
+      document.getElementById('btn-gasto-registrar').focus();
+    }
+  });
+  document.getElementById('bono-cliente').addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      autocompletarClienteBono();
       document.getElementById('bono-valor').focus();
       document.getElementById('bono-valor').select();
     }

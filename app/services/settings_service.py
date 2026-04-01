@@ -21,6 +21,9 @@ _DEFAULTS = {
     "default_module": "caja",
 }
 
+_settings_cache: dict | None = None
+_settings_cache_mtime: float | None = None
+
 
 def _normalizar_data_dir(value: str | None) -> str:
     raw = str(value or "").strip()
@@ -29,25 +32,41 @@ def _normalizar_data_dir(value: str | None) -> str:
     return str(Path(raw).expanduser())
 
 
-def get_settings() -> dict:
+def _resolver_settings() -> dict:
     if not SETTINGS_PATH.exists():
         return _DEFAULTS.copy()
+
+    with open(SETTINGS_PATH, encoding="utf-8") as f:
+        data = {**_DEFAULTS, **json.load(f)}
+        if "enabled_modules" not in data:
+            data["enabled_modules"] = ["caja", "gastos"] if data.get("mostrar_gastos") else ["caja"]
+        data["enabled_modules"] = _normalizar_modulos(data.get("enabled_modules"))
+        data["default_module"] = _normalizar_modulo_default(
+            data.get("default_module"),
+            data["enabled_modules"],
+        )
+        return data
+
+
+def get_settings() -> dict:
+    global _settings_cache, _settings_cache_mtime
+
     try:
-        with open(SETTINGS_PATH, encoding="utf-8") as f:
-            data = {**_DEFAULTS, **json.load(f)}
-            if "enabled_modules" not in data:
-                data["enabled_modules"] = ["caja", "gastos"] if data.get("mostrar_gastos") else ["caja"]
-            data["enabled_modules"] = _normalizar_modulos(data.get("enabled_modules"))
-            data["default_module"] = _normalizar_modulo_default(
-                data.get("default_module"),
-                data["enabled_modules"],
-            )
-            return data
+        current_mtime = SETTINGS_PATH.stat().st_mtime if SETTINGS_PATH.exists() else None
+        if _settings_cache is not None and current_mtime == _settings_cache_mtime:
+            return _settings_cache.copy()
+
+        data = _resolver_settings()
+        _settings_cache = data
+        _settings_cache_mtime = current_mtime
+        return data.copy()
     except Exception:
         return _DEFAULTS.copy()
 
 
 def save_settings(data: dict) -> None:
+    global _settings_cache, _settings_cache_mtime
+
     allowed = {"default_date", "modo_entrada", "sede", "data_dir", "enabled_modules", "default_module"}
     cleaned = {k: v for k, v in data.items() if k in allowed}
     if "sede" in cleaned:
@@ -59,6 +78,8 @@ def save_settings(data: dict) -> None:
     cleaned["default_module"] = _normalizar_modulo_default(cleaned.get("default_module"), enabled_modules)
     with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
         json.dump(cleaned, f, indent=2, ensure_ascii=False)
+    _settings_cache = None
+    _settings_cache_mtime = None
 
 
 def _normalizar_modulos(value) -> list[str]:

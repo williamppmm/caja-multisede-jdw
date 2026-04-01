@@ -18,6 +18,7 @@ dist/
 # Local data and settings
 settings.json
 bonos_clientes.json
+gastos_conceptos.json
 *.xlsx
 ~$*.xlsx
 *.lock

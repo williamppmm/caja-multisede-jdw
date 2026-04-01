@@ -75,6 +75,11 @@ def bonos_nombres():
     return {"nombres": nombres_service.obtener_nombres()}
 
 
+@router.get("/gastos/conceptos")
+def gastos_conceptos():
+    return {"conceptos": nombres_service.obtener_catalogo("gastos")}
+
+
 @router.post("/bonos/nombres/importar")
 def importar_nombres_bonos():
     selected = settings_service.select_text_file_dialog(settings_service.get_settings().get("data_dir"))
@@ -82,6 +87,27 @@ def importar_nombres_bonos():
         return {"ok": False, "cancelled": True}
     agregados = nombres_service.importar_desde_txt(selected)
     return {"ok": True, "agregados": agregados}
+
+
+@router.get("/catalogos/{tipo}")
+def obtener_catalogo(tipo: str):
+    if tipo not in {"bonos", "gastos"}:
+        raise HTTPException(status_code=404, detail="Catalogo no soportado")
+    key = "nombres" if tipo == "bonos" else "conceptos"
+    return {key: nombres_service.obtener_catalogo(tipo)}
+
+
+@router.post("/catalogos/{tipo}")
+def guardar_catalogo(tipo: str, body: dict):
+    if tipo not in {"bonos", "gastos"}:
+        raise HTTPException(status_code=404, detail="Catalogo no soportado")
+    items = body.get("items")
+    if not isinstance(items, list):
+        raise HTTPException(status_code=400, detail="El cuerpo debe incluir una lista en 'items'.")
+    nombres_service.guardar_catalogo(tipo, items)
+    key = "nombres" if tipo == "bonos" else "conceptos"
+    resultado = nombres_service.obtener_catalogo(tipo)
+    return {"ok": True, key: resultado, "total": len(resultado)}
 
 
 @router.post("/bonos/ultimo/editar", response_model=BonoRespuesta)

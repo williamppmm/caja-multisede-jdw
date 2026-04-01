@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from app.config import DENOMINACIONES
 from app.models.caja_models import CajaEntrada, ModuloItemsEntrada
-from app.services import excel_service
+from app.services import excel_service, nombres_service
 
 
 ROW_TYPES = {
@@ -61,6 +61,7 @@ def guardar_caja(entrada: CajaEntrada) -> dict:
     year = entrada.fecha.year
 
     try:
+        reemplazar_fecha = None
         if excel_service.fecha_existe_modulo("caja", entrada.fecha, year):
             if not entrada.forzar:
                 return {
@@ -68,11 +69,11 @@ def guardar_caja(entrada: CajaEntrada) -> dict:
                     "mensaje": f"Ya existe un registro de caja para {entrada.fecha}.",
                     "fecha": str(entrada.fecha),
                 }
-            excel_service.eliminar_fecha_modulo("caja", entrada.fecha, year)
+            reemplazar_fecha = entrada.fecha
 
         timestamp = datetime.now().replace(microsecond=0)
         filas, total_billetes, total_caja_fisica = construir_filas_caja(entrada, timestamp)
-        excel_service.guardar_filas_modulo("caja", filas, year)
+        excel_service.guardar_filas_modulo("caja", filas, year, reemplazar_fecha=reemplazar_fecha)
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
@@ -89,7 +90,6 @@ def guardar_caja(entrada: CajaEntrada) -> dict:
 def guardar_items_modulo(modulo: str, entrada: ModuloItemsEntrada) -> dict:
     year = entrada.fecha.year
     hoy = date.today()
-    reemplazar = None
 
     if modulo not in ROW_TYPES:
         return {"ok": False, "mensaje": "Modulo no soportado.", "fecha": str(entrada.fecha)}
@@ -101,21 +101,20 @@ def guardar_items_modulo(modulo: str, entrada: ModuloItemsEntrada) -> dict:
             "fecha": str(entrada.fecha),
         }
 
-    if entrada.fecha != hoy and entrada.forzar:
-        reemplazar = entrada.fecha
-
     try:
         timestamp = datetime.now().replace(microsecond=0)
         filas, total, cantidad = construir_filas_items(modulo, entrada, timestamp)
-        excel_service.guardar_filas_modulo(modulo, filas, year, reemplazar_fecha=reemplazar)
+        excel_service.guardar_filas_modulo(modulo, filas, year)
+        if modulo == "gastos":
+            for item in entrada.items:
+                nombres_service.agregar_item_catalogo("gastos", item.concepto)
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
     nombre = "Gastos" if modulo == "gastos" else "Bonos"
-    accion = "actualizados" if reemplazar else "guardados"
     return {
         "ok": True,
-        "mensaje": f"{nombre} {accion} correctamente",
+        "mensaje": f"{nombre} guardados correctamente",
         "fecha": str(entrada.fecha),
         "total": total,
         "cantidad_items": cantidad,

@@ -6,14 +6,15 @@ Aplicación local para registrar arqueos de caja, gastos y bonos por sede, guard
 
 - Captura arqueos diarios de caja desde una interfaz web local.
 - Registra gastos del día en hoja separada por sede.
-- Registra bonos del día en hoja separada por sede.
-- Guarda la información en archivos anuales por sede, como `Contadores_Barbacoas_2026.xlsx`.
+- Registra bonos del día con nombre de cliente en hoja separada por sede.
+- Guarda la información en archivos anuales por sede: `Contadores_Barbacoas_2026.xlsx`.
 - Soporte multi-sede: cada equipo configura su sede y escribe en su propio libro anual.
 - Configura la carpeta compartida (ej. Dropbox) desde el panel de administración.
 - Migra automáticamente hojas en formato antiguo (`RegistrosDiarios`) al nuevo esquema por sede.
 - Muestra un mensaje claro si el archivo está ocupado al momento de guardar.
 - Modo de ingreso configurable: por cantidad de billetes o por total por denominación.
 - Corrección de registros existentes protegida por contraseña de administrador.
+- Autocompletado de clientes (bonos) y conceptos (gastos) a partir de catálogos locales.
 
 ## Tecnologías
 
@@ -27,7 +28,7 @@ Aplicación local para registrar arqueos de caja, gastos y bonos por sede, guard
 ```
 app/
   main.py                  # Punto de entrada FastAPI (factory)
-  config.py                # Constantes y rutas globales
+  config.py                # Constantes, denominaciones y get_excel_path()
   runtime_paths.py         # Resolución de rutas (desarrollo / EXE)
   models/
     caja_models.py         # Modelos Pydantic de entrada y respuesta
@@ -35,18 +36,19 @@ app/
     modules.py             # Endpoints /api/modulos/* (caja, gastos, bonos)
     settings.py            # Endpoints /api/settings/* y /api/app/shutdown
   services/
-    caja_service.py        # Lógica de negocio para caja y módulos de items
+    caja_service.py        # Lógica de negocio para caja y gastos
     excel_service.py       # Lectura y escritura de Excel (openpyxl)
-    settings_service.py    # Configuración local y diálogos de archivo
+    settings_service.py    # Configuración local y diálogos de carpeta
     bonos_service.py       # Operaciones individuales sobre bonos
-    nombres_service.py     # Registro de nombres de clientes para autocompletar
+    nombres_service.py     # Catálogos locales (clientes y conceptos de gastos)
 web/
   index.html               # Interfaz principal
   app.js                   # Lógica de frontend
   styles.css               # Estilos
   assets/
     favicon.ico
-launcher.py                # Arranca el servidor y abre el navegador
+launcher.py                # Arranca el servidor, detecta puerto libre y abre el navegador
+CajaJDW.spec               # Configuración de PyInstaller para el EXE
 ```
 
 ## Requisitos
@@ -54,7 +56,7 @@ launcher.py                # Arranca el servidor y abre el navegador
 - Python 3.11 o superior
 - Acceso a la carpeta compartida donde vivirán los archivos Excel anuales por sede
 
-## Instalación local
+## Instalación local (desarrollo)
 
 ```bash
 python -m venv .venv
@@ -78,15 +80,23 @@ Para equipos sin Python instalado:
 2. Luego ejecutar `Construir EXE.bat`.
 3. El ejecutable quedará en `dist\CajaJDW.exe`.
 
-Ese archivo puede copiarse a otros equipos Windows. Al abrirlo levanta el servidor local y abre la interfaz en el navegador.
+El EXE:
+- Se construye a partir de `CajaJDW.spec`, que excluye paquetes no utilizados para reducir su tamaño.
+- Al abrirse, levanta el servidor local automáticamente y abre la interfaz en el navegador.
+- No requiere consola ni instalación adicional en el equipo de destino.
+- Detecta automáticamente un puerto libre entre 8000 y 8009 si el predeterminado está ocupado.
 
 ## Ejecución en desarrollo
 
 ```bash
-uvicorn app.main:app --reload
+python launcher.py
 ```
 
-Abrir en el navegador: `http://localhost:8000`
+O con recarga automática:
+
+```bash
+uvicorn app.main:app --reload
+```
 
 En Windows, después de instalar, también puedes usar `Iniciar Caja.bat`.
 
@@ -120,20 +130,31 @@ El año se toma automáticamente de la fecha del registro, por lo que al cambiar
 Cada equipo configura una sede distinta. Todos pueden apuntar a la misma carpeta compartida, pero cada uno escribirá en su propio archivo anual:
 
 | Sede        | Archivo anual                          | Hojas internas |
-|-------------|-----------------------------------------|----------------|
-| Barbacoas   | `Contadores_Barbacoas_2026.xlsx`        | `CajaBarbacoas`, `GastosBarbacoas`, `BonosBarbacoas` |
-| SanJose     | `Contadores_SanJose_2026.xlsx`          | `CajaSanJose`, `GastosSanJose`, `BonosSanJose` |
-| Satinga     | `Contadores_Satinga_2026.xlsx`          | `CajaSatinga`, `GastosSatinga`, `BonosSatinga` |
+|-------------|----------------------------------------|----------------|
+| Barbacoas   | `Contadores_Barbacoas_2026.xlsx`       | `CajaBarbacoas`, `GastosBarbacoas`, `BonosBarbacoas` |
+| SanJose     | `Contadores_SanJose_2026.xlsx`         | `CajaSanJose`, `GastosSanJose`, `BonosSanJose` |
+| Satinga     | `Contadores_Satinga_2026.xlsx`         | `CajaSatinga`, `GastosSatinga`, `BonosSatinga` |
 
 Esto facilita consolidar información con Power Query u otros procesos contables y reduce conflictos de sincronización entre sedes.
 
 ## Módulos disponibles
 
-| Módulo   | Descripción                                          | Restricción de fecha            |
-|----------|------------------------------------------------------|---------------------------------|
-| **Caja** | Arqueo de billetes + monedas + ventas informativas   | Requiere admin para corregir    |
-| **Gastos** | Lista de gastos del día con concepto y valor       | Hoy sin restricción; otro día requiere admin |
-| **Bonos**  | Lista de bonos del día con cliente y valor         | Hoy sin restricción; otro día requiere admin |
+| Módulo     | Descripción                                         | Restricción de fecha                          |
+|------------|-----------------------------------------------------|-----------------------------------------------|
+| **Caja**   | Arqueo de billetes + monedas + ventas informativas  | Requiere admin para corregir una fecha ya guardada |
+| **Gastos** | Lista de gastos del día con concepto y valor        | Hoy sin restricción; otro día requiere admin  |
+| **Bonos**  | Lista de bonos del día con cliente y valor          | Hoy sin restricción; otro día requiere admin  |
+
+## Catálogos locales
+
+La app mantiene dos archivos de autocompletado en el mismo directorio que el EXE (o raíz del proyecto en desarrollo):
+
+| Archivo                | Contenido                          |
+|------------------------|------------------------------------|
+| `bonos_clientes.json`  | Nombres de clientes para bonos     |
+| `gastos_conceptos.json`| Conceptos usados en gastos         |
+
+Estos archivos se actualizan automáticamente al guardar registros y se pueden editar manualmente desde el panel de administración. Son locales a cada equipo (no se comparten por Dropbox).
 
 ## Concurrencia y bloqueos
 
@@ -143,17 +164,20 @@ La app incluye un bloqueo de archivo para evitar guardados simultáneos en el mi
 
 ```
 settings.json
+bonos_clientes.json
+gastos_conceptos.json
 *.xlsx
 ~$*.xlsx          # Archivos temporales de Excel
-bonos_clientes.json
+*.lock
 ```
 
 ## Archivos de apoyo en Windows
 
-| Archivo                          | Función                                     |
-|----------------------------------|---------------------------------------------|
-| `Instalar Caja.bat`              | Crea el entorno virtual e instala todo      |
-| `Iniciar Caja.bat`               | Abre la capturadora local                   |
-| `Construir EXE.bat`              | Genera `dist\CajaJDW.exe` con PyInstaller   |
-| `scripts/install_windows.ps1`    | Instalador en PowerShell                    |
-| `scripts/build_windows_exe.ps1`  | Construye el EXE con PyInstaller            |
+| Archivo                          | Función                                                  |
+|----------------------------------|----------------------------------------------------------|
+| `Instalar Caja.bat`              | Crea el entorno virtual e instala todo                   |
+| `Iniciar Caja.bat`               | Abre la capturadora local (modo desarrollo)              |
+| `Construir EXE.bat`              | Genera `dist\CajaJDW.exe` usando `CajaJDW.spec`          |
+| `scripts/install_windows.ps1`    | Instalador detallado en PowerShell                       |
+| `scripts/build_windows_exe.ps1`  | Construye el EXE con PyInstaller usando el spec          |
+| `CajaJDW.spec`                   | Configuración del EXE: exclusiones, recursos y optimización |

@@ -228,7 +228,7 @@ def _formatear_filas_recientes(ws, cantidad_filas: int) -> None:
     for row_num in range(start_row, last_row + 1):
         ws.cell(row_num, 7).number_format = "#,##0"
         ws.cell(row_num, 1).number_format = "YYYY-MM-DD"
-        ws.cell(row_num, 8).number_format = "YYYY-MM-DD HH:MM:SS"
+        ws.cell(row_num, 8).number_format = "YYYY-MM-DD HH:mm:SS"
 
 
 def _formatear_filas_recientes_bonos(ws, cantidad_filas: int) -> None:
@@ -238,9 +238,9 @@ def _formatear_filas_recientes_bonos(ws, cantidad_filas: int) -> None:
     start_row = last_row - cantidad_filas + 1
     for row_num in range(start_row, last_row + 1):
         ws.cell(row_num, 1).number_format = "DD-MM"
-        ws.cell(row_num, 2).number_format = "HH:MM AM/PM"
+        ws.cell(row_num, 2).number_format = "HH:mm AM/PM"
         ws.cell(row_num, 4).number_format = "#,##0"
-        ws.cell(row_num, 5).number_format = "YYYY-MM-DD HH:MM:SS"
+        ws.cell(row_num, 5).number_format = "YYYY-MM-DD HH:mm:SS"
 
 
 def fecha_existe_modulo(modulo: str, fecha: date, year: int) -> bool:
@@ -443,29 +443,6 @@ def obtener_items_modulo_fecha(modulo: str, fecha: date, year: int) -> dict | No
 
 
 def obtener_ultima_fecha_modulo(modulo: str, year: int):
-    if modulo == "bonos":
-        path = get_excel_path(year)
-        if not path.exists():
-            return None
-
-        wb = load_workbook(path, read_only=True)
-        hojas = _obtener_hojas_para_lectura(wb, modulo)
-        if not hojas:
-            wb.close()
-            return None
-        ultima = None
-        for ws in hojas:
-            for row in ws.iter_rows(min_row=2, values_only=True):
-                if row[0] is None:
-                    continue
-                cell_date = row[0]
-                if isinstance(cell_date, datetime):
-                    cell_date = cell_date.date()
-                if isinstance(cell_date, date) and (ultima is None or cell_date > ultima):
-                    ultima = cell_date
-        wb.close()
-        return ultima
-
     path = get_excel_path(year)
     if not path.exists():
         return None
@@ -479,20 +456,46 @@ def obtener_ultima_fecha_modulo(modulo: str, year: int):
     ultima = None
     for ws in hojas:
         for row in ws.iter_rows(min_row=2, values_only=True):
-            if row[0] is None or not _fila_es_modulo(modulo, row):
+            if row[0] is None:
+                continue
+            if modulo != "bonos" and not _fila_es_modulo(modulo, row):
                 continue
             cell_date = row[0]
             if isinstance(cell_date, datetime):
                 cell_date = cell_date.date()
+            if not isinstance(cell_date, date):
+                continue
             if ultima is None or cell_date > ultima:
                 ultima = cell_date
 
     wb.close()
     return ultima
 
-def guardar_bono_registro(fecha: date, cliente: str, valor: float, timestamp: datetime) -> None:
+def guardar_bono_registro(fecha: date, cliente: str, valor: float, timestamp: datetime) -> float:
     fila = [fecha, timestamp, cliente, valor, timestamp]
-    guardar_filas_modulo("bonos", [fila], fecha.year)
+    path = get_excel_path(fecha.year)
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ws = _asegurar_hoja(wb, "bonos")
+        total_dia = 0.0
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            cell_date = row[0]
+            if isinstance(cell_date, datetime):
+                cell_date = cell_date.date()
+            if isinstance(cell_date, date) and cell_date == fecha:
+                total_dia += float(row[3] or 0)
+
+        ws.append(fila)
+        _formatear_filas_recientes_bonos(ws, 1)
+        try:
+            wb.save(path)
+        except PermissionError as exc:
+            raise ArchivoCajaOcupadoError(
+                "No se pudo guardar porque el libro esta siendo usado por otro proceso. Intenta nuevamente."
+            ) from exc
+        finally:
+            wb.close()
+    return total_dia + float(valor or 0)
 
 
 def obtener_bonos_fecha(fecha: date, year: int) -> list[dict]:
@@ -564,19 +567,33 @@ def actualizar_ultimo_bono(fecha: date, year: int, cliente: str, valor: float, t
         if ultimo_row is None:
             wb.close()
             return None
+        valor_anterior = float(ws.cell(ultimo_row, 4).value or 0)
         ws.cell(ultimo_row, 3).value = cliente
         ws.cell(ultimo_row, 4).value = valor
         ws.cell(ultimo_row, 5).value = timestamp
         _formatear_filas_recientes_bonos(ws, 1)
+        total_dia = 0.0
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            cell_date = row[0]
+            if isinstance(cell_date, datetime):
+                cell_date = cell_date.date()
+            if isinstance(cell_date, date) and cell_date == fecha:
+                total_dia += float(row[3] or 0)
         wb.save(path)
         wb.close()
-    return obtener_ultimo_bono(fecha, year)
+    return {
+        "hora_display": timestamp.strftime("%I:%M %p"),
+        "cliente": cliente,
+        "valor": float(valor),
+        "valor_anterior": valor_anterior,
+        "total_dia": total_dia,
+    }
 
 
-def eliminar_ultimo_bono(fecha: date, year: int) -> bool:
+def eliminar_ultimo_bono(fecha: date, year: int) -> float | None:
     path = get_excel_path(year)
     if not path.exists():
-        return False
+        return None
 
     with _bloqueo_escritura(path):
         wb = _abrir_o_crear_workbook(path)
@@ -595,8 +612,15 @@ def eliminar_ultimo_bono(fecha: date, year: int) -> bool:
                 ultimo_row = idx
         if ultimo_row is None:
             wb.close()
-            return False
+            return None
         ws.delete_rows(ultimo_row)
+        total_dia = 0.0
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            cell_date = row[0]
+            if isinstance(cell_date, datetime):
+                cell_date = cell_date.date()
+            if isinstance(cell_date, date) and cell_date == fecha:
+                total_dia += float(row[3] or 0)
         wb.save(path)
         wb.close()
-        return True
+        return total_dia

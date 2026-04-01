@@ -59,11 +59,11 @@
         <div class="grid-manuales">
           <div class="campo-manual">
             <label for="total_monedas">Total monedas</label>
-            <input type="number" id="total_monedas" min="0" placeholder="0" />
+            <input type="text" inputmode="numeric" id="total_monedas" placeholder="0" />
           </div>
           <div class="campo-manual">
             <label for="billetes_viejos">Billetes viejos</label>
-            <input type="number" id="billetes_viejos" min="0" placeholder="0" />
+            <input type="text" inputmode="numeric" id="billetes_viejos" placeholder="0" />
           </div>
         </div>
         <div class="separador-informativo">
@@ -71,11 +71,11 @@
           <div class="grid-manuales">
             <div class="campo-manual informativo">
               <label for="venta_practisistemas">Venta Practisistemas</label>
-              <input type="number" id="venta_practisistemas" min="0" placeholder="0" />
+              <input type="text" inputmode="numeric" id="venta_practisistemas" placeholder="0" />
             </div>
             <div class="campo-manual informativo">
               <label for="venta_deportivas">Venta Deportivas</label>
-              <input type="number" id="venta_deportivas" placeholder="0" />
+              <input type="text" inputmode="numeric" id="venta_deportivas" placeholder="0" />
             </div>
           </div>
         </div>
@@ -116,20 +116,44 @@
       <section class="card">
         <h2>Gastos del día</h2>
         <p class="modulo-ayuda">Puedes registrar varios gastos en el día actual. Para corregir otro día se requiere admin.</p>
-        <div id="lista-gastos"></div>
+        <div class="gastos-form">
+          <div class="campo-manual gastos-descripcion">
+            <label for="gasto-concepto">Descripción</label>
+            <input type="text" id="gasto-concepto" list="gastos-conceptos-lista" autocomplete="off" placeholder="Descripción del gasto" maxlength="80" />
+            <datalist id="gastos-conceptos-lista"></datalist>
+          </div>
+          <div class="campo-manual gastos-valor">
+            <label for="gasto-valor">Valor</label>
+            <input type="text" inputmode="numeric" id="gasto-valor" placeholder="0" />
+          </div>
+        </div>
+        <div class="bonos-acciones">
+          <button id="btn-gasto-registrar" class="btn btn-primary" type="button">Registrar</button>
+        </div>
         <div class="gasto-total-row">
           <span>Total gastos</span>
           <span id="total-gastos">$ 0</span>
         </div>
       </section>
-      <section class="card card-resumen">
-        <h2>Resumen Gastos</h2>
-        <div class="resumen-grid resumen-grid-simple">
-          <div class="resumen-item resumen-total">
-            <span class="resumen-label">TOTAL GASTOS</span>
-            <span id="resumen-gastos" class="resumen-valor">$ 0</span>
+      <section class="card">
+        <details id="gastos-detalle-dia" open>
+          <summary>Registros del día</summary>
+          <div class="bonos-listado-wrap">
+            <table class="bonos-tabla">
+              <thead>
+                <tr>
+                  <th>Descripción</th>
+                  <th>Valor</th>
+                </tr>
+              </thead>
+              <tbody id="gastos-registros-body">
+                <tr>
+                  <td colspan="2" class="bonos-vacio">Sin registros para esta fecha.</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-        </div>
+        </details>
       </section>
     </section>
 
@@ -152,10 +176,11 @@
             <label for="bono-cliente">Cliente</label>
             <input type="text" id="bono-cliente" list="bonos-clientes-lista" autocomplete="off" placeholder="Nombre del cliente" />
             <datalist id="bonos-clientes-lista"></datalist>
+            <p id="bono-acumulado-hint" class="modulo-ayuda bono-acumulado-hint">Sin bonos previos para este cliente en la fecha actual.</p>
           </div>
           <div class="campo-manual bonos-valor">
             <label for="bono-valor">Valor del bono</label>
-            <input type="number" id="bono-valor" min="0" placeholder="0" />
+            <input type="text" inputmode="numeric" id="bono-valor" placeholder="0" />
           </div>
         </div>
         <div class="bonos-acciones">
@@ -166,15 +191,6 @@
         <div class="gasto-total-row">
           <span>Total bonos del día</span>
           <span id="total-bonos">$ 0</span>
-        </div>
-      </section>
-      <section class="card card-resumen">
-        <h2>Resumen Bonos</h2>
-        <div class="resumen-grid resumen-grid-simple">
-          <div class="resumen-item resumen-total">
-            <span class="resumen-label">TOTAL BONOS</span>
-            <span id="resumen-bonos" class="resumen-valor">$ 0</span>
-          </div>
         </div>
       </section>
       <section class="card">
@@ -188,11 +204,12 @@
                   <th>Hora</th>
                   <th>Cliente</th>
                   <th>Valor</th>
+                  <th>Acumulado cliente</th>
                 </tr>
               </thead>
               <tbody id="bonos-registros-body">
                 <tr>
-                  <td colspan="4" class="bonos-vacio">Sin registros para esta fecha.</td>
+                  <td colspan="5" class="bonos-vacio">Sin registros para esta fecha.</td>
                 </tr>
               </tbody>
             </table>
@@ -227,47 +244,73 @@
         </div>
       </div>
       <div id="admin-config-section" class="oculto">
-        <h3>Configuración</h3>
-        <div class="campo-config">
-          <span class="campo-config-label">Fecha por defecto para Caja</span>
-          <div class="radio-group">
-            <label><input type="radio" name="default_date" value="today" /> Hoy</label>
-            <label><input type="radio" name="default_date" value="yesterday" /> Día anterior</label>
+        <div class="admin-panel-header">
+          <h3>Configuración</h3>
+          <p class="modal-desc">Ajusta comportamiento general y administra los catálogos de autocompletado.</p>
+        </div>
+        <section class="admin-section">
+          <h4 class="admin-section-title">General</h4>
+          <div class="campo-config">
+            <span class="campo-config-label">Fecha por defecto para Caja</span>
+            <div class="radio-group">
+              <label><input type="radio" name="default_date" value="today" /> Hoy</label>
+              <label><input type="radio" name="default_date" value="yesterday" /> Día anterior</label>
+            </div>
           </div>
-        </div>
-        <div class="campo-config">
-          <span class="campo-config-label">Modo de ingreso de billetes</span>
-          <div class="radio-group">
-            <label><input type="radio" name="modo_entrada" value="cantidad" /> Por cantidad de billetes</label>
-            <label><input type="radio" name="modo_entrada" value="subtotal" /> Por total por denominación</label>
+          <div class="campo-config">
+            <span class="campo-config-label">Modo de ingreso de billetes</span>
+            <div class="radio-group">
+              <label><input type="radio" name="modo_entrada" value="cantidad" /> Por cantidad de billetes</label>
+              <label><input type="radio" name="modo_entrada" value="subtotal" /> Por total por denominación</label>
+            </div>
           </div>
-        </div>
-        <div class="campo-config">
-          <span class="campo-config-label">Módulos habilitados</span>
-          <div class="check-group">
-            <label><input type="checkbox" name="enabled_modules" value="caja" /> Caja</label>
-            <label><input type="checkbox" name="enabled_modules" value="gastos" /> Gastos</label>
-            <label><input type="checkbox" name="enabled_modules" value="bonos" /> Bonos</label>
+          <div class="campo-config">
+            <span class="campo-config-label">Módulos habilitados</span>
+            <div class="check-group">
+              <label><input type="checkbox" name="enabled_modules" value="caja" /> Caja</label>
+              <label><input type="checkbox" name="enabled_modules" value="gastos" /> Gastos</label>
+              <label><input type="checkbox" name="enabled_modules" value="bonos" /> Bonos</label>
+            </div>
           </div>
-        </div>
-        <div class="campo-config">
-          <span class="campo-config-label">Módulo por defecto al abrir</span>
-          <select id="admin-default-module"></select>
-        </div>
-        <div class="campo-config">
-          <span class="campo-config-label">Sede</span>
-          <input type="text" id="admin-sede" placeholder="Ej: Barbacoas" maxlength="31" />
-          <p class="modal-desc" id="admin-sheet-preview">Hoja caja: CajaPrincipal</p>
-        </div>
-        <div class="campo-config">
-          <span class="campo-config-label">Carpeta de archivos anuales</span>
-          <input type="text" id="admin-data-dir" placeholder="Ej: C:\\Users\\Usuario\\Dropbox\\Locales_Cajas" />
-          <div class="acciones-modal acciones-modal-config">
-            <button id="btn-admin-buscar-carpeta" class="btn btn-secondary" type="button">Elegir carpeta</button>
-            <button id="btn-admin-importar-bonos" class="btn btn-secondary" type="button">Importar clientes bonos (.txt)</button>
+          <div class="campo-config">
+            <span class="campo-config-label">Módulo por defecto al abrir</span>
+            <select id="admin-default-module"></select>
           </div>
-          <p class="modal-desc">La app creará en esa carpeta un archivo anual por sede, por ejemplo <strong id="admin-excel-preview">Contadores_Principal_2026.xlsx</strong>.</p>
-        </div>
+        </section>
+        <section class="admin-section">
+          <h4 class="admin-section-title">Archivo Anual</h4>
+          <div class="campo-config">
+            <span class="campo-config-label">Sede</span>
+            <input type="text" id="admin-sede" placeholder="Ej: Barbacoas" maxlength="31" />
+            <p class="modal-desc" id="admin-sheet-preview">Hoja caja: CajaPrincipal</p>
+          </div>
+          <div class="campo-config">
+            <span class="campo-config-label">Carpeta de archivos anuales</span>
+            <input type="text" id="admin-data-dir" placeholder="Ej: C:\\Users\\Usuario\\Dropbox\\Locales_Cajas" />
+            <div class="acciones-modal acciones-modal-config">
+              <button id="btn-admin-buscar-carpeta" class="btn btn-secondary" type="button">Elegir carpeta</button>
+              <button id="btn-admin-importar-bonos" class="btn btn-secondary" type="button">Importar clientes bonos (.txt)</button>
+            </div>
+            <p class="modal-desc">La app creará en esa carpeta un archivo anual por sede, por ejemplo <strong id="admin-excel-preview">Contadores_Principal_2026.xlsx</strong>.</p>
+          </div>
+        </section>
+        <section class="admin-section">
+          <h4 class="admin-section-title">Autocompletado</h4>
+          <details class="admin-catalogo">
+            <summary>Clientes de bonos</summary>
+            <div class="admin-catalogo-body">
+              <textarea id="admin-bonos-catalogo" class="catalogo-editor" rows="6" placeholder="Un cliente por línea"></textarea>
+              <p class="modal-desc">Este catálogo se usa solo para autocompletado. No modifica bonos ya registrados.</p>
+            </div>
+          </details>
+          <details class="admin-catalogo">
+            <summary>Conceptos de gastos</summary>
+            <div class="admin-catalogo-body">
+              <textarea id="admin-gastos-catalogo" class="catalogo-editor" rows="6" placeholder="Un concepto por línea"></textarea>
+              <p class="modal-desc">Puedes corregir ortografía o mantener conceptos frecuentes como "Pago arriendo local".</p>
+            </div>
+          </details>
+        </section>
         <p id="admin-config-msg" class="config-msg oculto"></p>
         <div class="acciones-modal">
           <button id="btn-admin-guardar" class="btn btn-primary">Guardar</button>

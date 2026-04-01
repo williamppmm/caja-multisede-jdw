@@ -18,8 +18,21 @@ from app.main import app
 
 
 HOST = "127.0.0.1"
-PORT = 8000
+DEFAULT_PORT = 8000
+PORT = DEFAULT_PORT
 URL = f"http://{HOST}:{PORT}"
+
+
+def _encontrar_puerto_disponible() -> int:
+    for port in range(DEFAULT_PORT, DEFAULT_PORT + 10):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                sock.bind((HOST, port))
+                return port
+            except OSError:
+                continue
+    raise OSError("No se encontró un puerto disponible entre 8000 y 8009.")
 
 
 def _esperar_servidor_y_abrir():
@@ -33,5 +46,7 @@ def _esperar_servidor_y_abrir():
 
 
 if __name__ == "__main__":
+    PORT = _encontrar_puerto_disponible()
+    URL = f"http://{HOST}:{PORT}"
     threading.Thread(target=_esperar_servidor_y_abrir, daemon=True).start()
     uvicorn.run(app, host=HOST, port=PORT)
