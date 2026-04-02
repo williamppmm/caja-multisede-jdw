@@ -10,7 +10,8 @@ from app.models.caja_models import (
     ModuloItemsEntrada,
     ModuloItemsRespuesta,
 )
-from app.services import bonos_service, caja_service, excel_service, nombres_service, settings_service
+from app.models.contadores_models import ContadoresEntrada, ContadoresRespuesta
+from app.services import bonos_service, caja_service, contadores_service, excel_service, nombres_service, settings_service
 
 router = APIRouter(prefix="/api/modulos")
 
@@ -19,6 +20,21 @@ router = APIRouter(prefix="/api/modulos")
 def guardar_caja(entrada: CajaEntrada):
     resultado = caja_service.guardar_caja(entrada)
     return CajaRespuesta(**resultado)
+
+
+@router.post("/contadores/guardar", response_model=ContadoresRespuesta)
+def guardar_contadores(entrada: ContadoresEntrada):
+    resultado = contadores_service.guardar_contadores(entrada)
+    return ContadoresRespuesta(**resultado)
+
+
+@router.get("/contadores/fecha/{fecha}/datos")
+def datos_fecha_contadores(fecha: str):
+    try:
+        d = date.fromisoformat(fecha)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+    return contadores_service.construir_base_fecha(d)
 
 
 @router.get("/caja/fecha/{fecha}/datos")
@@ -91,19 +107,24 @@ def importar_nombres_bonos():
 
 @router.get("/catalogos/{tipo}")
 def obtener_catalogo(tipo: str):
-    if tipo not in {"bonos", "gastos"}:
+    if tipo not in {"bonos", "gastos", "contadores"}:
         raise HTTPException(status_code=404, detail="Catalogo no soportado")
+    if tipo == "contadores":
+        return {"items": contadores_service.obtener_catalogo()}
     key = "nombres" if tipo == "bonos" else "conceptos"
     return {key: nombres_service.obtener_catalogo(tipo)}
 
 
 @router.post("/catalogos/{tipo}")
 def guardar_catalogo(tipo: str, body: dict):
-    if tipo not in {"bonos", "gastos"}:
+    if tipo not in {"bonos", "gastos", "contadores"}:
         raise HTTPException(status_code=404, detail="Catalogo no soportado")
     items = body.get("items")
     if not isinstance(items, list):
         raise HTTPException(status_code=400, detail="El cuerpo debe incluir una lista en 'items'.")
+    if tipo == "contadores":
+        resultado = contadores_service.guardar_catalogo(items)
+        return {"ok": True, "items": resultado, "total": len(resultado)}
     nombres_service.guardar_catalogo(tipo, items)
     key = "nombres" if tipo == "bonos" else "conceptos"
     resultado = nombres_service.obtener_catalogo(tipo)
@@ -128,9 +149,16 @@ def eliminar_ultimo_bono(body: dict):
 
 @router.get("/{modulo}/fecha/{fecha}/estado")
 def consultar_fecha_modulo(modulo: str, fecha: str):
-    if modulo not in {"caja", "gastos", "bonos"}:
+    if modulo not in {"caja", "gastos", "bonos", "contadores"}:
         raise HTTPException(status_code=404, detail="Modulo no soportado")
     try:
+        if modulo == "contadores":
+            return {
+                "fecha": fecha,
+                "existe": contadores_service.fecha_existe(date.fromisoformat(fecha)),
+                "requiere_admin": contadores_service.fecha_existe(date.fromisoformat(fecha)),
+                "editable_libre": not contadores_service.fecha_existe(date.fromisoformat(fecha)),
+            }
         return caja_service.consultar_estado_modulo(modulo, fecha)
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
@@ -138,8 +166,13 @@ def consultar_fecha_modulo(modulo: str, fecha: str):
 
 @router.get("/{modulo}/ultima")
 def ultima_modulo(modulo: str):
-    if modulo not in {"caja", "gastos", "bonos"}:
+    if modulo not in {"caja", "gastos", "bonos", "contadores"}:
         raise HTTPException(status_code=404, detail="Modulo no soportado")
+    if modulo == "contadores":
+        ultima_fecha = contadores_service.obtener_ultima_fecha()
+        if ultima_fecha is None:
+            return {"fecha": None, "mensaje": "Sin registros en Contadores"}
+        return {"fecha": str(ultima_fecha)}
     year = date.today().year
     ultima_fecha = excel_service.obtener_ultima_fecha_modulo(modulo, year)
     if ultima_fecha is None:

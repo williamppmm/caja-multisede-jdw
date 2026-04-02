@@ -18,6 +18,7 @@ SECTION_PREFIXES = {
     "caja": "Caja",
     "gastos": "Gastos",
     "bonos": "Bonos",
+    "contadores": "Contadores",
 }
 
 BONOS_HEADERS = [
@@ -25,6 +26,22 @@ BONOS_HEADERS = [
     "hora",
     "cliente",
     "valor_bono",
+    "fecha_hora_registro",
+]
+
+CONTADORES_HEADERS = [
+    "fecha",
+    "nombre",
+    "denominacion",
+    "entradas",
+    "salidas",
+    "jackpot",
+    "cancelled",
+    "yield_actual",
+    "yield_referencia",
+    "resultado_unidades",
+    "resultado_monetario",
+    "observacion",
     "fecha_hora_registro",
 ]
 
@@ -60,7 +77,11 @@ def _obtener_nombre_hoja_seccion(seccion: str) -> str:
 
 def obtener_hojas_activas() -> dict[str, str]:
     enabled = get_settings().get("enabled_modules") or ["caja"]
-    return {modulo: _obtener_nombre_hoja_seccion(modulo) for modulo in enabled}
+    return {
+        modulo: _obtener_nombre_hoja_seccion(modulo)
+        for modulo in enabled
+        if modulo in SECTION_PREFIXES
+    }
 
 
 def _nombres_unicos(nombres: list[str]) -> list[str]:
@@ -97,7 +118,7 @@ def _nombres_lectura_modulo(modulo: str) -> list[str]:
 
 
 def _fila_es_modulo(modulo: str, row) -> bool:
-    if modulo == "bonos":
+    if modulo in {"bonos", "contadores"}:
         return True
     tipo = row[1]
     if modulo == "caja":
@@ -135,7 +156,12 @@ def _bloqueo_escritura(path: Path):
 
 
 def _escribir_encabezados(ws, modulo: str):
-    headers = BONOS_HEADERS if modulo == "bonos" else ENCABEZADOS
+    if modulo == "bonos":
+        headers = BONOS_HEADERS
+    elif modulo == "contadores":
+        headers = CONTADORES_HEADERS
+    else:
+        headers = ENCABEZADOS
     ws.append(headers)
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill("solid", fgColor="2F5496")
@@ -144,22 +170,16 @@ def _escribir_encabezados(ws, modulo: str):
         cell.fill = header_fill
         cell.alignment = Alignment(horizontal="center")
 
-    widths = {
-        "A": 14,
-        "B": 16,
-        "C": 22,
-        "D": 14,
-        "E": 10,
-        "F": 14,
-        "G": 14,
-        "H": 22,
-    } if modulo != "bonos" else {
-        "A": 12,
-        "B": 12,
-        "C": 28,
-        "D": 14,
-        "E": 22,
-    }
+    if modulo == "bonos":
+        widths = {"A": 12, "B": 12, "C": 28, "D": 14, "E": 22}
+    elif modulo == "contadores":
+        widths = {
+            "A": 14, "B": 26, "C": 14, "D": 12, "E": 12,
+            "F": 12, "G": 12, "H": 14, "I": 14, "J": 16,
+            "K": 18, "L": 30, "M": 22,
+        }
+    else:
+        widths = {"A": 14, "B": 16, "C": 22, "D": 14, "E": 10, "F": 14, "G": 14, "H": 22}
     for col, width in widths.items():
         ws.column_dimensions[col].width = width
 
@@ -243,6 +263,17 @@ def _formatear_filas_recientes_bonos(ws, cantidad_filas: int) -> None:
         ws.cell(row_num, 5).number_format = "YYYY-MM-DD HH:mm:SS"
 
 
+def _formatear_filas_recientes_contadores(ws, cantidad_filas: int) -> None:
+    if cantidad_filas <= 0:
+        return
+    last_row = ws.max_row
+    start_row = last_row - cantidad_filas + 1
+    for row_num in range(start_row, last_row + 1):
+        ws.cell(row_num, 1).number_format = "YYYY-MM-DD"   # fecha
+        ws.cell(row_num, 11).number_format = "#,##0"        # resultado_monetario
+        ws.cell(row_num, 13).number_format = "YYYY-MM-DD HH:mm:SS"  # fecha_hora_registro
+
+
 def fecha_existe_modulo(modulo: str, fecha: date, year: int) -> bool:
     path = get_excel_path(year)
     if not path.exists():
@@ -276,6 +307,8 @@ def guardar_filas_modulo(modulo: str, filas: list, year: int, reemplazar_fecha: 
                 ws.append(fila)
             if modulo == "bonos":
                 _formatear_filas_recientes_bonos(ws, len(filas))
+            elif modulo == "contadores":
+                _formatear_filas_recientes_contadores(ws, len(filas))
             else:
                 _formatear_filas_recientes(ws, len(filas))
 

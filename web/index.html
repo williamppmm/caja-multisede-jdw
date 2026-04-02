@@ -218,6 +218,42 @@
       </section>
     </section>
 
+    <section id="panel-contadores" class="modulo-panel oculto">
+      <section class="card">
+        <h2>Contadores del día</h2>
+        <p class="modulo-ayuda">Captura Entradas, Salidas, Jackpot y Cancelled por ítem. Si Entradas o Salidas bajan frente a la referencia vigente, se requerirá admin y referencia crítica.</p>
+        <div class="gasto-total-row contadores-resumen-top">
+          <span>Total resultado del día</span>
+          <span id="contadores-total">$ 0</span>
+        </div>
+      </section>
+      <section class="card">
+        <div id="contadores-empty" class="modulo-ayuda oculto">No hay ítems configurados. Agrégalos desde Administración para comenzar a usar Contadores.</div>
+        <div class="bonos-listado-wrap">
+          <table class="bonos-tabla contadores-tabla">
+            <thead>
+              <tr>
+                <th>Ítem</th>
+                <th>Denom.</th>
+                <th>Entradas</th>
+                <th>Salidas</th>
+                <th>Jackpot</th>
+                <th>Cancelled</th>
+                <th>Yield actual</th>
+                <th>Yield ref.</th>
+                <th>Resultado</th>
+              </tr>
+            </thead>
+            <tbody id="contadores-body">
+              <tr>
+                <td colspan="9" class="bonos-vacio">Sin ítems configurados.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
     <section class="card card-acciones">
       <button id="btn-guardar" class="btn btn-primary">Guardar</button>
       <button id="btn-limpiar" class="btn btn-secondary">Limpiar</button>
@@ -270,6 +306,7 @@
               <label><input type="checkbox" name="enabled_modules" value="caja" /> Caja</label>
               <label><input type="checkbox" name="enabled_modules" value="gastos" /> Gastos</label>
               <label><input type="checkbox" name="enabled_modules" value="bonos" /> Bonos</label>
+              <label><input type="checkbox" name="enabled_modules" value="contadores" /> Contadores</label>
             </div>
           </div>
           <div class="campo-config">
@@ -308,6 +345,13 @@
             <div class="admin-catalogo-body">
               <textarea id="admin-gastos-catalogo" class="catalogo-editor" rows="6" placeholder="Un concepto por línea"></textarea>
               <p class="modal-desc">Puedes corregir ortografía o mantener conceptos frecuentes como "Pago arriendo local".</p>
+            </div>
+          </details>
+          <details class="admin-catalogo">
+            <summary>Ítems de contadores</summary>
+            <div class="admin-catalogo-body">
+              <textarea id="admin-contadores-catalogo" class="catalogo-editor" rows="8" placeholder="ID | Nombre visible | Denominación"></textarea>
+              <p class="modal-desc">Usa una línea por ítem. Ejemplo: <strong>M01 | Ruleta 1 | 100</strong>. Esto solo define el catálogo operativo de Contadores.</p>
             </div>
           </details>
         </section>

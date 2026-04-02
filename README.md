@@ -1,12 +1,13 @@
 # CajaJDW — Capturadora Multimódulo
 
-Aplicación local para registrar arqueos de caja, gastos y bonos por sede, guardando un archivo anual independiente por cada sede.
+Aplicación local para registrar arqueos de caja, gastos, bonos y un prototipo funcional de contadores por sede, guardando un archivo anual independiente por cada sede.
 
 ## Qué hace
 
 - Captura arqueos diarios de caja desde una interfaz web local.
 - Registra gastos del día en hoja separada por sede.
 - Registra bonos del día con nombre de cliente en hoja separada por sede.
+- Incluye un módulo local de Contadores para capturar Entradas, Salidas, Jackpot y Cancelled por ítem.
 - Guarda la información en archivos anuales por sede: `Contadores_Barbacoas_2026.xlsx`.
 - Soporte multi-sede: cada equipo configura su sede y escribe en su propio libro anual.
 - Configura la carpeta compartida (ej. Dropbox) desde el panel de administración.
@@ -33,7 +34,7 @@ app/
   models/
     caja_models.py         # Modelos Pydantic de entrada y respuesta
   routers/
-    modules.py             # Endpoints /api/modulos/* (caja, gastos, bonos)
+    modules.py             # Endpoints /api/modulos/* (caja, gastos, bonos, contadores)
     settings.py            # Endpoints /api/settings/* y /api/app/shutdown
   services/
     caja_service.py        # Lógica de negocio para caja y gastos
@@ -41,6 +42,7 @@ app/
     settings_service.py    # Configuración local y diálogos de carpeta
     bonos_service.py       # Operaciones individuales sobre bonos
     nombres_service.py     # Catálogos locales (clientes y conceptos de gastos)
+    contadores_service.py  # Catálogo, referencias y registros locales de Contadores
 web/
   index.html               # Interfaz principal
   app.js                   # Lógica de frontend
@@ -144,6 +146,7 @@ Esto facilita consolidar información con Power Query u otros procesos contables
 | **Caja**   | Arqueo de billetes + monedas + ventas informativas  | Requiere admin para corregir una fecha ya guardada |
 | **Gastos** | Lista de gastos del día con concepto y valor        | Hoy sin restricción; otro día requiere admin  |
 | **Bonos**  | Lista de bonos del día con cliente y valor          | Hoy sin restricción; otro día requiere admin  |
+| **Contadores** | Captura por ítem de Entradas, Salidas, Jackpot y Cancelled | Requiere admin para corregir una fecha ya guardada |
 
 ## Catálogos locales
 
@@ -153,6 +156,9 @@ La app mantiene dos archivos de autocompletado en el mismo directorio que el EXE
 |------------------------|------------------------------------|
 | `bonos_clientes.json`  | Nombres de clientes para bonos     |
 | `gastos_conceptos.json`| Conceptos usados en gastos         |
+| `contadores_items.json`| Catálogo de ítems de Contadores    |
+| `contadores_registros.json` | Registros diarios de Contadores |
+| `contadores_referencias_criticas.json` | Referencias críticas locales |
 
 Estos archivos se actualizan automáticamente al guardar registros y se pueden editar manualmente desde el panel de administración. Son locales a cada equipo (no se comparten por Dropbox).
 
@@ -166,6 +172,9 @@ La app incluye un bloqueo de archivo para evitar guardados simultáneos en el mi
 settings.json
 bonos_clientes.json
 gastos_conceptos.json
+contadores_items.json
+contadores_registros.json
+contadores_referencias_criticas.json
 *.xlsx
 ~$*.xlsx          # Archivos temporales de Excel
 *.lock
