@@ -382,6 +382,21 @@ input[type="number"]::-webkit-outer-spin-button {
   gap: 12px;
 }
 
+.movimientos-form {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr 1fr;
+  gap: 12px;
+}
+
+.movimientos-concepto input,
+.movimientos-observacion input {
+  text-align: left;
+}
+
+.resumen-movimientos .resumen-total {
+  grid-column: 1 / -1;
+}
+
 .bonos-cliente input {
   text-align: left;
 }
@@ -1260,7 +1275,8 @@ input[type="number"]::-webkit-outer-spin-button {
   .check-group,
   .tabs-modulo { flex-direction: column; }
   .bonos-meta,
-  .bonos-form { grid-template-columns: 1fr; }
+  .bonos-form,
+  .movimientos-form { grid-template-columns: 1fr; }
   .contador-critica-grid { grid-template-columns: 1fr 1fr; }
   .acciones-modal,
   .acciones-modal-config { flex-wrap: wrap; }

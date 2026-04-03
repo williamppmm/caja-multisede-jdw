@@ -98,6 +98,38 @@ class PrestamoEntrada(BaseModel):
         return v
 
 
+class MovimientoEntrada(BaseModel):
+    fecha: date
+    tipo_movimiento: str
+    concepto: str
+    valor: float
+    observacion: str = ""
+    forzar: bool = False
+
+    @field_validator("tipo_movimiento")
+    @classmethod
+    def validar_tipo_movimiento(cls, v):
+        tipo = str(v or "").strip().lower()
+        if tipo not in {"ingreso", "salida"}:
+            raise ValueError("El tipo de movimiento debe ser ingreso o salida")
+        return tipo
+
+    @field_validator("concepto")
+    @classmethod
+    def validar_concepto(cls, v):
+        texto = str(v or "").strip()
+        if not texto:
+            raise ValueError("El concepto es obligatorio")
+        return texto
+
+    @field_validator("valor")
+    @classmethod
+    def validar_valor(cls, v):
+        if v <= 0:
+            raise ValueError("El valor del movimiento debe ser mayor que cero")
+        return v
+
+
 class CajaRespuesta(BaseModel):
     ok: bool
     mensaje: str
@@ -137,4 +169,18 @@ class PrestamoRespuesta(BaseModel):
     total_prestado: float = 0
     total_pagado: float = 0
     saldo_pendiente: float = 0
+    fecha_hora_registro: str = ""
+
+
+class MovimientoRespuesta(BaseModel):
+    ok: bool
+    mensaje: str
+    fecha: str = ""
+    tipo_movimiento: str = ""
+    concepto: str = ""
+    valor: float = 0
+    observacion: str = ""
+    total_ingresos: float = 0
+    total_salidas: float = 0
+    neto: float = 0
     fecha_hora_registro: str = ""

@@ -9,6 +9,7 @@ ROW_TYPES = {
     "gastos": "gasto",
     "bonos": "bono",
     "prestamos": "prestamo",
+    "movimientos": "movimiento",
 }
 
 
@@ -106,13 +107,18 @@ def guardar_items_modulo(modulo: str, entrada: ModuloItemsEntrada) -> dict:
         timestamp = datetime.now().replace(microsecond=0)
         filas, total, cantidad = construir_filas_items(modulo, entrada, timestamp)
         excel_service.guardar_filas_modulo(modulo, filas, year)
-        if modulo == "gastos":
+        if modulo in {"gastos", "movimientos"}:
             for item in entrada.items:
-                nombres_service.agregar_item_catalogo("gastos", item.concepto)
+                nombres_service.agregar_item_catalogo(modulo, item.concepto)
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
-    nombre = "Gastos" if modulo == "gastos" else "Prestamos" if modulo == "prestamos" else "Bonos"
+    nombre = {
+        "gastos": "Gastos",
+        "prestamos": "Prestamos",
+        "bonos": "Bonos",
+        "movimientos": "Movimientos",
+    }.get(modulo, modulo.title())
     return {
         "ok": True,
         "mensaje": f"{nombre} guardados correctamente",

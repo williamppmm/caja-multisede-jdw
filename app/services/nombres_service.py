@@ -6,11 +6,13 @@ from app.config import BASE_DIR
 NOMBRES_PATH = BASE_DIR / "bonos_clientes.json"
 GASTOS_PATH = BASE_DIR / "gastos_conceptos.json"
 PRESTAMOS_PATH = BASE_DIR / "prestamos_personas.json"
+MOVIMIENTOS_PATH = BASE_DIR / "movimientos_conceptos.json"
 
 CATALOG_PATHS = {
     "bonos": NOMBRES_PATH,
     "gastos": GASTOS_PATH,
     "prestamos": PRESTAMOS_PATH,
+    "movimientos": MOVIMIENTOS_PATH,
 }
 
 

@@ -19,6 +19,7 @@ SECTION_PREFIXES = {
     "gastos": "Gastos",
     "bonos": "Bonos",
     "prestamos": "Prestamos",
+    "movimientos": "Movimientos",
     "contadores": "Contadores",
 }
 
@@ -36,6 +37,16 @@ PRESTAMOS_HEADERS = [
     "persona",
     "tipo_movimiento",
     "valor_movimiento",
+    "fecha_hora_registro",
+]
+
+MOVIMIENTOS_HEADERS = [
+    "fecha",
+    "hora",
+    "tipo_movimiento",
+    "concepto",
+    "valor",
+    "observacion",
     "fecha_hora_registro",
 ]
 
@@ -132,7 +143,7 @@ def _nombres_lectura_modulo(modulo: str) -> list[str]:
 
 
 def _fila_es_modulo(modulo: str, row) -> bool:
-    if modulo in {"bonos", "prestamos", "contadores"}:
+    if modulo in {"bonos", "prestamos", "movimientos", "contadores"}:
         return True
     tipo = row[1]
     if modulo == "caja":
@@ -174,6 +185,8 @@ def _escribir_encabezados(ws, modulo: str):
         headers = BONOS_HEADERS
     elif modulo == "prestamos":
         headers = PRESTAMOS_HEADERS
+    elif modulo == "movimientos":
+        headers = MOVIMIENTOS_HEADERS
     elif modulo == "contadores":
         headers = CONTADORES_HEADERS
     else:
@@ -190,6 +203,8 @@ def _escribir_encabezados(ws, modulo: str):
         widths = {"A": 12, "B": 12, "C": 28, "D": 14, "E": 22}
     elif modulo == "prestamos":
         widths = {"A": 12, "B": 12, "C": 28, "D": 18, "E": 14, "F": 22}
+    elif modulo == "movimientos":
+        widths = {"A": 12, "B": 12, "C": 16, "D": 28, "E": 14, "F": 28, "G": 22}
     elif modulo == "contadores":
         widths = {
             "A": 14, "B": 20, "C": 26, "D": 14, "E": 12,
@@ -311,6 +326,18 @@ def _formatear_filas_recientes_prestamos(ws, cantidad_filas: int) -> None:
         ws.cell(row_num, 6).number_format = "YYYY-MM-DD HH:mm:SS"
 
 
+def _formatear_filas_recientes_movimientos(ws, cantidad_filas: int) -> None:
+    if cantidad_filas <= 0:
+        return
+    last_row = ws.max_row
+    start_row = last_row - cantidad_filas + 1
+    for row_num in range(start_row, last_row + 1):
+        ws.cell(row_num, 1).number_format = "DD-MM"
+        ws.cell(row_num, 2).number_format = "HH:mm AM/PM"
+        ws.cell(row_num, 5).number_format = "#,##0"
+        ws.cell(row_num, 7).number_format = "YYYY-MM-DD HH:mm:SS"
+
+
 def _formatear_filas_recientes_contadores(ws, cantidad_filas: int) -> None:
     if cantidad_filas <= 0:
         return
@@ -357,6 +384,8 @@ def guardar_filas_modulo(modulo: str, filas: list, year: int, reemplazar_fecha: 
                 _formatear_filas_recientes_bonos(ws, len(filas))
             elif modulo == "prestamos":
                 _formatear_filas_recientes_prestamos(ws, len(filas))
+            elif modulo == "movimientos":
+                _formatear_filas_recientes_movimientos(ws, len(filas))
             elif modulo == "contadores":
                 _formatear_filas_recientes_contadores(ws, len(filas))
             else:
@@ -504,6 +533,14 @@ def obtener_items_modulo_fecha(modulo: str, fecha: date, year: int) -> dict | No
             return None
         return {
             "items": [{"concepto": item["persona"], "valor": item["valor"]} for item in registros],
+            "total": sum(item["valor"] for item in registros),
+        }
+    if modulo == "movimientos":
+        registros = obtener_movimientos_fecha(fecha, year)
+        if not registros:
+            return None
+        return {
+            "items": [{"concepto": item["concepto"], "valor": item["valor"]} for item in registros],
             "total": sum(item["valor"] for item in registros),
         }
 
@@ -798,6 +835,39 @@ def guardar_prestamo_registro(
     return resumen
 
 
+def guardar_movimiento_registro(
+    fecha: date,
+    tipo_movimiento: str,
+    concepto: str,
+    valor: float,
+    observacion: str,
+    timestamp: datetime,
+) -> dict:
+    fila = [fecha, timestamp, tipo_movimiento, concepto, valor, observacion, timestamp]
+    path = get_excel_path(fecha.year)
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ws = _asegurar_hoja(wb, "movimientos")
+        ws.append(fila)
+        _formatear_filas_recientes_movimientos(ws, 1)
+        try:
+            wb.save(path)
+        except PermissionError as exc:
+            raise ArchivoCajaOcupadoError(
+                "No se pudo guardar porque el libro esta siendo usado por otro proceso. Intenta nuevamente."
+            ) from exc
+        finally:
+            wb.close()
+    registros = obtener_movimientos_fecha(fecha, fecha.year)
+    total_ingresos = sum(float(item["valor"] or 0) for item in registros if item["tipo_movimiento"] == "ingreso")
+    total_salidas = sum(float(item["valor"] or 0) for item in registros if item["tipo_movimiento"] == "salida")
+    return {
+        "total_ingresos": total_ingresos,
+        "total_salidas": total_salidas,
+        "neto": total_ingresos - total_salidas,
+    }
+
+
 def obtener_bonos_fecha(fecha: date, year: int) -> list[dict]:
     path = get_excel_path(year)
     if not path.exists():
@@ -844,6 +914,48 @@ def obtener_prestamos_fecha(fecha: date, year: int) -> list[dict]:
     return [item for item in registros if item["fecha"] == fecha.isoformat()]
 
 
+def obtener_movimientos_fecha(fecha: date, year: int) -> list[dict]:
+    path = get_excel_path(year)
+    if not path.exists():
+        return []
+
+    wb = load_workbook(path, read_only=True)
+    hojas = _obtener_hojas_para_lectura(wb, "movimientos")
+    if not hojas:
+        wb.close()
+        return []
+
+    registros = []
+    for ws in hojas:
+        for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            if row[0] is None:
+                continue
+            cell_date = row[0]
+            if isinstance(cell_date, datetime):
+                cell_date = cell_date.date()
+            if not (isinstance(cell_date, date) and cell_date == fecha):
+                continue
+            hora = row[1]
+            if isinstance(hora, datetime):
+                hora_texto = hora.strftime("%I:%M %p")
+            else:
+                hora_texto = str(hora or "")
+            registros.append({
+                "sheet_row": idx,
+                "fecha": cell_date.isoformat(),
+                "fecha_display": cell_date.strftime("%d-%m"),
+                "hora_display": hora_texto,
+                "tipo_movimiento": str(row[2] or "").strip().lower() or "salida",
+                "concepto": str(row[3] or "").strip(),
+                "valor": float(row[4] or 0),
+                "observacion": str(row[5] or "").strip(),
+                "fecha_hora_registro": row[6].isoformat() if isinstance(row[6], datetime) else str(row[6] or ""),
+            })
+    wb.close()
+    registros.sort(key=lambda item: item["fecha_hora_registro"] or "", reverse=True)
+    return registros
+
+
 def obtener_movimientos_prestamos() -> list[dict]:
     registros = []
     for path in _obtener_paths_prestamos_lectura():
@@ -856,17 +968,27 @@ def obtener_movimientos_prestamos() -> list[dict]:
         wb.close()
     registros.sort(key=lambda item: (item["fecha"], item["fecha_hora_registro"] or ""))
 
-    saldos = {}
-    for item in registros:
+    # Calcular saldo corrido completo y registrar dónde cerró cada ciclo (saldo == 0).
+    saldos: dict[str, float] = {}
+    ultimo_corte: dict[str, int] = {}  # índice donde el saldo llegó a cero por última vez
+
+    for i, item in enumerate(registros):
         persona_key = item["persona"].strip().lower()
         saldo = saldos.get(persona_key, 0.0)
         if item["tipo_movimiento"] == "pago":
             saldo -= float(item["valor"] or 0)
         else:
             saldo += float(item["valor"] or 0)
-        item["saldo_pendiente"] = saldo
+        item["saldo_pendiente"] = round(saldo, 2)
         saldos[persona_key] = saldo
-    return registros
+        if abs(saldo) < 0.01:
+            ultimo_corte[persona_key] = i  # ciclo cerrado aquí
+
+    # Devolver solo el ciclo activo de cada persona (movimientos posteriores al último cierre).
+    return [
+        item for i, item in enumerate(registros)
+        if i > ultimo_corte.get(item["persona"].strip().lower(), -1)
+    ]
 
 
 def obtener_resumen_prestamos(persona: str | None = None) -> dict:

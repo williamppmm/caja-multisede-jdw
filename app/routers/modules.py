@@ -9,11 +9,13 @@ from app.models.caja_models import (
     CajaRespuesta,
     ModuloItemsEntrada,
     ModuloItemsRespuesta,
+    MovimientoEntrada,
+    MovimientoRespuesta,
     PrestamoEntrada,
     PrestamoRespuesta,
 )
 from app.models.contadores_models import ContadoresEntrada, ContadoresRespuesta
-from app.services import bonos_service, caja_service, contadores_service, excel_service, nombres_service, prestamos_service, settings_service
+from app.services import bonos_service, caja_service, contadores_service, excel_service, movimientos_service, nombres_service, prestamos_service, settings_service
 
 router = APIRouter(prefix="/api/modulos")
 
@@ -71,6 +73,12 @@ def registrar_prestamo(entrada: PrestamoEntrada):
     return PrestamoRespuesta(**resultado)
 
 
+@router.post("/movimientos/registrar", response_model=MovimientoRespuesta)
+def registrar_movimiento(entrada: MovimientoEntrada):
+    resultado = movimientos_service.guardar_movimiento(entrada)
+    return MovimientoRespuesta(**resultado)
+
+
 @router.get("/prestamos/datos")
 def datos_prestamos():
     return prestamos_service.obtener_registros()
@@ -95,6 +103,18 @@ def datos_fecha_prestamos(fecha: str):
     if not registros:
         raise HTTPException(status_code=404, detail="No hay datos para esa fecha")
     return {"items": registros, "total": sum(item["valor"] for item in registros)}
+
+
+@router.get("/movimientos/fecha/{fecha}/datos")
+def datos_fecha_movimientos(fecha: str):
+    try:
+        d = date.fromisoformat(fecha)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+    datos = movimientos_service.obtener_registros(d)
+    if not datos["items"]:
+        raise HTTPException(status_code=404, detail="No hay datos para esa fecha")
+    return datos
 
 
 @router.get("/{modulo}/fecha/{fecha}/datos")
@@ -126,6 +146,11 @@ def prestamos_personas():
     return {"personas": nombres_service.obtener_catalogo("prestamos")}
 
 
+@router.get("/movimientos/conceptos")
+def movimientos_conceptos():
+    return {"conceptos": nombres_service.obtener_catalogo("movimientos")}
+
+
 @router.post("/bonos/nombres/importar")
 def importar_nombres_bonos():
     selected = settings_service.select_text_file_dialog(settings_service.get_settings().get("data_dir"))
@@ -137,7 +162,7 @@ def importar_nombres_bonos():
 
 @router.get("/catalogos/{tipo}")
 def obtener_catalogo(tipo: str):
-    if tipo not in {"bonos", "gastos", "prestamos", "contadores"}:
+    if tipo not in {"bonos", "gastos", "prestamos", "movimientos", "contadores"}:
         raise HTTPException(status_code=404, detail="Catalogo no soportado")
     if tipo == "contadores":
         return {"items": contadores_service.obtener_catalogo()}
@@ -147,7 +172,7 @@ def obtener_catalogo(tipo: str):
 
 @router.post("/catalogos/{tipo}")
 def guardar_catalogo(tipo: str, body: dict):
-    if tipo not in {"bonos", "gastos", "prestamos", "contadores"}:
+    if tipo not in {"bonos", "gastos", "prestamos", "movimientos", "contadores"}:
         raise HTTPException(status_code=404, detail="Catalogo no soportado")
     items = body.get("items")
     if not isinstance(items, list):
@@ -185,7 +210,7 @@ def eliminar_ultimo_bono(body: dict):
 
 @router.get("/{modulo}/fecha/{fecha}/estado")
 def consultar_fecha_modulo(modulo: str, fecha: str):
-    if modulo not in {"caja", "gastos", "bonos", "prestamos", "contadores"}:
+    if modulo not in {"caja", "gastos", "bonos", "prestamos", "movimientos", "contadores"}:
         raise HTTPException(status_code=404, detail="Modulo no soportado")
     try:
         if modulo == "contadores":
@@ -203,7 +228,7 @@ def consultar_fecha_modulo(modulo: str, fecha: str):
 
 @router.get("/{modulo}/ultima")
 def ultima_modulo(modulo: str):
-    if modulo not in {"caja", "gastos", "bonos", "prestamos", "contadores"}:
+    if modulo not in {"caja", "gastos", "bonos", "prestamos", "movimientos", "contadores"}:
         raise HTTPException(status_code=404, detail="Modulo no soportado")
     if modulo == "contadores":
         ultima_fecha = contadores_service.obtener_ultima_fecha()

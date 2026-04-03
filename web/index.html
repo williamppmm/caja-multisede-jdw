@@ -288,6 +288,79 @@
       </section>
     </section>
 
+    <section id="panel-movimientos" class="modulo-panel oculto">
+      <section class="card">
+        <h2>Movimientos</h2>
+        <p class="modulo-ayuda">Registra ingresos y salidas extraordinarias de caja. Cada movimiento se guarda de inmediato y se refleja en el historial del día.</p>
+        <div class="bonos-meta">
+          <div class="bonos-meta-item">
+            <span class="bonos-meta-label">Fecha</span>
+            <span id="movimientos-fecha-visual" class="bonos-meta-value">--</span>
+          </div>
+        </div>
+        <div class="radio-group radio-group-inline">
+          <label><input type="radio" name="movimiento-tipo" value="salida" checked /> Salida</label>
+          <label><input type="radio" name="movimiento-tipo" value="ingreso" /> Ingreso</label>
+        </div>
+        <div class="movimientos-form">
+          <div class="campo-manual movimientos-concepto">
+            <label for="movimiento-concepto">Concepto</label>
+            <input type="text" id="movimiento-concepto" list="movimientos-conceptos-lista" autocomplete="off" placeholder="Ej: Giro, Consignación, Retiro dueño" maxlength="80" />
+            <datalist id="movimientos-conceptos-lista"></datalist>
+          </div>
+          <div class="campo-manual movimientos-valor">
+            <label for="movimiento-valor">Valor</label>
+            <input type="text" inputmode="numeric" id="movimiento-valor" placeholder="0" />
+          </div>
+          <div class="campo-manual movimientos-observacion">
+            <label for="movimiento-observacion">Observación</label>
+            <input type="text" id="movimiento-observacion" placeholder="Opcional" maxlength="120" />
+          </div>
+        </div>
+        <div class="bonos-acciones">
+          <button id="btn-movimiento-registrar" class="btn btn-primary" type="button">Registrar</button>
+        </div>
+        <div class="resumen-grid resumen-grid-simple resumen-movimientos">
+          <div class="resumen-item">
+            <span class="resumen-label">Total ingresos</span>
+            <span id="total-movimientos-ingresos">$ 0</span>
+          </div>
+          <div class="resumen-item">
+            <span class="resumen-label">Total salidas</span>
+            <span id="total-movimientos-salidas">$ 0</span>
+          </div>
+          <div class="resumen-item resumen-total">
+            <span class="resumen-label">Neto del día</span>
+            <span id="total-movimientos-neto">$ 0</span>
+          </div>
+        </div>
+      </section>
+      <section class="card">
+        <details id="movimientos-detalle-dia" open>
+          <summary>Registros del día</summary>
+          <div class="bonos-listado-wrap">
+            <table class="bonos-tabla">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Hora</th>
+                  <th>Tipo</th>
+                  <th>Concepto</th>
+                  <th>Valor</th>
+                  <th>Observación</th>
+                </tr>
+              </thead>
+              <tbody id="movimientos-registros-body">
+                <tr>
+                  <td colspan="6" class="bonos-vacio">Sin registros para esta fecha.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+    </section>
+
     <section id="panel-contadores" class="modulo-panel oculto">
       <section class="card">
         <h2>Contadores del día</h2>
@@ -377,6 +450,7 @@
               <label><input type="checkbox" name="enabled_modules" value="gastos" /> Gastos</label>
               <label><input type="checkbox" name="enabled_modules" value="bonos" /> Bonos</label>
               <label><input type="checkbox" name="enabled_modules" value="prestamos" /> Prestamos</label>
+              <label><input type="checkbox" name="enabled_modules" value="movimientos" /> Movimientos</label>
               <label><input type="checkbox" name="enabled_modules" value="contadores" /> Contadores</label>
             </div>
           </div>
@@ -423,6 +497,13 @@
             <div class="admin-catalogo-body">
               <textarea id="admin-prestamos-catalogo" class="catalogo-editor" rows="6" placeholder="Una persona por línea"></textarea>
               <p class="modal-desc">Este catálogo se usa para autocompletado rápido de préstamos a operarios.</p>
+            </div>
+          </details>
+          <details class="admin-catalogo">
+            <summary>Conceptos de movimientos</summary>
+            <div class="admin-catalogo-body">
+              <textarea id="admin-movimientos-catalogo" class="catalogo-editor" rows="6" placeholder="Un concepto por línea"></textarea>
+              <p class="modal-desc">Úsalo para conceptos frecuentes como "Giro", "Consignación" o "Retiro dueño".</p>
             </div>
           </details>
           <details class="admin-catalogo">

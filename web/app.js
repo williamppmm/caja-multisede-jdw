@@ -6,6 +6,7 @@ const MODULE_META = {
   gastos: { label: 'Gastos', panelId: 'panel-gastos', dateLabel: 'Fecha de gastos', defaultDate: () => hoyStr() },
   bonos: { label: 'Bonos', panelId: 'panel-bonos', dateLabel: 'Fecha de bonos', defaultDate: () => hoyStr() },
   prestamos: { label: 'Prestamos', panelId: 'panel-prestamos', dateLabel: 'Fecha de préstamos', defaultDate: () => hoyStr() },
+  movimientos: { label: 'Movimientos', panelId: 'panel-movimientos', dateLabel: 'Fecha de movimientos', defaultDate: () => hoyStr() },
   contadores: { label: 'Contadores', panelId: 'panel-contadores', dateLabel: 'Fecha de contadores', defaultDate: () => hoyStr() },
 };
 
@@ -17,14 +18,16 @@ let enabledModules = ['caja', 'gastos'];
 let defaultModule = 'caja';
 let currentModule = 'caja';
 let moduleDates = {};
-let adminOverride = { caja: false, gastos: false, bonos: false, prestamos: false, contadores: false };
+let adminOverride = { caja: false, gastos: false, bonos: false, prestamos: false, movimientos: false, contadores: false };
 let debounceTimer = null;
 let pendingAdminAction = null;
 let bonusNames = [];
 let loanNames = [];
 let expenseConcepts = [];
+let movementConcepts = [];
 let bonusDayItems = [];
 let loanItems = [];
+let movementItems = [];
 let cajaLocked = false;
 let cajaDrafts = {};
 let contadorCatalog = [];
@@ -152,7 +155,7 @@ function actualizarPreviewHojasAdmin() {
   const preview = document.getElementById('admin-sheet-preview');
   if (!preview) return;
   const sede = normalizarSedePreview();
-  const modulos = obtenerModulosMarcadosAdmin().filter(modulo => ['caja', 'gastos', 'bonos', 'prestamos'].includes(modulo));
+  const modulos = obtenerModulosMarcadosAdmin().filter(modulo => ['caja', 'gastos', 'bonos', 'prestamos', 'movimientos'].includes(modulo));
   preview.textContent = modulos.length
     ? modulos.map(modulo => `Hoja ${modulo}: ${MODULE_META[modulo].label}${sede}`).join(' | ')
     : 'Sin módulos Excel habilitados';
@@ -311,6 +314,12 @@ function actualizarPrestamosVisuales() {
   if (fechaEl) fechaEl.textContent = formatFechaVisual(fecha);
 }
 
+function actualizarMovimientosVisuales() {
+  const fecha = moduleDates.movimientos || hoyStr();
+  const fechaEl = document.getElementById('movimientos-fecha-visual');
+  if (fechaEl) fechaEl.textContent = formatFechaVisual(fecha);
+}
+
 function renderBonusNames() {
   const list = document.getElementById('bonos-clientes-lista');
   if (!list) return;
@@ -327,6 +336,17 @@ function renderExpenseConcepts() {
   if (!list) return;
   list.innerHTML = '';
   expenseConcepts.forEach(concepto => {
+    const option = document.createElement('option');
+    option.value = concepto;
+    list.appendChild(option);
+  });
+}
+
+function renderMovementConcepts() {
+  const list = document.getElementById('movimientos-conceptos-lista');
+  if (!list) return;
+  list.innerHTML = '';
+  movementConcepts.forEach(concepto => {
     const option = document.createElement('option');
     option.value = concepto;
     list.appendChild(option);
@@ -365,6 +385,18 @@ async function cargarExpenseConcepts() {
   } catch {
     expenseConcepts = [];
     renderExpenseConcepts();
+  }
+}
+
+async function cargarMovementConcepts() {
+  try {
+    const res = await fetch('/api/modulos/movimientos/conceptos');
+    const data = await res.json();
+    movementConcepts = data.conceptos || [];
+    renderMovementConcepts();
+  } catch {
+    movementConcepts = [];
+    renderMovementConcepts();
   }
 }
 
@@ -856,6 +888,15 @@ function limpiarFormularioGastos() {
   if (valor) valor.value = '';
 }
 
+function limpiarFormularioMovimientos() {
+  const concepto = document.getElementById('movimiento-concepto');
+  const valor = document.getElementById('movimiento-valor');
+  const observacion = document.getElementById('movimiento-observacion');
+  if (concepto) concepto.value = '';
+  if (valor) valor.value = '';
+  if (observacion) observacion.value = '';
+}
+
 function actualizarAccionesBonos() {
   const esHoy = (moduleDates.bonos || hoyStr()) === hoyStr();
   const hayRegistros = document.getElementById('bonos-registros-body')?.querySelectorAll('tr').length > 0
@@ -979,6 +1020,28 @@ function autocompletarConceptoGasto() {
   return true;
 }
 
+function autocompletarConceptoMovimiento() {
+  const input = document.getElementById('movimiento-concepto');
+  const texto = input?.value.trim() || '';
+  if (!texto) return false;
+
+  const exacta = movementConcepts.find(concepto => concepto.toLocaleLowerCase('es-CO') === texto.toLocaleLowerCase('es-CO'));
+  if (exacta) {
+    input.value = exacta;
+    return true;
+  }
+
+  const coincidencia = movementConcepts.find(concepto => concepto.toLocaleLowerCase('es-CO').startsWith(texto.toLocaleLowerCase('es-CO')));
+  if (!coincidencia) return false;
+
+  input.value = coincidencia;
+  return true;
+}
+
+function obtenerTipoMovimientoSeleccionado() {
+  return document.querySelector('input[name="movimiento-tipo"]:checked')?.value || 'salida';
+}
+
 function renderBonosRegistros(items = [], total = 0) {
   const tbody = document.getElementById('bonos-registros-body');
   bonusDayItems = Array.isArray(items) ? [...items] : [];
@@ -1041,6 +1104,32 @@ function renderPrestamosRegistros(items = [], resumen = {}) {
   actualizarResumenPersonaPrestamo();
 }
 
+function renderMovimientosRegistros(items = [], resumen = {}) {
+  const tbody = document.getElementById('movimientos-registros-body');
+  movementItems = Array.isArray(items) ? [...items] : [];
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  if (!movementItems.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
+  } else {
+    movementItems.forEach(item => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${item.fecha_display || formatFechaVisual(item.fecha)}</td>
+        <td>${item.hora_display || ''}</td>
+        <td>${item.tipo_movimiento === 'ingreso' ? 'Ingreso' : 'Salida'}</td>
+        <td>${item.concepto || ''}</td>
+        <td>${fmt(item.valor || 0)}</td>
+        <td>${item.observacion || ''}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+  document.getElementById('total-movimientos-ingresos').textContent = fmt(resumen.total_ingresos || 0);
+  document.getElementById('total-movimientos-salidas').textContent = fmt(resumen.total_salidas || 0);
+  document.getElementById('total-movimientos-neto').textContent = fmt(resumen.neto || 0);
+}
+
 async function cargarBonosDelDia(fecha) {
   try {
     const res = await fetch(`/api/modulos/bonos/fecha/${fecha}/datos?t=${Date.now()}`, { cache: 'no-store' });
@@ -1055,7 +1144,7 @@ async function cargarBonosDelDia(fecha) {
   }
 }
 
-async function cargarPrestamosDelDia(fecha) {
+async function cargarPrestamosDelDia(_fecha) {
   try {
     const res = await fetch(`/api/modulos/prestamos/datos?t=${Date.now()}`, { cache: 'no-store' });
     if (!res.ok) {
@@ -1069,11 +1158,26 @@ async function cargarPrestamosDelDia(fecha) {
   }
 }
 
+async function cargarMovimientosDelDia(fecha) {
+  try {
+    const res = await fetch(`/api/modulos/movimientos/fecha/${fecha}/datos?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) {
+      renderMovimientosRegistros([], {});
+      return;
+    }
+    const data = await res.json();
+    renderMovimientosRegistros(data.items || [], data);
+  } catch {
+    renderMovimientosRegistros([], {});
+  }
+}
+
 function validarBono() {
   const cliente = document.getElementById('bono-cliente').value.trim();
   const valorRaw = document.getElementById('bono-valor').value;
   const valor = valorRaw === '' ? 0 : Number(valorRaw);
   if (!cliente) return 'Debes ingresar el nombre del cliente.';
+  if (/^\d+$/.test(cliente)) return 'El nombre del cliente no puede ser solo números.';
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de bono mayor que cero.';
   return null;
 }
@@ -1082,12 +1186,21 @@ function validarPrestamo() {
   const persona = document.getElementById('prestamo-persona').value.trim();
   const valor = parseNumeroInput('prestamo-valor');
   if (!persona) return 'Debes ingresar el nombre de la persona.';
+  if (/^\d+$/.test(persona)) return 'El nombre de la persona no puede ser solo números.';
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de préstamo mayor que cero.';
   if (obtenerTipoPrestamoSeleccionado() === 'pago') {
     const resumen = obtenerResumenPersonaPrestamo(persona);
     if (resumen.saldoPendiente <= 0) return 'Esa persona no tiene saldo pendiente para registrar un pago.';
     if (valor > resumen.saldoPendiente) return `El pago supera el saldo pendiente de ${fmt(resumen.saldoPendiente)}.`;
   }
+  return null;
+}
+
+function validarMovimiento() {
+  const concepto = document.getElementById('movimiento-concepto').value.trim();
+  const valor = parseNumeroInput('movimiento-valor');
+  if (!concepto) return 'Debes ingresar el concepto del movimiento.';
+  if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de movimiento mayor que cero.';
   return null;
 }
 
@@ -1173,6 +1286,9 @@ function limpiarModuloActual() {
     limpiarFormularioBonos();
   } else if (currentModule === 'prestamos') {
     limpiarFormularioPrestamos();
+  } else if (currentModule === 'movimientos') {
+    limpiarFormularioMovimientos();
+    renderMovimientosRegistros([], {});
   } else {
     limpiarFormularioGastos();
   }
@@ -1197,10 +1313,11 @@ function actualizarPaneles() {
     document.getElementById(meta.panelId).classList.toggle('oculto', modulo !== currentModule);
   });
   document.getElementById('fecha-label').textContent = MODULE_META[currentModule].dateLabel;
-  document.getElementById('btn-guardar').classList.toggle('oculto', ['bonos', 'gastos', 'prestamos'].includes(currentModule));
+  document.getElementById('btn-guardar').classList.toggle('oculto', ['bonos', 'gastos', 'prestamos', 'movimientos'].includes(currentModule));
   document.getElementById('btn-guardar').textContent = 'Guardar';
   actualizarBonosVisuales();
   actualizarPrestamosVisuales();
+  actualizarMovimientosVisuales();
 }
 
 function sugerirFechaModulo(modulo) {
@@ -1238,6 +1355,10 @@ async function activarModulo(modulo) {
   if (currentModule === 'prestamos') {
     limpiarFormularioPrestamos();
     actualizarPrestamosVisuales();
+  }
+  if (currentModule === 'movimientos') {
+    limpiarFormularioMovimientos();
+    actualizarMovimientosVisuales();
   }
   if (currentModule === 'contadores') {
     resetOverride('contadores');
@@ -1386,24 +1507,19 @@ async function cargarDatosCaja(fecha) {
   try {
     const estadoRes = await fetch(`/api/modulos/caja/fecha/${fecha}/estado`);
     const estado = estadoRes.ok ? await estadoRes.json() : { existe: false };
-    const mostrarDatos = adminOverride.caja;
 
-    if (estado.existe && !mostrarDatos) {
-      eliminarDraftCaja(fecha);
-      limpiarCaja();
-      setCajaEditable(false);
-      return;
-    }
-
-    setCajaEditable(true);
     if (!estado.existe) {
+      setCajaEditable(true);
       if (!aplicarDraftCaja(fecha)) limpiarCaja();
       return;
     }
 
+    // La caja existe: siempre cargar y mostrar los datos guardados.
+    // Si hay override de admin se habilita edición; si no, solo lectura.
     const res = await fetch(`/api/modulos/caja/fecha/${fecha}/datos`);
     if (!res.ok) {
       limpiarCaja();
+      setCajaEditable(adminOverride.caja);
       return;
     }
     const data = await res.json();
@@ -1417,6 +1533,8 @@ async function cargarDatosCaja(fecha) {
     setNumeroInputValue('venta_practisistemas', data.venta_practisistemas || '');
     setNumeroInputValue('venta_deportivas', data.venta_deportivas || '', true);
     calcularCaja();
+    eliminarDraftCaja(fecha);
+    setCajaEditable(adminOverride.caja);
   } catch {
     if (!aplicarDraftCaja(fecha)) limpiarCaja();
     setCajaEditable(true);
@@ -1434,6 +1552,10 @@ async function cargarDatosModuloItems(modulo, fecha) {
   }
   if (modulo === 'prestamos') {
     await cargarPrestamosDelDia(fecha);
+    return;
+  }
+  if (modulo === 'movimientos') {
+    await cargarMovimientosDelDia(fecha);
     return;
   }
   try {
@@ -1544,6 +1666,39 @@ async function registrarPrestamo() {
   document.getElementById('prestamo-persona').focus();
 }
 
+async function registrarMovimiento() {
+  const error = validarMovimiento();
+  if (error) {
+    mostrarMensaje(error, 'error');
+    return;
+  }
+  const fecha = document.getElementById('fecha').value;
+  const tipo_movimiento = obtenerTipoMovimientoSeleccionado();
+  const concepto = document.getElementById('movimiento-concepto').value.trim();
+  const valor = parseNumeroInput('movimiento-valor');
+  const observacion = document.getElementById('movimiento-observacion').value.trim();
+
+  const res = await fetch('/api/modulos/movimientos/registrar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha, tipo_movimiento, concepto, valor, observacion, forzar: adminOverride.movimientos }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    mostrarMensaje(data.mensaje, 'advertencia');
+    return;
+  }
+  limpiarFormularioMovimientos();
+  movementConcepts = Array.from(new Set([...movementConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
+  renderMovementConcepts();
+  await cargarMovimientosDelDia(fecha);
+  actualizarMovimientosVisuales();
+  mostrarMensaje(`✓ ${data.mensaje} — ${data.concepto}: ${fmt(data.valor)} — Neto día: ${fmt(data.neto)}`, 'ok');
+  resetOverride('movimientos');
+  await verificarFechaActual();
+  document.getElementById('movimiento-concepto').focus();
+}
+
 function validarGasto() {
   const concepto = document.getElementById('gasto-concepto').value.trim();
   const valorRaw = document.getElementById('gasto-valor').value;
@@ -1643,6 +1798,9 @@ async function guardarContadores() {
     .filter(row => row.dataset.pausado !== '1')
     .map(row => {
     const usarReferenciaCritica = row.dataset.criticaAutorizada === '1';
+    const observacionCritica = usarReferenciaCritica
+      ? (row.querySelector('[data-role="critica-observacion"]')?.value.trim() || OBSERVACION_CRITICA_DEFAULT)
+      : null;
     const item = {
       item_id: row.dataset.itemId,
       entradas: valorContadorRow(row, 'entradas'),
@@ -1650,17 +1808,14 @@ async function guardarContadores() {
       jackpot: valorContadorRow(row, 'jackpot'),
       cancelled: valorContadorRow(row, 'cancelled'),
       usar_referencia_critica: usarReferenciaCritica,
-    };
-    if (usarReferenciaCritica) {
-      const observacion = row.querySelector('[data-role="critica-observacion"]')?.value.trim() || OBSERVACION_CRITICA_DEFAULT;
-      item.referencia_critica = {
+      referencia_critica: usarReferenciaCritica ? {
         entradas: valorContadorRow(row, 'critica-entradas'),
         salidas: valorContadorRow(row, 'critica-salidas'),
         jackpot: valorContadorRow(row, 'critica-jackpot'),
         cancelled: valorContadorRow(row, 'critica-cancelled'),
-        observacion,
-      };
-    }
+        observacion: observacionCritica,
+      } : null,
+    };
     return item;
   });
 
@@ -1722,19 +1877,22 @@ function setCatalogoTextarea(id, items = []) {
 }
 
 async function cargarCatalogosAdmin() {
-  const [bonosRes, gastosRes, prestamosRes, contadoresRes] = await Promise.all([
+  const [bonosRes, gastosRes, prestamosRes, movimientosRes, contadoresRes] = await Promise.all([
     fetch('/api/modulos/catalogos/bonos'),
     fetch('/api/modulos/catalogos/gastos'),
     fetch('/api/modulos/catalogos/prestamos'),
+    fetch('/api/modulos/catalogos/movimientos'),
     fetch('/api/modulos/catalogos/contadores'),
   ]);
   const bonosData = bonosRes.ok ? await bonosRes.json() : { nombres: [] };
   const gastosData = gastosRes.ok ? await gastosRes.json() : { conceptos: [] };
   const prestamosData = prestamosRes.ok ? await prestamosRes.json() : { nombres: [] };
+  const movimientosData = movimientosRes.ok ? await movimientosRes.json() : { conceptos: [] };
   const contadoresData = contadoresRes.ok ? await contadoresRes.json() : { items: [] };
   setCatalogoTextarea('admin-bonos-catalogo', bonosData.nombres || []);
   setCatalogoTextarea('admin-gastos-catalogo', gastosData.conceptos || []);
   setCatalogoTextarea('admin-prestamos-catalogo', prestamosData.nombres || []);
+  setCatalogoTextarea('admin-movimientos-catalogo', movimientosData.conceptos || []);
   setContadoresCatalogoTextarea(contadoresData.items || []);
 }
 
@@ -1838,6 +1996,7 @@ function validarCaja() {
 function validarModuloItems(modulo) {
   if (modulo === 'gastos') return validarGasto();
   if (modulo === 'prestamos') return validarPrestamo();
+  if (modulo === 'movimientos') return validarMovimiento();
   if (modulo === 'contadores') return validarContadores();
   return null;
 }
@@ -1902,6 +2061,9 @@ async function guardar() {
       return;
     } else if (currentModule === 'prestamos') {
       await registrarPrestamo();
+      return;
+    } else if (currentModule === 'movimientos') {
+      await registrarMovimiento();
       return;
     } else if (currentModule === 'gastos') {
       await registrarGasto();
@@ -2056,6 +2218,11 @@ async function guardarAdmin() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items: parseCatalogoTextarea('admin-prestamos-catalogo') }),
     });
+    await fetch('/api/modulos/catalogos/movimientos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: parseCatalogoTextarea('admin-movimientos-catalogo') }),
+    });
     await fetch('/api/modulos/catalogos/contadores', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2070,6 +2237,7 @@ async function guardarAdmin() {
     await cargarBonusNames();
     await cargarLoanNames();
     await cargarExpenseConcepts();
+    await cargarMovementConcepts();
     await cargarContadoresCatalogo();
 
     enabledModules.forEach(modulo => {
@@ -2127,6 +2295,7 @@ async function init() {
   await cargarBonusNames();
   await cargarLoanNames();
   await cargarExpenseConcepts();
+  await cargarMovementConcepts();
   await cargarContadoresCatalogo();
 
   try {
@@ -2145,6 +2314,7 @@ async function init() {
     gastos: sugerirFechaModulo('gastos'),
     bonos: sugerirFechaModulo('bonos'),
     prestamos: sugerirFechaModulo('prestamos'),
+    movimientos: sugerirFechaModulo('movimientos'),
     contadores: sugerirFechaModulo('contadores'),
   };
   const _savedModule = sessionStorage.getItem('lastModule');
@@ -2158,6 +2328,7 @@ async function init() {
   aplicarFechaModulo(currentModule);
   actualizarBonosVisuales();
   actualizarPrestamosVisuales();
+  actualizarMovimientosVisuales();
   await cargarVistaModulo(currentModule, moduleDates[currentModule]);
   await verificarFechaActual();
 
@@ -2206,6 +2377,9 @@ async function init() {
     } else if (currentModule === 'prestamos') {
       limpiarFormularioPrestamos();
       actualizarPrestamosVisuales();
+    } else if (currentModule === 'movimientos') {
+      limpiarFormularioMovimientos();
+      actualizarMovimientosVisuales();
     } else if (currentModule === 'gastos') {
       limpiarFormularioGastos();
     } else if (currentModule === 'contadores') {
@@ -2228,6 +2402,7 @@ async function init() {
     aplicarFechaModulo(currentModule);
     if (currentModule === 'bonos') limpiarFormularioBonos();
     if (currentModule === 'prestamos') limpiarFormularioPrestamos();
+    if (currentModule === 'movimientos') limpiarFormularioMovimientos();
     await cargarVistaModulo(currentModule, moduleDates[currentModule]);
     await verificarFechaActual();
   });
@@ -2260,6 +2435,7 @@ async function init() {
   document.getElementById('btn-bono-registrar').addEventListener('click', registrarBono);
   document.getElementById('btn-prestamo-registrar').addEventListener('click', registrarPrestamo);
   document.getElementById('btn-gasto-registrar').addEventListener('click', registrarGasto);
+  document.getElementById('btn-movimiento-registrar').addEventListener('click', registrarMovimiento);
   document.getElementById('btn-bono-editar-ultimo').addEventListener('click', editarUltimoBono);
   document.getElementById('btn-bono-eliminar-ultimo').addEventListener('click', eliminarUltimoBono);
   document.getElementById('contadores-body').addEventListener('click', e => {
@@ -2298,7 +2474,7 @@ async function init() {
       manejarEventoContadores(e.target);
     }
   });
-  ['bono-valor', 'gasto-valor', 'prestamo-valor'].forEach(id => {
+  ['bono-valor', 'gasto-valor', 'prestamo-valor', 'movimiento-valor'].forEach(id => {
     const el = document.getElementById(id);
     formatearInputNumerico(el);
     el.addEventListener('input', () => formatearInputNumerico(el));
@@ -2338,6 +2514,14 @@ async function init() {
       document.getElementById('prestamo-valor').select();
     }
   });
+  document.getElementById('movimiento-concepto').addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      autocompletarConceptoMovimiento();
+      document.getElementById('movimiento-valor').focus();
+      document.getElementById('movimiento-valor').select();
+    }
+  });
   document.getElementById('bono-valor').addEventListener('keydown', e => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -2350,12 +2534,29 @@ async function init() {
       document.getElementById('btn-prestamo-registrar').focus();
     }
   });
+  document.getElementById('movimiento-valor').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('btn-movimiento-registrar').focus();
+    } else if (e.key === 'Tab' && !e.shiftKey) {
+      e.preventDefault();
+      document.getElementById('movimiento-observacion').focus();
+      document.getElementById('movimiento-observacion').select();
+    }
+  });
+  document.getElementById('movimiento-observacion').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('btn-movimiento-registrar').focus();
+    }
+  });
   document.querySelectorAll('input[name="prestamo-tipo"]').forEach(el => {
     el.addEventListener('change', actualizarResumenPersonaPrestamo);
   });
   setInterval(() => {
     actualizarBonosVisuales();
     actualizarPrestamosVisuales();
+    actualizarMovimientosVisuales();
   }, 30000);
 
   document.getElementById('modal-admin').addEventListener('click', e => {
