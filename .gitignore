@@ -21,8 +21,6 @@ bonos_clientes.json
 gastos_conceptos.json
 prestamos_personas.json
 contadores_items.json
-contadores_registros.json
-contadores_referencias_criticas.json
 *.xlsx
 ~$*.xlsx
 *.lock

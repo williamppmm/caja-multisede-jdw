@@ -45,7 +45,7 @@ app/
     bonos_service.py       # Operaciones individuales sobre bonos
     prestamos_service.py   # Lógica de negocio para préstamos y pagos
     nombres_service.py     # Catálogos locales (clientes, personas y conceptos)
-    contadores_service.py  # Catálogo, referencias y registros locales de Contadores
+    contadores_service.py  # Catálogo, referencias y lógica de Contadores
 web/
   index.html               # Interfaz principal
   app.js                   # Lógica de frontend
@@ -154,7 +154,7 @@ Esto facilita consolidar información con Power Query u otros procesos contables
 
 ## Catálogos locales
 
-La app mantiene dos archivos de autocompletado en el mismo directorio que el EXE (o raíz del proyecto en desarrollo):
+La app mantiene archivos locales en el mismo directorio que el EXE (o raíz del proyecto en desarrollo):
 
 | Archivo                                  | Contenido                                         |
 |------------------------------------------|---------------------------------------------------|
@@ -162,10 +162,9 @@ La app mantiene dos archivos de autocompletado en el mismo directorio que el EXE
 | `gastos_conceptos.json`                  | Conceptos usados en gastos                        |
 | `prestamos_personas.json`                | Nombres de personas para préstamos                |
 | `contadores_items.json`                  | Catálogo de ítems de Contadores                   |
-| `contadores_registros.json`              | Registros diarios de Contadores                   |
-| `contadores_referencias_criticas.json`   | Referencias críticas locales                      |
+| `settings.json`                          | Configuración local del equipo                    |
 
-Estos archivos se actualizan automáticamente al guardar registros y se pueden editar manualmente desde el panel de administración. Son locales a cada equipo (no se comparten por Dropbox).
+Estos archivos se actualizan automáticamente al usar la app. Son locales a cada equipo y no se comparten por Dropbox.
 
 ## Concurrencia y bloqueos
 
@@ -177,9 +176,8 @@ La app incluye un bloqueo de archivo para evitar guardados simultáneos en el mi
 settings.json
 bonos_clientes.json
 gastos_conceptos.json
+prestamos_personas.json
 contadores_items.json
-contadores_registros.json
-contadores_referencias_criticas.json
 *.xlsx
 ~$*.xlsx          # Archivos temporales de Excel
 *.lock
