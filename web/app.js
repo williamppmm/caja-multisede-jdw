@@ -1,9 +1,11 @@
 const DENOMINACIONES = [100000, 50000, 20000, 10000, 5000, 2000];
 const CONTRASENA = '1980';
+const OBSERVACION_CRITICA_DEFAULT = 'reinicio técnico';
 const MODULE_META = {
   caja: { label: 'Caja', panelId: 'panel-caja', dateLabel: 'Fecha del arqueo', defaultDate: () => configDefaultDate === 'yesterday' ? ayerStr() : hoyStr() },
   gastos: { label: 'Gastos', panelId: 'panel-gastos', dateLabel: 'Fecha de gastos', defaultDate: () => hoyStr() },
   bonos: { label: 'Bonos', panelId: 'panel-bonos', dateLabel: 'Fecha de bonos', defaultDate: () => hoyStr() },
+  prestamos: { label: 'Prestamos', panelId: 'panel-prestamos', dateLabel: 'Fecha de préstamos', defaultDate: () => hoyStr() },
   contadores: { label: 'Contadores', panelId: 'panel-contadores', dateLabel: 'Fecha de contadores', defaultDate: () => hoyStr() },
 };
 
@@ -15,12 +17,14 @@ let enabledModules = ['caja', 'gastos'];
 let defaultModule = 'caja';
 let currentModule = 'caja';
 let moduleDates = {};
-let adminOverride = { caja: false, gastos: false, bonos: false, contadores: false };
+let adminOverride = { caja: false, gastos: false, bonos: false, prestamos: false, contadores: false };
 let debounceTimer = null;
 let pendingAdminAction = null;
 let bonusNames = [];
+let loanNames = [];
 let expenseConcepts = [];
 let bonusDayItems = [];
+let loanItems = [];
 let cajaLocked = false;
 let cajaDrafts = {};
 let contadorCatalog = [];
@@ -88,7 +92,10 @@ function parsePositivo(id) {
 }
 
 function dateToStr(d) {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function hoyStr() {
@@ -145,7 +152,7 @@ function actualizarPreviewHojasAdmin() {
   const preview = document.getElementById('admin-sheet-preview');
   if (!preview) return;
   const sede = normalizarSedePreview();
-  const modulos = obtenerModulosMarcadosAdmin().filter(modulo => ['caja', 'gastos', 'bonos'].includes(modulo));
+  const modulos = obtenerModulosMarcadosAdmin().filter(modulo => ['caja', 'gastos', 'bonos', 'prestamos'].includes(modulo));
   preview.textContent = modulos.length
     ? modulos.map(modulo => `Hoja ${modulo}: ${MODULE_META[modulo].label}${sede}`).join(' | ')
     : 'Sin módulos Excel habilitados';
@@ -298,6 +305,12 @@ function actualizarBonosVisuales() {
   if (horaEl) horaEl.textContent = formatHoraVisual(new Date());
 }
 
+function actualizarPrestamosVisuales() {
+  const fecha = moduleDates.prestamos || hoyStr();
+  const fechaEl = document.getElementById('prestamos-fecha-visual');
+  if (fechaEl) fechaEl.textContent = formatFechaVisual(fecha);
+}
+
 function renderBonusNames() {
   const list = document.getElementById('bonos-clientes-lista');
   if (!list) return;
@@ -316,6 +329,17 @@ function renderExpenseConcepts() {
   expenseConcepts.forEach(concepto => {
     const option = document.createElement('option');
     option.value = concepto;
+    list.appendChild(option);
+  });
+}
+
+function renderLoanNames() {
+  const list = document.getElementById('prestamos-personas-lista');
+  if (!list) return;
+  list.innerHTML = '';
+  loanNames.forEach(nombre => {
+    const option = document.createElement('option');
+    option.value = nombre;
     list.appendChild(option);
   });
 }
@@ -341,6 +365,18 @@ async function cargarExpenseConcepts() {
   } catch {
     expenseConcepts = [];
     renderExpenseConcepts();
+  }
+}
+
+async function cargarLoanNames() {
+  try {
+    const res = await fetch('/api/modulos/prestamos/personas');
+    const data = await res.json();
+    loanNames = data.personas || [];
+    renderLoanNames();
+  } catch {
+    loanNames = [];
+    renderLoanNames();
   }
 }
 
@@ -371,8 +407,8 @@ function setContadoresEditable(editable) {
     input.tabIndex = contadoresLocked ? -1 : 0;
     input.classList.toggle('input-readonly', contadoresLocked);
   });
-  document.querySelectorAll('.contador-critica-check').forEach(check => {
-    check.disabled = contadoresLocked;
+  document.querySelectorAll('.btn-confirmar-critica').forEach(btn => {
+    btn.disabled = contadoresLocked;
   });
 }
 
@@ -402,7 +438,7 @@ function leerContadoresDraftActual() {
       salidas: row.querySelector(`[data-role="salidas"]`)?.value || '',
       jackpot: row.querySelector(`[data-role="jackpot"]`)?.value || '',
       cancelled: row.querySelector(`[data-role="cancelled"]`)?.value || '',
-      usar_referencia_critica: row.querySelector('.contador-critica-check')?.checked || false,
+      critica_autorizada: row.dataset.criticaAutorizada === '1',
       ref_entradas: row.querySelector(`[data-role="critica-entradas"]`)?.value || '',
       ref_salidas: row.querySelector(`[data-role="critica-salidas"]`)?.value || '',
       ref_jackpot: row.querySelector(`[data-role="critica-jackpot"]`)?.value || '',
@@ -434,8 +470,8 @@ function applyContadoresDraft(fecha) {
       const input = row.querySelector(`[data-role="${role}"]`);
       if (input) input.value = item[role] || '';
     });
-    const check = row.querySelector('.contador-critica-check');
-    if (check) check.checked = Boolean(item.usar_referencia_critica);
+    row.dataset.criticaAutorizada = item.critica_autorizada ? '1' : '0';
+    actualizarSummaryCritica(row);
     const mapaCritica = {
       'critica-entradas': item.ref_entradas,
       'critica-salidas': item.ref_salidas,
@@ -521,36 +557,74 @@ function renderContadores(items = [], total = 0) {
     tr.dataset.refYield = String(fila.referencia?.yield || 0);
     tr.dataset.refFecha = fila.referencia?.fecha || '';
     tr.dataset.refTipo = fila.referencia?.tipo || 'sin_referencia';
-    tr.className = fila.alerta ? 'contador-alerta' : '';
-    tr.innerHTML = `
-      <td>
-        <span class="contador-item-nombre">${fila.nombre}</span>
-        <span class="contador-item-id">${fila.item_id}</span>
-        <span class="contador-ref-texto">${formatRefTexto(fila)}</span>
-        <details class="contador-critica-detalle oculto" ${fila.usar_referencia_critica ? 'open' : ''}>
-          <summary>Referencia crítica</summary>
-          <div class="contador-critica">
-            <label><input type="checkbox" class="contador-critica-check" ${fila.usar_referencia_critica ? 'checked' : ''} /> Usar referencia crítica para este ítem</label>
-            <div class="contador-critica-grid">
-              <input type="text" inputmode="numeric" data-role="critica-entradas" placeholder="Ref. Entradas" value="${fila.usar_referencia_critica ? limpiarNumeroTexto(fila.referencia?.entradas || fila.entradas || 0) : ''}" />
-              <input type="text" inputmode="numeric" data-role="critica-salidas" placeholder="Ref. Salidas" value="${fila.usar_referencia_critica ? limpiarNumeroTexto(fila.referencia?.salidas || fila.salidas || 0) : ''}" />
-              <input type="text" inputmode="numeric" data-role="critica-jackpot" placeholder="Ref. Jackpot" value="${fila.usar_referencia_critica ? limpiarNumeroTexto(fila.referencia?.jackpot || fila.jackpot || 0) : ''}" />
-              <input type="text" inputmode="numeric" data-role="critica-cancelled" placeholder="Ref. Cancelled" value="${fila.usar_referencia_critica ? limpiarNumeroTexto(fila.referencia?.cancelled || fila.cancelled || 0) : ''}" />
-            </div>
-            <input type="password" data-role="critica-password" placeholder="Contraseña admin" class="${(fila.usar_referencia_critica && !adminOverride.contadores) ? '' : 'oculto'}" autocomplete="off" />
-            <textarea data-role="critica-observacion" placeholder="Observación">${fila.observacion_referencia || fila.motivo_referencia || ''}</textarea>
+    tr.dataset.criticaAutorizada = fila.usar_referencia_critica ? '1' : '0';
+    tr.dataset.pausado = fila.pausado ? '1' : '0';
+    tr.className = fila.pausado ? 'contador-pausado' : '';
+
+    const refTexto = formatRefTexto(fila);
+    const refVisible = fila.referencia && fila.referencia.tipo !== 'sin_referencia';
+
+    if (fila.pausado) {
+      tr.innerHTML = `
+        <td>
+          <span class="contador-item-nombre"><span class="contador-item-id-inline">${fila.item_id}</span> ${fila.nombre}</span>
+          <div class="contador-controles-inline">
+            <details class="contador-pausa-detalle">
+              <summary title="Reactivar máquina">▶</summary>
+              <div class="contador-pausa-accion">
+                <input type="password" data-role="pausa-password" placeholder="Contraseña admin" autocomplete="off" tabindex="-1" />
+                <button type="button" class="btn-toggle-pausa" data-pausado="1" tabindex="-1">Confirmar reactivación</button>
+                <span class="pausa-pass-error oculto"></span>
+              </div>
+            </details>
           </div>
-        </details>
-      </td>
-      <td>${fmt(fila.denominacion || 0)}</td>
-      <td>${crearInputContador('entradas', fila.entradas)}</td>
-      <td>${crearInputContador('salidas', fila.salidas)}</td>
-      <td>${crearInputContador('jackpot', fila.jackpot)}</td>
-      <td>${crearInputContador('cancelled', fila.cancelled)}</td>
-      <td class="contador-yield" data-role="yield-actual">${limpiarNumeroTexto(fila.yield_actual || 0, true)}</td>
-      <td data-role="yield-ref">${limpiarNumeroTexto(fila.referencia?.yield || 0, true)}<span class="contador-ref-texto">${fila.referencia?.fecha || 'Base 0'}</span></td>
-      <td class="contador-resultado ${fila.resultado_monetario < 0 ? 'negativo' : ''}" data-role="resultado">${fmt(fila.resultado_monetario || 0)}</td>
-    `;
+        </td>
+        <td>${fmt(fila.denominacion || 0)}</td>
+        <td colspan="7" class="contador-pausa-celdas">— en pausa —</td>
+      `;
+    } else {
+      tr.innerHTML = `
+        <td>
+          <span class="contador-item-nombre"><span class="contador-item-id-inline">${fila.item_id}</span> ${fila.nombre}</span>
+          <div class="contador-controles-inline">
+            ${refVisible ? `<span class="contador-ref-texto">${refTexto}</span>` : ''}
+            <details class="contador-critica-detalle oculto" ${fila.usar_referencia_critica ? 'open' : ''}>
+              <summary class="${fila.usar_referencia_critica ? 'autorizado' : ''}">${fila.usar_referencia_critica ? 'Autorizado' : 'Referencia crítica'}</summary>
+              <div class="contador-critica">
+                <div class="contador-critica-grid">
+                  <input type="text" inputmode="numeric" data-role="critica-entradas" placeholder="Ref. Entradas" value="${limpiarNumeroTexto((fila.ref_entradas_guardada ?? fila.referencia?.entradas) || 0)}" />
+                  <input type="text" inputmode="numeric" data-role="critica-salidas" placeholder="Ref. Salidas" value="${limpiarNumeroTexto((fila.ref_salidas_guardada ?? fila.referencia?.salidas) || 0)}" />
+                  <input type="text" inputmode="numeric" data-role="critica-jackpot" placeholder="Ref. Jackpot" value="${limpiarNumeroTexto((fila.ref_jackpot_guardada ?? fila.referencia?.jackpot) || 0)}" />
+                  <input type="text" inputmode="numeric" data-role="critica-cancelled" placeholder="Ref. Cancelled" value="${limpiarNumeroTexto((fila.ref_cancelled_guardada ?? fila.referencia?.cancelled) || 0)}" />
+                </div>
+                <textarea data-role="critica-observacion" class="oculto" aria-hidden="true" tabindex="-1" readonly>${fila.observacion_referencia || fila.motivo_referencia || OBSERVACION_CRITICA_DEFAULT}</textarea>
+                <div class="contador-critica-confirm">
+                  <input type="password" data-role="critica-password" placeholder="Contraseña admin" autocomplete="off" />
+                  <button type="button" class="btn-confirmar-critica">Confirmar</button>
+                </div>
+                <span class="critica-pass-error oculto"></span>
+              </div>
+            </details>
+            <details class="contador-pausa-detalle">
+              <summary title="Pausar máquina">⏸</summary>
+              <div class="contador-pausa-accion">
+                <input type="password" data-role="pausa-password" placeholder="Contraseña admin" autocomplete="off" tabindex="-1" />
+                <button type="button" class="btn-toggle-pausa" data-pausado="0" tabindex="-1">Confirmar pausa</button>
+                <span class="pausa-pass-error oculto"></span>
+              </div>
+            </details>
+          </div>
+        </td>
+        <td>${fmt(fila.denominacion || 0)}</td>
+        <td>${crearInputContador('entradas', fila.entradas)}</td>
+        <td>${crearInputContador('salidas', fila.salidas)}</td>
+        <td>${crearInputContador('jackpot', fila.jackpot)}</td>
+        <td>${crearInputContador('cancelled', fila.cancelled)}</td>
+        <td class="contador-yield" data-role="yield-actual">${limpiarNumeroTexto(fila.yield_actual || 0, true)}</td>
+        <td data-role="yield-ref">${limpiarNumeroTexto(fila.referencia?.yield || 0, true)}<span class="contador-ref-texto">${fila.referencia?.fecha || 'Base 0'}</span></td>
+        <td class="contador-resultado ${fila.resultado_monetario < 0 ? 'negativo' : ''}" data-role="resultado">${fmt(fila.resultado_monetario || 0)}</td>
+      `;
+    }
     tbody.appendChild(tr);
   });
 
@@ -575,17 +649,20 @@ function recalcularFilaContador(row) {
   const salidas = valorContadorRow(row, 'salidas');
   const jackpot = valorContadorRow(row, 'jackpot');
   const cancelled = valorContadorRow(row, 'cancelled');
-  const checkCritica = row.querySelector('.contador-critica-check');
-  const usaCritica = Boolean(checkCritica?.checked);
+  const usaCritica = row.dataset.criticaAutorizada === '1';
   const detalleCritica = row.querySelector('.contador-critica-detalle');
 
-  const alerta = completa && (entradas < fila.refEntradas || salidas < fila.refSalidas);
-  const passField = row.querySelector('[data-role="critica-password"]');
-  const passOk = adminOverride.contadores || (passField?.value || '') === CONTRASENA;
-  row.classList.toggle('contador-alerta', alerta && !(usaCritica && passOk));
+  const alerta = completa && (
+    entradas < fila.refEntradas
+    || salidas < fila.refSalidas
+    || jackpot < fila.refJackpot
+    || cancelled < fila.refCancelled
+  );
+  row.classList.remove('contador-alerta');
   if (detalleCritica) {
-    detalleCritica.classList.toggle('oculto', !(alerta || usaCritica));
-    if (usaCritica) detalleCritica.open = true;
+    // Mostrar la sección solo cuando hay alerta activa o cuando aún no se ha guardado y ya fue autorizada.
+    detalleCritica.classList.toggle('oculto', !(alerta || (usaCritica && row.dataset.guardado !== '1')));
+    if (row.dataset.guardado === '1') detalleCritica.open = false;
   }
 
   if (!tieneCaptura && !usaCritica) {
@@ -593,7 +670,6 @@ function recalcularFilaContador(row) {
     row.querySelector('[data-role="yield-ref"]').innerHTML = `${limpiarNumeroTexto(fila.refYield, true)}<span class="contador-ref-texto">${fila.refFecha || 'Base 0'}</span>`;
     row.querySelector('[data-role="resultado"]').textContent = '';
     row.querySelector('[data-role="resultado"]').classList.remove('negativo');
-    row.querySelector('.contador-alerta-badge')?.remove();
     return;
   }
 
@@ -602,7 +678,6 @@ function recalcularFilaContador(row) {
     row.querySelector('[data-role="yield-ref"]').innerHTML = `${limpiarNumeroTexto(fila.refYield, true)}<span class="contador-ref-texto">${fila.refFecha || 'Base 0'}</span>`;
     row.querySelector('[data-role="resultado"]').textContent = '';
     row.querySelector('[data-role="resultado"]').classList.remove('negativo');
-    row.querySelector('.contador-alerta-badge')?.remove();
     return;
   }
 
@@ -618,44 +693,16 @@ function recalcularFilaContador(row) {
   const yieldActual = entradas - salidas - jackpot - cancelled;
   const resultado = (yieldActual - refYield) * fila.denominacion;
   row.querySelector('[data-role="yield-actual"]').textContent = limpiarNumeroTexto(yieldActual, true);
-  row.querySelector('[data-role="yield-ref"]').innerHTML = `${limpiarNumeroTexto(refYield, true)}<span class="contador-ref-texto">${usaCritica ? (passOk ? 'Ref. crítica autorizada' : 'Ref. crítica — pendiente clave') : (fila.refFecha || 'Base 0')}</span>`;
+  row.querySelector('[data-role="yield-ref"]').innerHTML = `${limpiarNumeroTexto(refYield, true)}<span class="contador-ref-texto">${usaCritica ? 'Autorizado' : (fila.refFecha || 'Base 0')}</span>`;
   const resultadoEl = row.querySelector('[data-role="resultado"]');
   resultadoEl.textContent = fmt(resultado);
   resultadoEl.classList.toggle('negativo', resultado < 0);
-
-  let badge = row.querySelector('.contador-alerta-badge');
-  if (usaCritica && passOk) {
-    if (!badge) {
-      badge = document.createElement('span');
-      badge.className = 'contador-alerta-badge autorizado';
-      row.querySelector('td').appendChild(badge);
-    }
-    badge.className = 'contador-alerta-badge autorizado';
-    badge.textContent = 'Referencia crítica autorizada.';
-  } else if (alerta && usaCritica) {
-    if (!badge) {
-      badge = document.createElement('span');
-      badge.className = 'contador-alerta-badge';
-      row.querySelector('td').appendChild(badge);
-    }
-    badge.className = 'contador-alerta-badge';
-    badge.textContent = 'Ingresa la contraseña admin para autorizar la referencia crítica.';
-  } else if (alerta) {
-    if (!badge) {
-      badge = document.createElement('span');
-      badge.className = 'contador-alerta-badge';
-      row.querySelector('td').appendChild(badge);
-    }
-    badge.className = 'contador-alerta-badge';
-    badge.textContent = 'Valor menor a la referencia — verifica el dato. Si es correcto, marca referencia crítica.';
-  } else if (badge) {
-    badge.remove();
-  }
 }
 
 function recalcularContadores() {
   let total = 0;
   document.querySelectorAll('#contadores-body tr[data-item-id]').forEach(row => {
+    if (row.dataset.pausado === '1') return;
     recalcularFilaContador(row);
     if (!(row.dataset.guardado === '1' || filaContadorTieneCaptura(row))) return;
     const texto = row.querySelector('[data-role="resultado"]')?.textContent || '';
@@ -698,31 +745,6 @@ function bindContadoresInputs() {
     }
   });
 
-  document.querySelectorAll('.contador-critica-check').forEach(check => {
-    if (check.dataset.bound === '1') return;
-    check.dataset.bound = '1';
-    check.addEventListener('change', () => {
-      const row = check.closest('tr');
-      const detalle = row.querySelector('.contador-critica-detalle');
-      const passField = row.querySelector('[data-role="critica-password"]');
-      if (check.checked) {
-        ['entradas', 'salidas', 'jackpot', 'cancelled'].forEach(role => {
-          const source = row.querySelector(`[data-role="${role}"]`);
-          const target = row.querySelector(`[data-role="critica-${role}"]`);
-          if (source && target && !target.value) target.value = source.value;
-        });
-        if (detalle) detalle.open = true;
-        if (passField) {
-          passField.classList.toggle('oculto', adminOverride.contadores);
-          if (!adminOverride.contadores) passField.focus();
-        }
-      } else {
-        if (passField) { passField.classList.add('oculto'); passField.value = ''; }
-      }
-      recalcularContadores();
-      guardarDraftContadores();
-    });
-  });
 }
 
 function manejarEventoContadores(target) {
@@ -730,8 +752,85 @@ function manejarEventoContadores(target) {
   if (target.matches('.contador-campo')) {
     formatearInputNumerico(target, false, false);
   }
+  // Al editar campos de referencia crítica, se pierde la autorización previa
+  if (target.matches('[data-role="critica-entradas"],[data-role="critica-salidas"],[data-role="critica-jackpot"],[data-role="critica-cancelled"]')) {
+    const row = target.closest('tr');
+    if (row && row.dataset.criticaAutorizada === '1') {
+      row.dataset.criticaAutorizada = '0';
+      actualizarSummaryCritica(row);
+    }
+  }
   recalcularContadores();
   guardarDraftContadores();
+}
+
+function actualizarSummaryCritica(row) {
+  const summary = row.querySelector('.contador-critica-detalle summary');
+  if (!summary) return;
+  const autorizado = row.dataset.criticaAutorizada === '1';
+  summary.textContent = autorizado ? 'Autorizado' : 'Referencia crítica';
+  summary.className = autorizado ? 'autorizado' : '';
+}
+
+function confirmarReferenciaCritica(row) {
+  const passField = row.querySelector('[data-role="critica-password"]');
+  const passError = row.querySelector('.critica-pass-error');
+  const pass = (passField?.value || '').trim();
+  const ok = adminOverride.contadores || pass === CONTRASENA;
+  if (!ok) {
+    if (passError) { passError.textContent = 'Contraseña incorrecta.'; passError.classList.remove('oculto'); }
+    if (passField) { passField.value = ''; passField.focus(); }
+    return;
+  }
+  if (passError) { passError.textContent = ''; passError.classList.add('oculto'); }
+  if (passField) passField.value = '';
+  const defaults = {
+    'critica-entradas': row.dataset.refEntradas || '0',
+    'critica-salidas': row.dataset.refSalidas || '0',
+    'critica-jackpot': row.dataset.refJackpot || '0',
+    'critica-cancelled': row.dataset.refCancelled || '0',
+  };
+  Object.entries(defaults).forEach(([role, value]) => {
+    const input = row.querySelector(`[data-role="${role}"]`);
+    if (input && !input.value.trim()) input.value = limpiarNumeroTexto(value);
+  });
+  row.dataset.criticaAutorizada = '1';
+  const detalle = row.querySelector('.contador-critica-detalle');
+  if (detalle) detalle.open = false;
+  actualizarSummaryCritica(row);
+  recalcularContadores();
+  guardarDraftContadores();
+}
+
+async function togglePausaContador(btn) {
+  const row = btn.closest('tr');
+  if (!row) return;
+  const pausado = btn.dataset.pausado === '1';
+  const detalle = btn.closest('.contador-pausa-detalle');
+  const passField = detalle?.querySelector('[data-role="pausa-password"]');
+  const passError = detalle?.querySelector('.pausa-pass-error');
+  const pass = (passField?.value || '').trim();
+  const ok = adminOverride.contadores || pass === CONTRASENA;
+  if (!ok) {
+    if (passError) { passError.textContent = 'Contraseña incorrecta.'; passError.classList.remove('oculto'); }
+    if (passField) { passField.value = ''; passField.focus(); }
+    return;
+  }
+  const itemId = row.dataset.itemId;
+  try {
+    const res = await fetch(`/api/modulos/contadores/catalogo/${encodeURIComponent(itemId)}/pausar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pausado: !pausado }),
+    });
+    const data = await res.json();
+    if (!data.ok) { mostrarMensaje(data.mensaje || 'Error al cambiar estado.', 'error'); return; }
+    const fecha = document.getElementById('fecha')?.value;
+    await cargarDatosContadores(fecha);
+    mostrarMensaje(`${row.dataset.nombre}: ${!pausado ? 'máquina pausada' : 'máquina reactivada'}.`, 'ok');
+  } catch {
+    mostrarMensaje('Error de conexión al cambiar estado de pausa.', 'error');
+  }
 }
 
 function limpiarFormularioBonos() {
@@ -740,6 +839,14 @@ function limpiarFormularioBonos() {
   if (cliente) cliente.value = '';
   if (valor) valor.value = '';
   actualizarAcumuladoBonoCliente();
+}
+
+function limpiarFormularioPrestamos() {
+  const persona = document.getElementById('prestamo-persona');
+  const valor = document.getElementById('prestamo-valor');
+  if (persona) persona.value = '';
+  if (valor) valor.value = '';
+  actualizarResumenPersonaPrestamo();
 }
 
 function limpiarFormularioGastos() {
@@ -800,6 +907,60 @@ function autocompletarClienteBono() {
   return true;
 }
 
+function autocompletarPersonaPrestamo() {
+  const input = document.getElementById('prestamo-persona');
+  const texto = input?.value.trim() || '';
+  if (!texto) return false;
+
+  const exacta = loanNames.find(nombre => nombre.toLocaleLowerCase('es-CO') === texto.toLocaleLowerCase('es-CO'));
+  if (exacta) {
+    input.value = exacta;
+    return true;
+  }
+
+  const coincidencia = loanNames.find(nombre => nombre.toLocaleLowerCase('es-CO').startsWith(texto.toLocaleLowerCase('es-CO')));
+  if (!coincidencia) return false;
+
+  input.value = coincidencia;
+  return true;
+}
+
+function obtenerTipoPrestamoSeleccionado() {
+  return document.querySelector('input[name="prestamo-tipo"]:checked')?.value || 'prestamo';
+}
+
+function obtenerResumenPersonaPrestamo(persona) {
+  const nombre = String(persona || '').trim().toLocaleLowerCase('es-CO');
+  if (!nombre) {
+    return { totalPrestado: 0, totalPagado: 0, saldoPendiente: 0 };
+  }
+  return loanItems.reduce((acc, item) => {
+    const actual = String(item.persona || '').trim().toLocaleLowerCase('es-CO');
+    if (actual !== nombre) return acc;
+    const valor = Number(item.valor || 0);
+    if (item.tipo_movimiento === 'pago') acc.totalPagado += valor;
+    else acc.totalPrestado += valor;
+    acc.saldoPendiente = acc.totalPrestado - acc.totalPagado;
+    return acc;
+  }, { totalPrestado: 0, totalPagado: 0, saldoPendiente: 0 });
+}
+
+function actualizarResumenPersonaPrestamo() {
+  const hint = document.getElementById('prestamo-resumen-hint');
+  const persona = document.getElementById('prestamo-persona')?.value.trim() || '';
+  if (!hint) return;
+  if (!persona) {
+    hint.textContent = 'Sin movimientos previos para esta persona.';
+    return;
+  }
+  const resumen = obtenerResumenPersonaPrestamo(persona);
+  if (!resumen.totalPrestado && !resumen.totalPagado) {
+    hint.textContent = 'Sin movimientos previos para esta persona.';
+    return;
+  }
+  hint.textContent = `Prestado: ${fmt(resumen.totalPrestado)} | Pagado: ${fmt(resumen.totalPagado)} | Saldo: ${fmt(resumen.saldoPendiente)}`;
+}
+
 function autocompletarConceptoGasto() {
   const input = document.getElementById('gasto-concepto');
   const texto = input?.value.trim() || '';
@@ -854,6 +1015,32 @@ function renderBonosRegistros(items = [], total = 0) {
   actualizarAcumuladoBonoCliente();
 }
 
+function renderPrestamosRegistros(items = [], resumen = {}) {
+  const tbody = document.getElementById('prestamos-registros-body');
+  loanItems = Array.isArray(items) ? [...items] : [];
+  tbody.innerHTML = '';
+  if (!loanItems.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="bonos-vacio">Sin movimientos registrados.</td></tr>';
+  } else {
+    [...loanItems].reverse().forEach(item => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${item.fecha_display || formatFechaVisual(item.fecha)}</td>
+        <td>${item.hora_display || ''}</td>
+        <td>${item.persona || ''}</td>
+        <td>${item.tipo_movimiento === 'pago' ? 'Pago' : 'Préstamo'}</td>
+        <td>${fmt(item.valor || 0)}</td>
+        <td>${fmt(item.saldo_pendiente || 0)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+  document.getElementById('total-prestado').textContent = fmt(resumen.total_prestado || 0);
+  document.getElementById('total-pagado').textContent = fmt(resumen.total_pagado || 0);
+  document.getElementById('saldo-prestamos').textContent = fmt(resumen.saldo_pendiente || 0);
+  actualizarResumenPersonaPrestamo();
+}
+
 async function cargarBonosDelDia(fecha) {
   try {
     const res = await fetch(`/api/modulos/bonos/fecha/${fecha}/datos?t=${Date.now()}`, { cache: 'no-store' });
@@ -868,12 +1055,39 @@ async function cargarBonosDelDia(fecha) {
   }
 }
 
+async function cargarPrestamosDelDia(fecha) {
+  try {
+    const res = await fetch(`/api/modulos/prestamos/datos?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) {
+      renderPrestamosRegistros([], {});
+      return;
+    }
+    const data = await res.json();
+    renderPrestamosRegistros(data.items || [], data);
+  } catch {
+    renderPrestamosRegistros([], {});
+  }
+}
+
 function validarBono() {
   const cliente = document.getElementById('bono-cliente').value.trim();
   const valorRaw = document.getElementById('bono-valor').value;
   const valor = valorRaw === '' ? 0 : Number(valorRaw);
   if (!cliente) return 'Debes ingresar el nombre del cliente.';
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de bono mayor que cero.';
+  return null;
+}
+
+function validarPrestamo() {
+  const persona = document.getElementById('prestamo-persona').value.trim();
+  const valor = parseNumeroInput('prestamo-valor');
+  if (!persona) return 'Debes ingresar el nombre de la persona.';
+  if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de préstamo mayor que cero.';
+  if (obtenerTipoPrestamoSeleccionado() === 'pago') {
+    const resumen = obtenerResumenPersonaPrestamo(persona);
+    if (resumen.saldoPendiente <= 0) return 'Esa persona no tiene saldo pendiente para registrar un pago.';
+    if (valor > resumen.saldoPendiente) return `El pago supera el saldo pendiente de ${fmt(resumen.saldoPendiente)}.`;
+  }
   return null;
 }
 
@@ -957,6 +1171,8 @@ function limpiarModuloActual() {
     })), 0);
   } else if (currentModule === 'bonos') {
     limpiarFormularioBonos();
+  } else if (currentModule === 'prestamos') {
+    limpiarFormularioPrestamos();
   } else {
     limpiarFormularioGastos();
   }
@@ -981,9 +1197,10 @@ function actualizarPaneles() {
     document.getElementById(meta.panelId).classList.toggle('oculto', modulo !== currentModule);
   });
   document.getElementById('fecha-label').textContent = MODULE_META[currentModule].dateLabel;
-  document.getElementById('btn-guardar').classList.toggle('oculto', ['bonos', 'gastos'].includes(currentModule));
+  document.getElementById('btn-guardar').classList.toggle('oculto', ['bonos', 'gastos', 'prestamos'].includes(currentModule));
   document.getElementById('btn-guardar').textContent = 'Guardar';
   actualizarBonosVisuales();
+  actualizarPrestamosVisuales();
 }
 
 function sugerirFechaModulo(modulo) {
@@ -1009,6 +1226,7 @@ async function activarModulo(modulo) {
   if (!enabledModules.includes(modulo)) {
     currentModule = enabledModules[0];
   }
+  sessionStorage.setItem('lastModule', currentModule);
   renderTabs();
   actualizarPaneles();
   aplicarFechaModulo(currentModule);
@@ -1016,6 +1234,10 @@ async function activarModulo(modulo) {
     limpiarFormularioBonos();
     actualizarAccionesBonos();
     actualizarBonosVisuales();
+  }
+  if (currentModule === 'prestamos') {
+    limpiarFormularioPrestamos();
+    actualizarPrestamosVisuales();
   }
   if (currentModule === 'contadores') {
     resetOverride('contadores');
@@ -1210,6 +1432,10 @@ async function cargarDatosModuloItems(modulo, fecha) {
     await cargarBonosDelDia(fecha);
     return;
   }
+  if (modulo === 'prestamos') {
+    await cargarPrestamosDelDia(fecha);
+    return;
+  }
   try {
     const res = await fetch(`/api/modulos/${modulo}/fecha/${fecha}/datos`);
     if (!res.ok) {
@@ -1286,6 +1512,38 @@ async function registrarBono() {
   document.getElementById('bono-cliente').focus();
 }
 
+async function registrarPrestamo() {
+  const error = validarPrestamo();
+  if (error) {
+    mostrarMensaje(error, 'error');
+    return;
+  }
+  const fecha = document.getElementById('fecha').value;
+  const persona = document.getElementById('prestamo-persona').value.trim();
+  const tipo_movimiento = obtenerTipoPrestamoSeleccionado();
+  const valor = parseNumeroInput('prestamo-valor');
+
+  const res = await fetch('/api/modulos/prestamos/registrar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha, persona, tipo_movimiento, valor, forzar: adminOverride.prestamos }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    mostrarMensaje(data.mensaje, 'advertencia');
+    return;
+  }
+  limpiarFormularioPrestamos();
+  loanNames = Array.from(new Set([...loanNames, persona])).sort((a, b) => a.localeCompare(b, 'es'));
+  renderLoanNames();
+  await cargarPrestamosDelDia(fecha);
+  actualizarPrestamosVisuales();
+  mostrarMensaje(`✓ ${data.mensaje} — ${data.persona}: ${fmt(data.valor)} — Saldo pendiente: ${fmt(data.saldo_pendiente)}`, 'ok');
+  resetOverride('prestamos');
+  await verificarFechaActual();
+  document.getElementById('prestamo-persona').focus();
+}
+
 function validarGasto() {
   const concepto = document.getElementById('gasto-concepto').value.trim();
   const valorRaw = document.getElementById('gasto-valor').value;
@@ -1330,6 +1588,7 @@ function validarContadores() {
   if (!rows.length) return 'No hay ítems configurados en Contadores.';
 
   for (const row of rows) {
+    if (row.dataset.pausado === '1') continue;
     const tieneCaptura = filaContadorTieneCaptura(row);
     const completa = filaContadorCompleta(row);
 
@@ -1351,23 +1610,21 @@ function validarContadores() {
 
     const entradas = valorContadorRow(row, 'entradas');
     const salidas = valorContadorRow(row, 'salidas');
-    const alerta = entradas < Number(row.dataset.refEntradas || 0) || salidas < Number(row.dataset.refSalidas || 0);
-    const usaCritica = row.querySelector('.contador-critica-check')?.checked;
+    const jackpot = valorContadorRow(row, 'jackpot');
+    const cancelled = valorContadorRow(row, 'cancelled');
+    const alerta = entradas < Number(row.dataset.refEntradas || 0)
+      || salidas < Number(row.dataset.refSalidas || 0)
+      || jackpot < Number(row.dataset.refJackpot || 0)
+      || cancelled < Number(row.dataset.refCancelled || 0);
+    const usaCritica = row.dataset.criticaAutorizada === '1';
 
     if (alerta && !usaCritica) {
-      return `El ítem ${row.dataset.nombre} tiene Entradas o Salidas inferiores a su referencia vigente. Debes autorizar admin y marcar referencia crítica.`;
+      return `${row.dataset.nombre}: hay valores menores a la referencia en Entradas, Salidas, Jackpot o Cancelled. Abre "Referencia crítica", ajusta los valores y confirma con la contraseña.`;
     }
 
     if (usaCritica) {
-      const passField = row.querySelector('[data-role="critica-password"]');
-      const passOk = adminOverride.contadores || (passField?.value || '') === CONTRASENA;
-      if (!passOk) {
-        return `Ingresa la contraseña admin para usar referencia crítica en ${row.dataset.nombre}.`;
-      }
-      const observacion = row.querySelector('[data-role="critica-observacion"]')?.value.trim() || '';
-      if (!observacion) {
-        return `Escribe una observación para la referencia crítica de ${row.dataset.nombre}.`;
-      }
+      const observacion = row.querySelector('[data-role="critica-observacion"]');
+      if (observacion && !observacion.value.trim()) observacion.value = OBSERVACION_CRITICA_DEFAULT;
     }
   }
 
@@ -1382,8 +1639,10 @@ async function guardarContadores() {
   }
 
   const fecha = document.getElementById('fecha').value;
-  const items = [...document.querySelectorAll('#contadores-body tr[data-item-id]')].map(row => {
-    const usarReferenciaCritica = row.querySelector('.contador-critica-check')?.checked || false;
+  const items = [...document.querySelectorAll('#contadores-body tr[data-item-id]')]
+    .filter(row => row.dataset.pausado !== '1')
+    .map(row => {
+    const usarReferenciaCritica = row.dataset.criticaAutorizada === '1';
     const item = {
       item_id: row.dataset.itemId,
       entradas: valorContadorRow(row, 'entradas'),
@@ -1393,13 +1652,12 @@ async function guardarContadores() {
       usar_referencia_critica: usarReferenciaCritica,
     };
     if (usarReferenciaCritica) {
-      const observacion = row.querySelector('[data-role="critica-observacion"]')?.value.trim() || '';
+      const observacion = row.querySelector('[data-role="critica-observacion"]')?.value.trim() || OBSERVACION_CRITICA_DEFAULT;
       item.referencia_critica = {
         entradas: valorContadorRow(row, 'critica-entradas'),
         salidas: valorContadorRow(row, 'critica-salidas'),
         jackpot: valorContadorRow(row, 'critica-jackpot'),
         cancelled: valorContadorRow(row, 'critica-cancelled'),
-        motivo: observacion,
         observacion,
       };
     }
@@ -1464,16 +1722,19 @@ function setCatalogoTextarea(id, items = []) {
 }
 
 async function cargarCatalogosAdmin() {
-  const [bonosRes, gastosRes, contadoresRes] = await Promise.all([
+  const [bonosRes, gastosRes, prestamosRes, contadoresRes] = await Promise.all([
     fetch('/api/modulos/catalogos/bonos'),
     fetch('/api/modulos/catalogos/gastos'),
+    fetch('/api/modulos/catalogos/prestamos'),
     fetch('/api/modulos/catalogos/contadores'),
   ]);
   const bonosData = bonosRes.ok ? await bonosRes.json() : { nombres: [] };
   const gastosData = gastosRes.ok ? await gastosRes.json() : { conceptos: [] };
+  const prestamosData = prestamosRes.ok ? await prestamosRes.json() : { nombres: [] };
   const contadoresData = contadoresRes.ok ? await contadoresRes.json() : { items: [] };
   setCatalogoTextarea('admin-bonos-catalogo', bonosData.nombres || []);
   setCatalogoTextarea('admin-gastos-catalogo', gastosData.conceptos || []);
+  setCatalogoTextarea('admin-prestamos-catalogo', prestamosData.nombres || []);
   setContadoresCatalogoTextarea(contadoresData.items || []);
 }
 
@@ -1576,6 +1837,7 @@ function validarCaja() {
 
 function validarModuloItems(modulo) {
   if (modulo === 'gastos') return validarGasto();
+  if (modulo === 'prestamos') return validarPrestamo();
   if (modulo === 'contadores') return validarContadores();
   return null;
 }
@@ -1594,6 +1856,8 @@ async function guardar() {
       ? validarContadores()
     : currentModule === 'bonos'
       ? validarBono()
+      : currentModule === 'prestamos'
+        ? validarPrestamo()
       : validarModuloItems(currentModule);
   if (error) {
     mostrarMensaje(error, 'error');
@@ -1636,6 +1900,9 @@ async function guardar() {
     } else if (currentModule === 'bonos') {
       await registrarBono();
       return;
+    } else if (currentModule === 'prestamos') {
+      await registrarPrestamo();
+      return;
     } else if (currentModule === 'gastos') {
       await registrarGasto();
       return;
@@ -1660,7 +1927,7 @@ async function guardar() {
       limpiarCaja();
       setCajaEditable(false);
       mostrarMensaje(`✓ ${data.mensaje} — Total caja física: ${fmt(data.total_caja_fisica)} — ${data.fecha_hora_registro.slice(0, 10)} ${hora12}`, 'ok');
-    } else if (currentModule === 'bonos') {
+    } else if (currentModule === 'bonos' || currentModule === 'prestamos') {
       return;
     } else {
       if (adminOverride[currentModule]) resetOverride(currentModule);
@@ -1784,6 +2051,11 @@ async function guardarAdmin() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items: parseCatalogoTextarea('admin-gastos-catalogo') }),
     });
+    await fetch('/api/modulos/catalogos/prestamos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: parseCatalogoTextarea('admin-prestamos-catalogo') }),
+    });
     await fetch('/api/modulos/catalogos/contadores', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1796,6 +2068,7 @@ async function guardarAdmin() {
     configSede = body.sede || 'Principal';
     configDataDir = body.data_dir;
     await cargarBonusNames();
+    await cargarLoanNames();
     await cargarExpenseConcepts();
     await cargarContadoresCatalogo();
 
@@ -1852,6 +2125,7 @@ async function cerrarAplicacion() {
 async function init() {
   buildTablaBilletes();
   await cargarBonusNames();
+  await cargarLoanNames();
   await cargarExpenseConcepts();
   await cargarContadoresCatalogo();
 
@@ -1870,15 +2144,20 @@ async function init() {
     caja: sugerirFechaModulo('caja'),
     gastos: sugerirFechaModulo('gastos'),
     bonos: sugerirFechaModulo('bonos'),
+    prestamos: sugerirFechaModulo('prestamos'),
     contadores: sugerirFechaModulo('contadores'),
   };
-  currentModule = enabledModules.includes(defaultModule) ? defaultModule : enabledModules[0];
+  const _savedModule = sessionStorage.getItem('lastModule');
+  currentModule = (_savedModule && enabledModules.includes(_savedModule))
+    ? _savedModule
+    : (enabledModules.includes(defaultModule) ? defaultModule : enabledModules[0]);
 
   aplicarModoEntrada();
   renderTabs();
   actualizarPaneles();
   aplicarFechaModulo(currentModule);
   actualizarBonosVisuales();
+  actualizarPrestamosVisuales();
   await cargarVistaModulo(currentModule, moduleDates[currentModule]);
   await verificarFechaActual();
 
@@ -1924,6 +2203,9 @@ async function init() {
       limpiarFormularioBonos();
       actualizarBonosVisuales();
       actualizarAccionesBonos();
+    } else if (currentModule === 'prestamos') {
+      limpiarFormularioPrestamos();
+      actualizarPrestamosVisuales();
     } else if (currentModule === 'gastos') {
       limpiarFormularioGastos();
     } else if (currentModule === 'contadores') {
@@ -1945,6 +2227,7 @@ async function init() {
     moduleDates[currentModule] = sugerirFechaModulo(currentModule);
     aplicarFechaModulo(currentModule);
     if (currentModule === 'bonos') limpiarFormularioBonos();
+    if (currentModule === 'prestamos') limpiarFormularioPrestamos();
     await cargarVistaModulo(currentModule, moduleDates[currentModule]);
     await verificarFechaActual();
   });
@@ -1975,9 +2258,18 @@ async function init() {
   });
 
   document.getElementById('btn-bono-registrar').addEventListener('click', registrarBono);
+  document.getElementById('btn-prestamo-registrar').addEventListener('click', registrarPrestamo);
   document.getElementById('btn-gasto-registrar').addEventListener('click', registrarGasto);
   document.getElementById('btn-bono-editar-ultimo').addEventListener('click', editarUltimoBono);
   document.getElementById('btn-bono-eliminar-ultimo').addEventListener('click', eliminarUltimoBono);
+  document.getElementById('contadores-body').addEventListener('click', e => {
+    if (e.target.matches('.btn-confirmar-critica')) {
+      confirmarReferenciaCritica(e.target.closest('tr'));
+    }
+    if (e.target.matches('.btn-toggle-pausa')) {
+      togglePausaContador(e.target);
+    }
+  });
   document.getElementById('contadores-body').addEventListener('input', e => {
     if (e.target.matches('.contador-campo, .contador-critica input, .contador-critica textarea')) {
       manejarEventoContadores(e.target);
@@ -1995,13 +2287,18 @@ async function init() {
     }
   }, true);
   document.getElementById('contadores-body').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.matches('[data-role="critica-password"]')) {
+      e.preventDefault();
+      confirmarReferenciaCritica(e.target.closest('tr'));
+      return;
+    }
     if (e.key === 'Enter' && e.target.matches('.contador-campo')) {
       e.preventDefault();
       moverSiguienteCampoContador(e.target);
       manejarEventoContadores(e.target);
     }
   });
-  ['bono-valor', 'gasto-valor'].forEach(id => {
+  ['bono-valor', 'gasto-valor', 'prestamo-valor'].forEach(id => {
     const el = document.getElementById(id);
     formatearInputNumerico(el);
     el.addEventListener('input', () => formatearInputNumerico(el));
@@ -2009,6 +2306,7 @@ async function init() {
     el.addEventListener('blur', () => formatearInputNumerico(el));
   });
   document.getElementById('bono-cliente').addEventListener('input', actualizarAcumuladoBonoCliente);
+  document.getElementById('prestamo-persona').addEventListener('input', actualizarResumenPersonaPrestamo);
   document.getElementById('gasto-concepto').addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
@@ -2031,13 +2329,34 @@ async function init() {
       document.getElementById('bono-valor').select();
     }
   });
+  document.getElementById('prestamo-persona').addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      autocompletarPersonaPrestamo();
+      actualizarResumenPersonaPrestamo();
+      document.getElementById('prestamo-valor').focus();
+      document.getElementById('prestamo-valor').select();
+    }
+  });
   document.getElementById('bono-valor').addEventListener('keydown', e => {
     if (e.key === 'Enter') {
       e.preventDefault();
       document.getElementById('btn-bono-registrar').focus();
     }
   });
-  setInterval(actualizarBonosVisuales, 30000);
+  document.getElementById('prestamo-valor').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('btn-prestamo-registrar').focus();
+    }
+  });
+  document.querySelectorAll('input[name="prestamo-tipo"]').forEach(el => {
+    el.addEventListener('change', actualizarResumenPersonaPrestamo);
+  });
+  setInterval(() => {
+    actualizarBonosVisuales();
+    actualizarPrestamosVisuales();
+  }, 30000);
 
   document.getElementById('modal-admin').addEventListener('click', e => {
     if (e.target === e.currentTarget) cerrarAdmin();

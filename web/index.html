@@ -218,6 +218,76 @@
       </section>
     </section>
 
+    <section id="panel-prestamos" class="modulo-panel oculto">
+      <section class="card">
+        <h2>Préstamos y pagos</h2>
+        <p class="modulo-ayuda">Registra movimientos de préstamo o pago. El historial permanece visible y el saldo pendiente se calcula por persona.</p>
+        <div class="bonos-meta">
+          <div class="bonos-meta-item">
+            <span class="bonos-meta-label">Fecha</span>
+            <span id="prestamos-fecha-visual" class="bonos-meta-value">--</span>
+          </div>
+        </div>
+        <div class="radio-group radio-group-inline">
+          <label><input type="radio" name="prestamo-tipo" value="prestamo" checked /> Préstamo</label>
+          <label><input type="radio" name="prestamo-tipo" value="pago" /> Pago</label>
+        </div>
+        <div class="bonos-form">
+          <div class="campo-manual bonos-cliente">
+            <label for="prestamo-persona">Persona</label>
+            <input type="text" id="prestamo-persona" list="prestamos-personas-lista" autocomplete="off" placeholder="Nombre de la persona" />
+            <datalist id="prestamos-personas-lista"></datalist>
+            <p id="prestamo-resumen-hint" class="modulo-ayuda bono-acumulado-hint">Sin movimientos previos para esta persona.</p>
+          </div>
+          <div class="campo-manual bonos-valor">
+            <label for="prestamo-valor">Valor</label>
+            <input type="text" inputmode="numeric" id="prestamo-valor" placeholder="0" />
+          </div>
+        </div>
+        <div class="bonos-acciones">
+          <button id="btn-prestamo-registrar" class="btn btn-primary" type="button">Registrar</button>
+        </div>
+        <div class="resumen-grid resumen-grid-simple">
+          <div class="resumen-item">
+            <span class="resumen-label">Total prestado</span>
+            <span id="total-prestado">$ 0</span>
+          </div>
+          <div class="resumen-item">
+            <span class="resumen-label">Total pagado</span>
+            <span id="total-pagado">$ 0</span>
+          </div>
+          <div class="resumen-item resumen-total">
+            <span class="resumen-label">Saldo pendiente</span>
+            <span id="saldo-prestamos">$ 0</span>
+          </div>
+        </div>
+      </section>
+      <section class="card">
+        <details id="prestamos-detalle-dia" open>
+          <summary>Historial de movimientos</summary>
+          <div class="bonos-listado-wrap">
+            <table class="bonos-tabla">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Hora</th>
+                  <th>Persona</th>
+                  <th>Tipo</th>
+                  <th>Valor</th>
+                  <th>Saldo persona</th>
+                </tr>
+              </thead>
+              <tbody id="prestamos-registros-body">
+                <tr>
+                  <td colspan="6" class="bonos-vacio">Sin movimientos registrados.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+    </section>
+
     <section id="panel-contadores" class="modulo-panel oculto">
       <section class="card">
         <h2>Contadores del día</h2>
@@ -306,6 +376,7 @@
               <label><input type="checkbox" name="enabled_modules" value="caja" /> Caja</label>
               <label><input type="checkbox" name="enabled_modules" value="gastos" /> Gastos</label>
               <label><input type="checkbox" name="enabled_modules" value="bonos" /> Bonos</label>
+              <label><input type="checkbox" name="enabled_modules" value="prestamos" /> Prestamos</label>
               <label><input type="checkbox" name="enabled_modules" value="contadores" /> Contadores</label>
             </div>
           </div>
@@ -345,6 +416,13 @@
             <div class="admin-catalogo-body">
               <textarea id="admin-gastos-catalogo" class="catalogo-editor" rows="6" placeholder="Un concepto por línea"></textarea>
               <p class="modal-desc">Puedes corregir ortografía o mantener conceptos frecuentes como "Pago arriendo local".</p>
+            </div>
+          </details>
+          <details class="admin-catalogo">
+            <summary>Personas frecuentes de préstamos</summary>
+            <div class="admin-catalogo-body">
+              <textarea id="admin-prestamos-catalogo" class="catalogo-editor" rows="6" placeholder="Una persona por línea"></textarea>
+              <p class="modal-desc">Este catálogo se usa para autocompletado rápido de préstamos a operarios.</p>
             </div>
           </details>
           <details class="admin-catalogo">
