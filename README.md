@@ -7,6 +7,7 @@ Aplicación local para registrar arqueos de caja, gastos, bonos y un prototipo f
 - Captura arqueos diarios de caja desde una interfaz web local.
 - Registra gastos del día en hoja separada por sede.
 - Registra bonos del día con nombre de cliente en hoja separada por sede.
+- Registra préstamos a personas y pagos a cuenta, con saldo pendiente en tiempo real.
 - Incluye un módulo local de Contadores para capturar Entradas, Salidas, Jackpot y Cancelled por ítem.
 - Guarda la información en archivos anuales por sede: `Contadores_Barbacoas_2026.xlsx`.
 - Soporte multi-sede: cada equipo configura su sede y escribe en su propio libro anual.
@@ -32,16 +33,18 @@ app/
   config.py                # Constantes, denominaciones y get_excel_path()
   runtime_paths.py         # Resolución de rutas (desarrollo / EXE)
   models/
-    caja_models.py         # Modelos Pydantic de entrada y respuesta
+    caja_models.py         # Modelos Pydantic de Caja, Gastos, Bonos y Préstamos
+    contadores_models.py   # Modelos Pydantic de Contadores y catálogo de ítems
   routers/
-    modules.py             # Endpoints /api/modulos/* (caja, gastos, bonos, contadores)
+    modules.py             # Endpoints /api/modulos/* (caja, gastos, bonos, préstamos, contadores)
     settings.py            # Endpoints /api/settings/* y /api/app/shutdown
   services/
-    caja_service.py        # Lógica de negocio para caja y gastos
+    caja_service.py        # Lógica de negocio para caja, gastos y estado de módulos
     excel_service.py       # Lectura y escritura de Excel (openpyxl)
     settings_service.py    # Configuración local y diálogos de carpeta
     bonos_service.py       # Operaciones individuales sobre bonos
-    nombres_service.py     # Catálogos locales (clientes y conceptos de gastos)
+    prestamos_service.py   # Lógica de negocio para préstamos y pagos
+    nombres_service.py     # Catálogos locales (clientes, personas y conceptos)
     contadores_service.py  # Catálogo, referencias y registros locales de Contadores
 web/
   index.html               # Interfaz principal
@@ -131,34 +134,36 @@ El año se toma automáticamente de la fecha del registro, por lo que al cambiar
 
 Cada equipo configura una sede distinta. Todos pueden apuntar a la misma carpeta compartida, pero cada uno escribirá en su propio archivo anual:
 
-| Sede        | Archivo anual                          | Hojas internas |
-|-------------|----------------------------------------|----------------|
-| Barbacoas   | `Contadores_Barbacoas_2026.xlsx`       | `CajaBarbacoas`, `GastosBarbacoas`, `BonosBarbacoas` |
-| SanJose     | `Contadores_SanJose_2026.xlsx`         | `CajaSanJose`, `GastosSanJose`, `BonosSanJose` |
-| Satinga     | `Contadores_Satinga_2026.xlsx`         | `CajaSatinga`, `GastosSatinga`, `BonosSatinga` |
+| Sede        | Archivo anual                          | Hojas internas (según módulos habilitados)                                             |
+|-------------|----------------------------------------|----------------------------------------------------------------------------------------|
+| Barbacoas   | `Contadores_Barbacoas_2026.xlsx`       | `CajaBarbacoas`, `GastosBarbacoas`, `BonosBarbacoas`, `PrestamosBarbacoas`, `ContadoresBarbacoas` |
+| SanJose     | `Contadores_SanJose_2026.xlsx`         | `CajaSanJose`, `GastosSanJose`, `BonosSanJose`, `PrestamosSanJose`, `ContadoresSanJose` |
+| Satinga     | `Contadores_Satinga_2026.xlsx`         | `CajaSatinga`, `GastosSatinga`, `BonosSatinga`, `PrestamosSatinga`, `ContadoresSatinga` |
 
 Esto facilita consolidar información con Power Query u otros procesos contables y reduce conflictos de sincronización entre sedes.
 
 ## Módulos disponibles
 
-| Módulo     | Descripción                                         | Restricción de fecha                          |
-|------------|-----------------------------------------------------|-----------------------------------------------|
-| **Caja**   | Arqueo de billetes + monedas + ventas informativas  | Requiere admin para corregir una fecha ya guardada |
-| **Gastos** | Lista de gastos del día con concepto y valor        | Hoy sin restricción; otro día requiere admin  |
-| **Bonos**  | Lista de bonos del día con cliente y valor          | Hoy sin restricción; otro día requiere admin  |
-| **Contadores** | Captura por ítem de Entradas, Salidas, Jackpot y Cancelled | Requiere admin para corregir una fecha ya guardada |
+| Módulo         | Descripción                                                        | Restricción de fecha                               |
+|----------------|--------------------------------------------------------------------|----------------------------------------------------||
+| **Caja**       | Arqueo de billetes + monedas + ventas informativas                 | Requiere admin para corregir una fecha ya guardada |
+| **Gastos**     | Lista de gastos del día con concepto y valor                       | Hoy sin restricción; otro día requiere admin       |
+| **Bonos**      | Lista de bonos del día con cliente y valor                         | Hoy sin restricción; otro día requiere admin       |
+| **Préstamos**  | Registro de préstamos a personas y pagos asociados; saldo en tiempo real | Solo fecha actual sin restricción; otro día requiere admin |
+| **Contadores** | Captura por ítem de Entradas, Salidas, Jackpot y Cancelled         | Requiere admin para corregir una fecha ya guardada |
 
 ## Catálogos locales
 
 La app mantiene dos archivos de autocompletado en el mismo directorio que el EXE (o raíz del proyecto en desarrollo):
 
-| Archivo                | Contenido                          |
-|------------------------|------------------------------------|
-| `bonos_clientes.json`  | Nombres de clientes para bonos     |
-| `gastos_conceptos.json`| Conceptos usados en gastos         |
-| `contadores_items.json`| Catálogo de ítems de Contadores    |
-| `contadores_registros.json` | Registros diarios de Contadores |
-| `contadores_referencias_criticas.json` | Referencias críticas locales |
+| Archivo                                  | Contenido                                         |
+|------------------------------------------|---------------------------------------------------|
+| `bonos_clientes.json`                    | Nombres de clientes para bonos                    |
+| `gastos_conceptos.json`                  | Conceptos usados en gastos                        |
+| `prestamos_personas.json`                | Nombres de personas para préstamos                |
+| `contadores_items.json`                  | Catálogo de ítems de Contadores                   |
+| `contadores_registros.json`              | Registros diarios de Contadores                   |
+| `contadores_referencias_criticas.json`   | Referencias críticas locales                      |
 
 Estos archivos se actualizan automáticamente al guardar registros y se pueden editar manualmente desde el panel de administración. Son locales a cada equipo (no se comparten por Dropbox).
 

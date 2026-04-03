@@ -9,9 +9,11 @@ from app.models.caja_models import (
     CajaRespuesta,
     ModuloItemsEntrada,
     ModuloItemsRespuesta,
+    PrestamoEntrada,
+    PrestamoRespuesta,
 )
 from app.models.contadores_models import ContadoresEntrada, ContadoresRespuesta
-from app.services import bonos_service, caja_service, contadores_service, excel_service, nombres_service, settings_service
+from app.services import bonos_service, caja_service, contadores_service, excel_service, nombres_service, prestamos_service, settings_service
 
 router = APIRouter(prefix="/api/modulos")
 
@@ -63,6 +65,17 @@ def registrar_bono(entrada: BonoEntrada):
     return BonoRespuesta(**resultado)
 
 
+@router.post("/prestamos/registrar", response_model=PrestamoRespuesta)
+def registrar_prestamo(entrada: PrestamoEntrada):
+    resultado = prestamos_service.guardar_prestamo(entrada)
+    return PrestamoRespuesta(**resultado)
+
+
+@router.get("/prestamos/datos")
+def datos_prestamos():
+    return prestamos_service.obtener_registros()
+
+
 @router.get("/bonos/fecha/{fecha}/datos")
 def datos_fecha_bonos(fecha: str):
     try:
@@ -70,6 +83,18 @@ def datos_fecha_bonos(fecha: str):
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
     return bonos_service.obtener_registros(d)
+
+
+@router.get("/prestamos/fecha/{fecha}/datos")
+def datos_fecha_prestamos(fecha: str):
+    try:
+        d = date.fromisoformat(fecha)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+    registros = excel_service.obtener_prestamos_fecha(d, d.year)
+    if not registros:
+        raise HTTPException(status_code=404, detail="No hay datos para esa fecha")
+    return {"items": registros, "total": sum(item["valor"] for item in registros)}
 
 
 @router.get("/{modulo}/fecha/{fecha}/datos")
@@ -96,6 +121,11 @@ def gastos_conceptos():
     return {"conceptos": nombres_service.obtener_catalogo("gastos")}
 
 
+@router.get("/prestamos/personas")
+def prestamos_personas():
+    return {"personas": nombres_service.obtener_catalogo("prestamos")}
+
+
 @router.post("/bonos/nombres/importar")
 def importar_nombres_bonos():
     selected = settings_service.select_text_file_dialog(settings_service.get_settings().get("data_dir"))
@@ -107,17 +137,17 @@ def importar_nombres_bonos():
 
 @router.get("/catalogos/{tipo}")
 def obtener_catalogo(tipo: str):
-    if tipo not in {"bonos", "gastos", "contadores"}:
+    if tipo not in {"bonos", "gastos", "prestamos", "contadores"}:
         raise HTTPException(status_code=404, detail="Catalogo no soportado")
     if tipo == "contadores":
         return {"items": contadores_service.obtener_catalogo()}
-    key = "nombres" if tipo == "bonos" else "conceptos"
+    key = "nombres" if tipo in {"bonos", "prestamos"} else "conceptos"
     return {key: nombres_service.obtener_catalogo(tipo)}
 
 
 @router.post("/catalogos/{tipo}")
 def guardar_catalogo(tipo: str, body: dict):
-    if tipo not in {"bonos", "gastos", "contadores"}:
+    if tipo not in {"bonos", "gastos", "prestamos", "contadores"}:
         raise HTTPException(status_code=404, detail="Catalogo no soportado")
     items = body.get("items")
     if not isinstance(items, list):
@@ -126,9 +156,15 @@ def guardar_catalogo(tipo: str, body: dict):
         resultado = contadores_service.guardar_catalogo(items)
         return {"ok": True, "items": resultado, "total": len(resultado)}
     nombres_service.guardar_catalogo(tipo, items)
-    key = "nombres" if tipo == "bonos" else "conceptos"
+    key = "nombres" if tipo in {"bonos", "prestamos"} else "conceptos"
     resultado = nombres_service.obtener_catalogo(tipo)
     return {"ok": True, key: resultado, "total": len(resultado)}
+
+
+@router.post("/contadores/catalogo/{item_id}/pausar")
+def pausar_contador(item_id: str, body: dict):
+    pausado = bool(body.get("pausado", True))
+    return contadores_service.pausar_item(item_id, pausado)
 
 
 @router.post("/bonos/ultimo/editar", response_model=BonoRespuesta)
@@ -149,15 +185,16 @@ def eliminar_ultimo_bono(body: dict):
 
 @router.get("/{modulo}/fecha/{fecha}/estado")
 def consultar_fecha_modulo(modulo: str, fecha: str):
-    if modulo not in {"caja", "gastos", "bonos", "contadores"}:
+    if modulo not in {"caja", "gastos", "bonos", "prestamos", "contadores"}:
         raise HTTPException(status_code=404, detail="Modulo no soportado")
     try:
         if modulo == "contadores":
+            existe = contadores_service.fecha_existe(date.fromisoformat(fecha))
             return {
                 "fecha": fecha,
-                "existe": contadores_service.fecha_existe(date.fromisoformat(fecha)),
-                "requiere_admin": contadores_service.fecha_existe(date.fromisoformat(fecha)),
-                "editable_libre": not contadores_service.fecha_existe(date.fromisoformat(fecha)),
+                "existe": existe,
+                "requiere_admin": existe,
+                "editable_libre": not existe,
             }
         return caja_service.consultar_estado_modulo(modulo, fecha)
     except ValueError:
@@ -166,7 +203,7 @@ def consultar_fecha_modulo(modulo: str, fecha: str):
 
 @router.get("/{modulo}/ultima")
 def ultima_modulo(modulo: str):
-    if modulo not in {"caja", "gastos", "bonos", "contadores"}:
+    if modulo not in {"caja", "gastos", "bonos", "prestamos", "contadores"}:
         raise HTTPException(status_code=404, detail="Modulo no soportado")
     if modulo == "contadores":
         ultima_fecha = contadores_service.obtener_ultima_fecha()
