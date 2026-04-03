@@ -8,6 +8,7 @@ from app.services import excel_service, nombres_service
 ROW_TYPES = {
     "gastos": "gasto",
     "bonos": "bono",
+    "prestamos": "prestamo",
 }
 
 
@@ -111,7 +112,7 @@ def guardar_items_modulo(modulo: str, entrada: ModuloItemsEntrada) -> dict:
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
-    nombre = "Gastos" if modulo == "gastos" else "Bonos"
+    nombre = "Gastos" if modulo == "gastos" else "Prestamos" if modulo == "prestamos" else "Bonos"
     return {
         "ok": True,
         "mensaje": f"{nombre} guardados correctamente",

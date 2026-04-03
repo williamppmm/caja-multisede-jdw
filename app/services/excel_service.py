@@ -6,7 +6,7 @@ from pathlib import Path
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
-from app.config import ENCABEZADOS, HOJA_REGISTROS, get_excel_path
+from app.config import ENCABEZADOS, HOJA_REGISTROS, get_excel_filename, get_excel_path, normalizar_sede_archivo
 from app.services.settings_service import get_settings
 
 
@@ -18,6 +18,7 @@ SECTION_PREFIXES = {
     "caja": "Caja",
     "gastos": "Gastos",
     "bonos": "Bonos",
+    "prestamos": "Prestamos",
     "contadores": "Contadores",
 }
 
@@ -29,8 +30,18 @@ BONOS_HEADERS = [
     "fecha_hora_registro",
 ]
 
+PRESTAMOS_HEADERS = [
+    "fecha",
+    "hora",
+    "persona",
+    "tipo_movimiento",
+    "valor_movimiento",
+    "fecha_hora_registro",
+]
+
 CONTADORES_HEADERS = [
     "fecha",
+    "item_id",
     "nombre",
     "denominacion",
     "entradas",
@@ -38,10 +49,13 @@ CONTADORES_HEADERS = [
     "jackpot",
     "cancelled",
     "yield_actual",
+    "ref_entradas",
+    "ref_salidas",
+    "ref_jackpot",
+    "ref_cancelled",
     "yield_referencia",
-    "resultado_unidades",
-    "resultado_monetario",
     "observacion",
+    "resultado_monetario",
     "fecha_hora_registro",
 ]
 
@@ -118,7 +132,7 @@ def _nombres_lectura_modulo(modulo: str) -> list[str]:
 
 
 def _fila_es_modulo(modulo: str, row) -> bool:
-    if modulo in {"bonos", "contadores"}:
+    if modulo in {"bonos", "prestamos", "contadores"}:
         return True
     tipo = row[1]
     if modulo == "caja":
@@ -158,6 +172,8 @@ def _bloqueo_escritura(path: Path):
 def _escribir_encabezados(ws, modulo: str):
     if modulo == "bonos":
         headers = BONOS_HEADERS
+    elif modulo == "prestamos":
+        headers = PRESTAMOS_HEADERS
     elif modulo == "contadores":
         headers = CONTADORES_HEADERS
     else:
@@ -172,11 +188,14 @@ def _escribir_encabezados(ws, modulo: str):
 
     if modulo == "bonos":
         widths = {"A": 12, "B": 12, "C": 28, "D": 14, "E": 22}
+    elif modulo == "prestamos":
+        widths = {"A": 12, "B": 12, "C": 28, "D": 18, "E": 14, "F": 22}
     elif modulo == "contadores":
         widths = {
-            "A": 14, "B": 26, "C": 14, "D": 12, "E": 12,
-            "F": 12, "G": 12, "H": 14, "I": 14, "J": 16,
-            "K": 18, "L": 30, "M": 22,
+            "A": 14, "B": 20, "C": 26, "D": 14, "E": 12,
+            "F": 12, "G": 12, "H": 12, "I": 14, "J": 12,
+            "K": 12, "L": 12, "M": 12, "N": 14,
+            "O": 30, "P": 18, "Q": 22,
         }
     else:
         widths = {"A": 14, "B": 16, "C": 22, "D": 14, "E": 10, "F": 14, "G": 14, "H": 22}
@@ -227,6 +246,23 @@ def _asegurar_hoja(wb, modulo: str):
     return ws
 
 
+def _actualizar_encabezados_prestamos(ws) -> None:
+    headers_actuales = [str(ws.cell(1, idx).value or "").strip().lower() for idx in range(1, 7)]
+    if headers_actuales == PRESTAMOS_HEADERS:
+        return
+    for idx, header in enumerate(PRESTAMOS_HEADERS, start=1):
+        ws.cell(1, idx).value = header
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="2F5496")
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+    widths = {"A": 12, "B": 12, "C": 28, "D": 18, "E": 14, "F": 22}
+    for col, width in widths.items():
+        ws.column_dimensions[col].width = width
+
+
 def _iterar_filas_fecha(hojas, fecha_objetivo: date):
     for ws in hojas:
         for row in ws.iter_rows(min_row=2, values_only=True):
@@ -263,6 +299,18 @@ def _formatear_filas_recientes_bonos(ws, cantidad_filas: int) -> None:
         ws.cell(row_num, 5).number_format = "YYYY-MM-DD HH:mm:SS"
 
 
+def _formatear_filas_recientes_prestamos(ws, cantidad_filas: int) -> None:
+    if cantidad_filas <= 0:
+        return
+    last_row = ws.max_row
+    start_row = last_row - cantidad_filas + 1
+    for row_num in range(start_row, last_row + 1):
+        ws.cell(row_num, 1).number_format = "DD-MM"
+        ws.cell(row_num, 2).number_format = "HH:mm AM/PM"
+        ws.cell(row_num, 5).number_format = "#,##0"
+        ws.cell(row_num, 6).number_format = "YYYY-MM-DD HH:mm:SS"
+
+
 def _formatear_filas_recientes_contadores(ws, cantidad_filas: int) -> None:
     if cantidad_filas <= 0:
         return
@@ -270,8 +318,8 @@ def _formatear_filas_recientes_contadores(ws, cantidad_filas: int) -> None:
     start_row = last_row - cantidad_filas + 1
     for row_num in range(start_row, last_row + 1):
         ws.cell(row_num, 1).number_format = "YYYY-MM-DD"   # fecha
-        ws.cell(row_num, 11).number_format = "#,##0"        # resultado_monetario
-        ws.cell(row_num, 13).number_format = "YYYY-MM-DD HH:mm:SS"  # fecha_hora_registro
+        ws.cell(row_num, 16).number_format = "#,##0"        # resultado_monetario
+        ws.cell(row_num, 17).number_format = "YYYY-MM-DD HH:mm:SS"  # fecha_hora_registro
 
 
 def fecha_existe_modulo(modulo: str, fecha: date, year: int) -> bool:
@@ -307,6 +355,8 @@ def guardar_filas_modulo(modulo: str, filas: list, year: int, reemplazar_fecha: 
                 ws.append(fila)
             if modulo == "bonos":
                 _formatear_filas_recientes_bonos(ws, len(filas))
+            elif modulo == "prestamos":
+                _formatear_filas_recientes_prestamos(ws, len(filas))
             elif modulo == "contadores":
                 _formatear_filas_recientes_contadores(ws, len(filas))
             else:
@@ -448,6 +498,14 @@ def obtener_items_modulo_fecha(modulo: str, fecha: date, year: int) -> dict | No
             "items": [{"concepto": item["cliente"], "valor": item["valor"]} for item in registros],
             "total": sum(item["valor"] for item in registros),
         }
+    if modulo == "prestamos":
+        registros = obtener_prestamos_fecha(fecha, year)
+        if not registros:
+            return None
+        return {
+            "items": [{"concepto": item["persona"], "valor": item["valor"]} for item in registros],
+            "total": sum(item["valor"] for item in registros),
+        }
 
     path = get_excel_path(year)
     if not path.exists():
@@ -491,7 +549,7 @@ def obtener_ultima_fecha_modulo(modulo: str, year: int):
         for row in ws.iter_rows(min_row=2, values_only=True):
             if row[0] is None:
                 continue
-            if modulo != "bonos" and not _fila_es_modulo(modulo, row):
+            if modulo not in {"bonos", "prestamos"} and not _fila_es_modulo(modulo, row):
                 continue
             cell_date = row[0]
             if isinstance(cell_date, datetime):
@@ -503,6 +561,188 @@ def obtener_ultima_fecha_modulo(modulo: str, year: int):
 
     wb.close()
     return ultima
+
+
+def obtener_datos_contadores_fecha(fecha: date, year: int) -> dict:
+    """Devuelve {item_id: {...}} con los valores guardados para la fecha dada."""
+    path = get_excel_path(year)
+    if not path.exists():
+        return {}
+    wb = load_workbook(path, read_only=True)
+    hojas = _obtener_hojas_para_lectura(wb, "contadores")
+    if not hojas:
+        wb.close()
+        return {}
+    result = {}
+    for row in _iterar_filas_fecha(hojas, fecha):
+        data = _parsear_fila_contadores(row)
+        item_id = data["item_id"]
+        if not item_id:
+            continue
+        result[item_id] = {
+            "entradas": data["entradas"],
+            "salidas": data["salidas"],
+            "jackpot": data["jackpot"],
+            "cancelled": data["cancelled"],
+            "yield_actual": data["yield_actual"],
+            "yield_referencia": data["yield_referencia"],
+            "resultado_unidades": data["yield_actual"] - data["yield_referencia"],
+            "resultado_monetario": data["resultado_monetario"],
+            "observacion": data["observacion"],
+            "ref_entradas": data["ref_entradas"],
+            "ref_salidas": data["ref_salidas"],
+            "ref_jackpot": data["ref_jackpot"],
+            "ref_cancelled": data["ref_cancelled"],
+            "fecha_hora_registro": data["fecha_hora_registro"],
+        }
+    wb.close()
+    return result
+
+
+def obtener_historial_contadores(hasta_fecha: date) -> list[dict]:
+    """Devuelve todos los registros de contadores anteriores a hasta_fecha, en todos los años disponibles.
+    Si la fila tiene referencia crítica embebida, emite un evento adicional de tipo referencia_critica
+    en la misma fecha (con orden posterior al registro normal) para que _iter_referencias_previas
+    lo use como referencia vigente.
+    """
+    eventos = []
+    for path in _obtener_paths_prestamos_lectura():
+        if not path.exists():
+            continue
+        wb = load_workbook(path, read_only=True)
+        hojas = _obtener_hojas_para_lectura(wb, "contadores")
+        for ws in hojas:
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                if row[0] is None:
+                    continue
+                cell_date = row[0]
+                if isinstance(cell_date, datetime):
+                    cell_date = cell_date.date()
+                if not isinstance(cell_date, date):
+                    continue
+                if cell_date >= hasta_fecha:
+                    continue
+                item_id = str(row[1] or "").strip()
+                if not item_id:
+                    continue
+                fecha_str = str(cell_date)
+                data = _parsear_fila_contadores(row)
+                observacion = data["observacion"]
+                # Regular registro event
+                eventos.append({
+                    "tipo": "registro",
+                    "fecha": fecha_str,
+                    "item_id": item_id,
+                    "entradas": data["entradas"],
+                    "salidas": data["salidas"],
+                    "jackpot": data["jackpot"],
+                    "cancelled": data["cancelled"],
+                    "yield": data["yield_actual"],
+                    "observacion": observacion,
+                })
+                # Critical reference event (embedded in same row)
+                if data["ref_entradas"] is not None:
+                    ref_e = int(data["ref_entradas"] or 0)
+                    ref_s = int(data["ref_salidas"] or 0)
+                    ref_j = int(data["ref_jackpot"] or 0)
+                    ref_c = int(data["ref_cancelled"] or 0)
+                    eventos.append({
+                        "tipo": "referencia_critica",
+                        "fecha": fecha_str,
+                        "item_id": item_id,
+                        "entradas": ref_e,
+                        "salidas": ref_s,
+                        "jackpot": ref_j,
+                        "cancelled": ref_c,
+                        "yield": ref_e - ref_s - ref_j - ref_c,
+                        "observacion": observacion,
+                    })
+        wb.close()
+    return eventos
+
+
+def _obtener_paths_prestamos_lectura() -> list[Path]:
+    settings = get_settings()
+    data_dir = Path(settings.get("data_dir") or ".")
+    sede = normalizar_sede_archivo(settings.get("sede"))
+    patron = f"Contadores_{sede}_*.xlsx"
+    paths = sorted(data_dir.glob(patron))
+    actual = get_excel_path(date.today().year)
+    if actual not in paths:
+        paths.append(actual)
+    return paths
+
+
+def _parsear_fila_contadores(row) -> dict:
+    # fecha,item_id,nombre,denom,entradas,salidas,jackpot,cancelled,yield_actual,
+    # ref_entradas,ref_salidas,ref_jackpot,ref_cancelled,yield_referencia,observacion,
+    # resultado_monetario,fecha_hora_registro
+    return {
+        "item_id": str(row[1] or "").strip(),
+        "entradas": int(row[4] or 0),
+        "salidas": int(row[5] or 0),
+        "jackpot": int(row[6] or 0),
+        "cancelled": int(row[7] or 0),
+        "yield_actual": int(row[8] or 0),
+        "yield_referencia": int(row[13] or 0),
+        "resultado_monetario": float(row[15] or 0),
+        "observacion": str(row[14] or ""),
+        "ref_entradas": int(row[9]) if row[9] is not None else None,
+        "ref_salidas": int(row[10]) if row[10] is not None else None,
+        "ref_jackpot": int(row[11]) if row[11] is not None else None,
+        "ref_cancelled": int(row[12]) if row[12] is not None else None,
+        "fecha_hora_registro": row[16].isoformat() if isinstance(row[16], datetime) else str(row[16] or ""),
+    }
+
+
+def _leer_movimientos_prestamos_desde_hoja(ws) -> list[dict]:
+    headers = [str(cell.value or "").strip().lower() for cell in ws[1]]
+    schema_nuevo = headers[:6] == PRESTAMOS_HEADERS
+    registros = []
+    for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if row[0] is None:
+            continue
+        cell_date = row[0]
+        if isinstance(cell_date, datetime):
+            cell_date = cell_date.date()
+        if not isinstance(cell_date, date):
+            continue
+
+        if schema_nuevo:
+            hora = row[1]
+            persona = str(row[2] or "").strip()
+            tipo = str(row[3] or "prestamo").strip().lower() or "prestamo"
+            valor = float(row[4] or 0)
+            timestamp = row[5]
+        else:
+            hora = None
+            persona = str(row[1] or "").strip()
+            tipo = "prestamo"
+            valor = float(row[2] or 0)
+            timestamp = row[3]
+
+        if not persona:
+            continue
+        if isinstance(hora, datetime):
+            hora_texto = hora.strftime("%I:%M %p")
+        elif hora:
+            hora_texto = str(hora)
+        elif isinstance(timestamp, datetime):
+            hora_texto = timestamp.strftime("%I:%M %p")
+        else:
+            hora_texto = ""
+
+        registros.append({
+            "sheet_row": idx,
+            "fecha": cell_date.isoformat(),
+            "fecha_display": cell_date.strftime("%d-%m"),
+            "hora_display": hora_texto,
+            "persona": persona,
+            "tipo_movimiento": "pago" if tipo == "pago" else "prestamo",
+            "valor": abs(valor),
+            "fecha_hora_registro": timestamp.isoformat() if isinstance(timestamp, datetime) else str(timestamp or ""),
+        })
+    return registros
 
 def guardar_bono_registro(fecha: date, cliente: str, valor: float, timestamp: datetime) -> float:
     fila = [fecha, timestamp, cliente, valor, timestamp]
@@ -529,6 +769,33 @@ def guardar_bono_registro(fecha: date, cliente: str, valor: float, timestamp: da
         finally:
             wb.close()
     return total_dia + float(valor or 0)
+
+
+def guardar_prestamo_registro(
+    fecha: date,
+    persona: str,
+    tipo_movimiento: str,
+    valor: float,
+    timestamp: datetime,
+) -> dict:
+    fila = [fecha, timestamp, persona, tipo_movimiento, valor, timestamp]
+    path = get_excel_path(fecha.year)
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ws = _asegurar_hoja(wb, "prestamos")
+        _actualizar_encabezados_prestamos(ws)
+        ws.append(fila)
+        _formatear_filas_recientes_prestamos(ws, 1)
+        try:
+            wb.save(path)
+        except PermissionError as exc:
+            raise ArchivoCajaOcupadoError(
+                "No se pudo guardar porque el libro esta siendo usado por otro proceso. Intenta nuevamente."
+            ) from exc
+        finally:
+            wb.close()
+    resumen = obtener_resumen_prestamos(persona=persona)
+    return resumen
 
 
 def obtener_bonos_fecha(fecha: date, year: int) -> list[dict]:
@@ -570,6 +837,52 @@ def obtener_bonos_fecha(fecha: date, year: int) -> list[dict]:
     wb.close()
     registros.sort(key=lambda item: item["fecha_hora_registro"] or "")
     return registros
+
+
+def obtener_prestamos_fecha(fecha: date, year: int) -> list[dict]:
+    registros = obtener_movimientos_prestamos()
+    return [item for item in registros if item["fecha"] == fecha.isoformat()]
+
+
+def obtener_movimientos_prestamos() -> list[dict]:
+    registros = []
+    for path in _obtener_paths_prestamos_lectura():
+        if not path.exists():
+            continue
+        wb = load_workbook(path, read_only=True)
+        hojas = _obtener_hojas_para_lectura(wb, "prestamos")
+        for ws in hojas:
+            registros.extend(_leer_movimientos_prestamos_desde_hoja(ws))
+        wb.close()
+    registros.sort(key=lambda item: (item["fecha"], item["fecha_hora_registro"] or ""))
+
+    saldos = {}
+    for item in registros:
+        persona_key = item["persona"].strip().lower()
+        saldo = saldos.get(persona_key, 0.0)
+        if item["tipo_movimiento"] == "pago":
+            saldo -= float(item["valor"] or 0)
+        else:
+            saldo += float(item["valor"] or 0)
+        item["saldo_pendiente"] = saldo
+        saldos[persona_key] = saldo
+    return registros
+
+
+def obtener_resumen_prestamos(persona: str | None = None) -> dict:
+    registros = obtener_movimientos_prestamos()
+    if persona:
+        persona_norm = persona.strip().lower()
+        registros = [item for item in registros if item["persona"].strip().lower() == persona_norm]
+    total_prestado = sum(float(item["valor"] or 0) for item in registros if item["tipo_movimiento"] == "prestamo")
+    total_pagado = sum(float(item["valor"] or 0) for item in registros if item["tipo_movimiento"] == "pago")
+    saldo_pendiente = total_prestado - total_pagado
+    return {
+        "items": registros,
+        "total_prestado": total_prestado,
+        "total_pagado": total_pagado,
+        "saldo_pendiente": saldo_pendiente,
+    }
 
 
 def obtener_ultimo_bono(fecha: date, year: int) -> dict | None:

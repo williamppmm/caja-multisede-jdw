@@ -8,8 +8,7 @@ class ReferenciaCriticaEntrada(BaseModel):
     salidas: int = 0
     jackpot: int = 0
     cancelled: int = 0
-    motivo: str
-    observacion: str
+    observacion: str = ""
 
     @field_validator("entradas", "salidas", "jackpot", "cancelled")
     @classmethod
@@ -18,13 +17,10 @@ class ReferenciaCriticaEntrada(BaseModel):
             raise ValueError("Los valores de referencia no pueden ser negativos")
         return int(value)
 
-    @field_validator("motivo", "observacion")
+    @field_validator("observacion")
     @classmethod
     def validar_texto(cls, value: str) -> str:
-        texto = str(value or "").strip()
-        if not texto:
-            raise ValueError("Este campo es obligatorio")
-        return texto
+        return str(value or "").strip()
 
 
 class ContadorFilaEntrada(BaseModel):
@@ -79,6 +75,7 @@ class ContadorCatalogoItem(BaseModel):
     nombre: str
     denominacion: int
     activo: bool = True
+    pausado: bool = False
 
     @field_validator("item_id", "nombre")
     @classmethod

@@ -67,6 +67,37 @@ class BonoEntrada(BaseModel):
         return v
 
 
+class PrestamoEntrada(BaseModel):
+    fecha: date
+    persona: str
+    tipo_movimiento: str = "prestamo"
+    valor: float
+    forzar: bool = False
+
+    @field_validator("persona")
+    @classmethod
+    def validar_persona(cls, v):
+        texto = str(v or "").strip()
+        if not texto:
+            raise ValueError("El nombre de la persona es obligatorio")
+        return texto
+
+    @field_validator("tipo_movimiento")
+    @classmethod
+    def validar_tipo_movimiento(cls, v):
+        tipo = str(v or "").strip().lower()
+        if tipo not in {"prestamo", "pago"}:
+            raise ValueError("El tipo de movimiento debe ser prestamo o pago")
+        return tipo
+
+    @field_validator("valor")
+    @classmethod
+    def validar_valor(cls, v):
+        if v <= 0:
+            raise ValueError("El valor del prestamo debe ser mayor que cero")
+        return v
+
+
 class CajaRespuesta(BaseModel):
     ok: bool
     mensaje: str
@@ -93,4 +124,17 @@ class BonoRespuesta(BaseModel):
     cliente: str = ""
     valor: float = 0
     total_dia: float = 0
+    fecha_hora_registro: str = ""
+
+
+class PrestamoRespuesta(BaseModel):
+    ok: bool
+    mensaje: str
+    fecha: str = ""
+    persona: str = ""
+    tipo_movimiento: str = ""
+    valor: float = 0
+    total_prestado: float = 0
+    total_pagado: float = 0
+    saldo_pendiente: float = 0
     fecha_hora_registro: str = ""
