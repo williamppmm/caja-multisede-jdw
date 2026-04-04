@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Caja Diaria</title>
+  <title>ContabilidadJDW</title>
   <link rel="icon" type="image/x-icon" href="/static/assets/favicon.ico" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
@@ -66,19 +66,6 @@
             <input type="text" inputmode="numeric" id="billetes_viejos" placeholder="0" />
           </div>
         </div>
-        <div class="separador-informativo">
-          <span class="etiqueta-informativo">Informativos (no suman a caja física)</span>
-          <div class="grid-manuales">
-            <div class="campo-manual informativo">
-              <label for="venta_practisistemas">Venta Practisistemas</label>
-              <input type="text" inputmode="numeric" id="venta_practisistemas" placeholder="0" />
-            </div>
-            <div class="campo-manual informativo">
-              <label for="venta_deportivas">Venta Deportivas</label>
-              <input type="text" inputmode="numeric" id="venta_deportivas" placeholder="0" />
-            </div>
-          </div>
-        </div>
       </section>
 
       <section class="card card-resumen">
@@ -100,13 +87,40 @@
             <span class="resumen-label">TOTAL CAJA FÍSICA</span>
             <span id="resumen-total" class="resumen-valor">$ 0</span>
           </div>
-          <div class="resumen-item resumen-informativo">
+        </div>
+      </section>
+    </section>
+
+    <section id="panel-plataformas" class="modulo-panel oculto">
+      <section class="card">
+        <h2>Plataformas</h2>
+        <p class="modulo-ayuda">Registra las ventas del día de plataformas. Este módulo sí se acumula en el Cuadre aunque no se haya hecho Caja en días anteriores.</p>
+        <div class="grid-manuales">
+          <div class="campo-manual">
+            <label for="venta_practisistemas">Venta Practisistemas</label>
+            <input type="text" inputmode="numeric" id="venta_practisistemas" placeholder="0" />
+          </div>
+          <div class="campo-manual">
+            <label for="venta_deportivas">Venta Deportivas</label>
+            <input type="text" inputmode="numeric" id="venta_deportivas" placeholder="0" />
+          </div>
+        </div>
+      </section>
+
+      <section class="card card-resumen">
+        <h2>Resumen Plataformas</h2>
+        <div class="resumen-grid resumen-grid-simple">
+          <div class="resumen-item">
             <span class="resumen-label">Venta Practisistemas</span>
             <span id="resumen-practisistemas" class="resumen-valor">$ 0</span>
           </div>
-          <div class="resumen-item resumen-informativo">
+          <div class="resumen-item">
             <span class="resumen-label">Venta Deportivas</span>
             <span id="resumen-deportivas" class="resumen-valor">$ 0</span>
+          </div>
+          <div class="resumen-item resumen-total">
+            <span class="resumen-label">TOTAL PLATAFORMAS</span>
+            <span id="resumen-plataformas-total" class="resumen-valor">$ 0</span>
           </div>
         </div>
       </section>
@@ -397,6 +411,185 @@
       </section>
     </section>
 
+    <section id="panel-cuadre" class="modulo-panel oculto">
+      <div id="cuadre-bloqueado" class="card cuadre-bloqueado oculto">
+        <p id="cuadre-bloqueado-msg" class="cuadre-msg-error"></p>
+      </div>
+
+      <div id="cuadre-contenido" class="oculto">
+        <div class="card cuadre-periodo-card">
+          <span id="cuadre-periodo-texto" class="cuadre-periodo-texto"></span>
+        </div>
+
+        <section class="card">
+          <h2>Base anterior</h2>
+          <div class="cuadre-base-row">
+            <span id="cuadre-base-display" class="cuadre-base-valor"></span>
+            <div id="cuadre-base-input-wrap" class="campo-manual oculto">
+              <label for="cuadre-base-input">Base inicial (primer uso — dinero en caja antes de iniciar el software)</label>
+              <input type="text" inputmode="numeric" id="cuadre-base-input" placeholder="0" />
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="cuadre-seccion-header">
+            <h2>Contadores</h2>
+            <span id="cuadre-contadores-total" class="cuadre-total-badge"></span>
+          </div>
+          <div class="bonos-listado-wrap">
+            <table class="bonos-tabla">
+              <thead>
+                <tr><th>#</th><th>Ítem</th><th>Yield actual</th><th>Resultado</th></tr>
+              </thead>
+              <tbody id="cuadre-contadores-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="cuadre-seccion-header">
+            <h2>Plataformas</h2>
+            <span id="cuadre-plataformas-total" class="cuadre-total-badge"></span>
+          </div>
+          <div class="resumen-grid resumen-grid-simple">
+            <div class="resumen-item">
+              <span class="resumen-label">Practisistemas</span>
+              <span id="cuadre-plataformas-practi" class="resumen-valor"></span>
+            </div>
+            <div class="resumen-item">
+              <span class="resumen-label">Deportivas</span>
+              <span id="cuadre-plataformas-deport" class="resumen-valor"></span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="cuadre-seccion-header">
+            <h2>Bonos <span class="cuadre-seccion-sub">(top 5 clientes)</span></h2>
+            <span id="cuadre-bonos-total" class="cuadre-total-badge cuadre-badge-negativo"></span>
+          </div>
+          <div class="bonos-listado-wrap">
+            <table class="bonos-tabla">
+              <thead><tr><th>Cliente</th><th>Total bonos</th></tr></thead>
+              <tbody id="cuadre-bonos-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="cuadre-seccion-header">
+            <h2>Gastos</h2>
+            <span id="cuadre-gastos-total" class="cuadre-total-badge cuadre-badge-negativo"></span>
+          </div>
+          <div class="bonos-listado-wrap">
+            <table class="bonos-tabla">
+              <thead><tr><th>Concepto</th><th>Valor</th></tr></thead>
+              <tbody id="cuadre-gastos-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="cuadre-seccion-header">
+            <h2>Préstamos</h2>
+          </div>
+          <div class="resumen-grid resumen-grid-simple">
+            <div class="resumen-item">
+              <span class="resumen-label">Salidas (prestado)</span>
+              <span id="cuadre-prestamos-salida" class="resumen-valor"></span>
+            </div>
+            <div class="resumen-item">
+              <span class="resumen-label">Entradas (pagos recibidos)</span>
+              <span id="cuadre-prestamos-entrada" class="resumen-valor"></span>
+            </div>
+            <div class="resumen-item resumen-total">
+              <span class="resumen-label">Neto en caja</span>
+              <span id="cuadre-prestamos-neto" class="resumen-valor"></span>
+            </div>
+          </div>
+          <div id="cuadre-prestamos-detalle-wrap" class="oculto">
+            <div class="bonos-listado-wrap" style="margin-top:12px">
+              <table class="bonos-tabla">
+                <thead><tr><th>Persona</th><th>Prestado</th><th>Pagado</th><th>Neto</th></tr></thead>
+                <tbody id="cuadre-prestamos-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="cuadre-seccion-header">
+            <h2>Movimientos</h2>
+          </div>
+          <div class="resumen-grid resumen-grid-simple">
+            <div class="resumen-item">
+              <span class="resumen-label">Total ingresos</span>
+              <span id="cuadre-mov-ingresos" class="resumen-valor"></span>
+            </div>
+            <div class="resumen-item resumen-total">
+              <span class="resumen-label">Total salidas</span>
+              <span id="cuadre-mov-salidas" class="resumen-valor"></span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Caja física</h2>
+          <div class="bonos-listado-wrap">
+            <table class="bonos-tabla">
+              <thead><tr><th>Denominación</th><th>Subtotal</th></tr></thead>
+              <tbody id="cuadre-caja-body"></tbody>
+            </table>
+          </div>
+          <div class="resumen-grid resumen-grid-simple cuadre-caja-extras">
+            <div class="resumen-item">
+              <span class="resumen-label">Monedas</span>
+              <span id="cuadre-caja-monedas" class="resumen-valor"></span>
+            </div>
+            <div class="resumen-item">
+              <span class="resumen-label">Billetes viejos</span>
+              <span id="cuadre-caja-viejos" class="resumen-valor"></span>
+            </div>
+            <div class="resumen-item resumen-total">
+              <span class="resumen-label">TOTAL EFECTIVO</span>
+              <span id="cuadre-caja-total" class="resumen-valor"></span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card card-resumen cuadre-balance-card">
+          <h2>Balance del período</h2>
+          <div class="resumen-grid">
+            <div class="resumen-item">
+              <span class="resumen-label">Base anterior</span>
+              <span id="cuadre-balance-base" class="resumen-valor"></span>
+            </div>
+            <div class="resumen-item">
+              <span class="resumen-label">Caja teórica</span>
+              <span id="cuadre-teorica" class="resumen-valor"></span>
+            </div>
+            <div class="resumen-item">
+              <span class="resumen-label">Caja física</span>
+              <span id="cuadre-fisica" class="resumen-valor"></span>
+            </div>
+            <div class="resumen-item resumen-total" id="cuadre-diferencia-row">
+              <span class="resumen-label" id="cuadre-diferencia-label">DIFERENCIA</span>
+              <span id="cuadre-diferencia" class="resumen-valor"></span>
+            </div>
+            <div class="resumen-item">
+              <span class="resumen-label">Base nueva (próximo período)</span>
+              <span id="cuadre-base-nueva" class="resumen-valor"></span>
+            </div>
+          </div>
+          <div id="cuadre-acciones" class="bonos-acciones oculto">
+            <button id="btn-cuadre-guardar" class="btn btn-primary" type="button">Guardar Cuadre</button>
+          </div>
+          <p id="cuadre-guardado-info" class="modulo-ayuda oculto"></p>
+        </section>
+      </div>
+    </section>
+
     <section class="card card-acciones">
       <button id="btn-guardar" class="btn btn-primary">Guardar</button>
       <button id="btn-limpiar" class="btn btn-secondary">Limpiar</button>
@@ -447,11 +640,13 @@
             <span class="campo-config-label">Módulos habilitados</span>
             <div class="check-group">
               <label><input type="checkbox" name="enabled_modules" value="caja" /> Caja</label>
+              <label><input type="checkbox" name="enabled_modules" value="plataformas" /> Plataformas</label>
               <label><input type="checkbox" name="enabled_modules" value="gastos" /> Gastos</label>
               <label><input type="checkbox" name="enabled_modules" value="bonos" /> Bonos</label>
               <label><input type="checkbox" name="enabled_modules" value="prestamos" /> Prestamos</label>
               <label><input type="checkbox" name="enabled_modules" value="movimientos" /> Movimientos</label>
               <label><input type="checkbox" name="enabled_modules" value="contadores" /> Contadores</label>
+              <label><input type="checkbox" name="enabled_modules" value="cuadre" /> Cuadre</label>
             </div>
           </div>
           <div class="campo-config">

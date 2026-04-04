@@ -3,11 +3,13 @@ const CONTRASENA = '1980';
 const OBSERVACION_CRITICA_DEFAULT = 'reinicio técnico';
 const MODULE_META = {
   caja: { label: 'Caja', panelId: 'panel-caja', dateLabel: 'Fecha del arqueo', defaultDate: () => configDefaultDate === 'yesterday' ? ayerStr() : hoyStr() },
+  plataformas: { label: 'Plataformas', panelId: 'panel-plataformas', dateLabel: 'Fecha de plataformas', defaultDate: () => hoyStr() },
   gastos: { label: 'Gastos', panelId: 'panel-gastos', dateLabel: 'Fecha de gastos', defaultDate: () => hoyStr() },
   bonos: { label: 'Bonos', panelId: 'panel-bonos', dateLabel: 'Fecha de bonos', defaultDate: () => hoyStr() },
   prestamos: { label: 'Prestamos', panelId: 'panel-prestamos', dateLabel: 'Fecha de préstamos', defaultDate: () => hoyStr() },
   movimientos: { label: 'Movimientos', panelId: 'panel-movimientos', dateLabel: 'Fecha de movimientos', defaultDate: () => hoyStr() },
   contadores: { label: 'Contadores', panelId: 'panel-contadores', dateLabel: 'Fecha de contadores', defaultDate: () => hoyStr() },
+  cuadre: { label: 'Cuadre', panelId: 'panel-cuadre', dateLabel: 'Fecha del cuadre', defaultDate: () => hoyStr() },
 };
 
 let configDefaultDate = 'today';
@@ -18,7 +20,8 @@ let enabledModules = ['caja', 'gastos'];
 let defaultModule = 'caja';
 let currentModule = 'caja';
 let moduleDates = {};
-let adminOverride = { caja: false, gastos: false, bonos: false, prestamos: false, movimientos: false, contadores: false };
+let adminOverride = { caja: false, plataformas: false, gastos: false, bonos: false, prestamos: false, movimientos: false, contadores: false, cuadre: false };
+let cuadreDatos = null;
 let debounceTimer = null;
 let pendingAdminAction = null;
 let bonusNames = [];
@@ -155,7 +158,7 @@ function actualizarPreviewHojasAdmin() {
   const preview = document.getElementById('admin-sheet-preview');
   if (!preview) return;
   const sede = normalizarSedePreview();
-  const modulos = obtenerModulosMarcadosAdmin().filter(modulo => ['caja', 'gastos', 'bonos', 'prestamos', 'movimientos'].includes(modulo));
+  const modulos = obtenerModulosMarcadosAdmin().filter(modulo => ['caja', 'plataformas', 'gastos', 'bonos', 'prestamos', 'movimientos', 'contadores', 'cuadre'].includes(modulo));
   preview.textContent = modulos.length
     ? modulos.map(modulo => `Hoja ${modulo}: ${MODULE_META[modulo].label}${sede}`).join(' | ')
     : 'Sin módulos Excel habilitados';
@@ -163,7 +166,7 @@ function actualizarPreviewHojasAdmin() {
 
 function actualizarEstadoDeportivas() {
   const input = document.getElementById('venta_deportivas');
-  const resumenItem = document.getElementById('resumen-deportivas')?.closest('.resumen-informativo');
+  const resumenItem = document.getElementById('resumen-deportivas')?.closest('.resumen-item');
   if (!input || !resumenItem) return;
   const valor = parseNumeroTexto(input.value, true);
   const esNegativo = !isNaN(valor) && valor < 0;
@@ -197,7 +200,7 @@ function buildTablaBilletes() {
 function camposEditablesBilletes() {
   const prefijo = configModoEntrada === 'cantidad' ? 'cant_' : 'sub_';
   const billetes = DENOMINACIONES.map(d => document.getElementById(prefijo + d));
-  const manuales = ['total_monedas', 'billetes_viejos', 'venta_practisistemas', 'venta_deportivas']
+  const manuales = ['total_monedas', 'billetes_viejos']
     .map(id => document.getElementById(id));
   return [...billetes, ...manuales];
 }
@@ -219,7 +222,7 @@ function setCajaEditable(editable) {
     sub.classList.toggle('input-readonly', cajaLocked || esCantidad);
   });
 
-  ['total_monedas', 'billetes_viejos', 'venta_practisistemas', 'venta_deportivas'].forEach(id => {
+  ['total_monedas', 'billetes_viejos'].forEach(id => {
     const input = document.getElementById(id);
     if (!input) return;
     input.readOnly = cajaLocked;
@@ -267,8 +270,6 @@ function calcularCaja() {
 
   const monedas = parsePositivo('total_monedas');
   const viejos = parsePositivo('billetes_viejos');
-  const practi = parsePositivo('venta_practisistemas');
-  const deport = parseNumeroInput('venta_deportivas', true) || 0;
   const totalCaja = totalBilletes + monedas + viejos;
 
   document.getElementById('total-billetes').textContent = fmt(totalBilletes);
@@ -276,8 +277,14 @@ function calcularCaja() {
   document.getElementById('resumen-monedas').textContent = fmt(monedas);
   document.getElementById('resumen-viejos').textContent = fmt(viejos);
   document.getElementById('resumen-total').textContent = fmt(totalCaja);
+}
+
+function calcularPlataformas() {
+  const practi = parsePositivo('venta_practisistemas');
+  const deport = parseNumeroInput('venta_deportivas', true) || 0;
   document.getElementById('resumen-practisistemas').textContent = fmt(practi);
   document.getElementById('resumen-deportivas').textContent = fmt(deport);
+  document.getElementById('resumen-plataformas-total').textContent = fmt(practi + deport);
   actualizarEstadoDeportivas();
 }
 
@@ -1204,14 +1211,30 @@ function validarMovimiento() {
   return null;
 }
 
+function validarPlataformas() {
+  const practi = parseNumeroInput('venta_practisistemas');
+  const deport = parseNumeroInput('venta_deportivas', true);
+  const practiVal = isNaN(practi) ? 0 : practi;
+  const deportVal = isNaN(deport) ? 0 : deport;
+  if (practiVal < 0) return 'La venta de Practisistemas no puede ser negativa.';
+  if (practiVal === 0 && deportVal === 0) return 'Debes ingresar al menos un valor en Plataformas.';
+  return null;
+}
+
 function limpiarCaja() {
   DENOMINACIONES.forEach(d => {
     document.getElementById(`cant_${d}`).value = '';
     document.getElementById(`sub_${d}`).value = '';
   });
-  ['total_monedas', 'billetes_viejos', 'venta_practisistemas', 'venta_deportivas']
+  ['total_monedas', 'billetes_viejos']
     .forEach(id => { document.getElementById(id).value = ''; });
   calcularCaja();
+}
+
+function limpiarPlataformas() {
+  setNumeroInputValue('venta_practisistemas', '');
+  setNumeroInputValue('venta_deportivas', '', true);
+  calcularPlataformas();
 }
 
 function obtenerDraftCajaActual() {
@@ -1230,8 +1253,6 @@ function obtenerDraftCajaActual() {
     billetes,
     total_monedas: document.getElementById('total_monedas').value || '',
     billetes_viejos: document.getElementById('billetes_viejos').value || '',
-    venta_practisistemas: document.getElementById('venta_practisistemas').value || '',
-    venta_deportivas: document.getElementById('venta_deportivas').value || '',
   };
 }
 
@@ -1257,8 +1278,6 @@ function aplicarDraftCaja(fecha) {
   });
   setNumeroInputValue('total_monedas', draft.total_monedas || '');
   setNumeroInputValue('billetes_viejos', draft.billetes_viejos || '');
-  setNumeroInputValue('venta_practisistemas', draft.venta_practisistemas || '');
-  setNumeroInputValue('venta_deportivas', draft.venta_deportivas || '', true);
   calcularCaja();
   return true;
 }
@@ -1267,6 +1286,8 @@ function limpiarModuloActual() {
   if (currentModule === 'caja') {
     eliminarDraftCaja(document.getElementById('fecha').value);
     limpiarCaja();
+  } else if (currentModule === 'plataformas') {
+    limpiarPlataformas();
   } else if (currentModule === 'contadores') {
     eliminarDraftContadores(document.getElementById('fecha').value);
     renderContadores(contadorCatalog.map(item => ({
@@ -1313,7 +1334,7 @@ function actualizarPaneles() {
     document.getElementById(meta.panelId).classList.toggle('oculto', modulo !== currentModule);
   });
   document.getElementById('fecha-label').textContent = MODULE_META[currentModule].dateLabel;
-  document.getElementById('btn-guardar').classList.toggle('oculto', ['bonos', 'gastos', 'prestamos', 'movimientos'].includes(currentModule));
+  document.getElementById('btn-guardar').classList.toggle('oculto', ['bonos', 'gastos', 'prestamos', 'movimientos', 'cuadre'].includes(currentModule));
   document.getElementById('btn-guardar').textContent = 'Guardar';
   actualizarBonosVisuales();
   actualizarPrestamosVisuales();
@@ -1351,6 +1372,9 @@ async function activarModulo(modulo) {
     limpiarFormularioBonos();
     actualizarAccionesBonos();
     actualizarBonosVisuales();
+  }
+  if (currentModule === 'plataformas') {
+    calcularPlataformas();
   }
   if (currentModule === 'prestamos') {
     limpiarFormularioPrestamos();
@@ -1390,6 +1414,53 @@ async function verificarFechaActual() {
     const res = await fetch(`/api/modulos/${currentModule}/fecha/${fecha}/estado`);
     const data = await res.json();
     btnGuardar.disabled = false;
+
+    if (currentModule === 'cuadre') {
+      if (data.existe && !adminOverride.cuadre) {
+        estado.innerHTML = `El Cuadre de ${fecha} ya existe. <button class="btn-inline-editar" id="btn-inline-editar">Corregir (admin)</button>`;
+        estado.className = 'fecha-estado existe';
+        document.getElementById('btn-inline-editar')?.addEventListener('click', () => autorizarModulo());
+        return;
+      }
+      if (adminOverride.cuadre) {
+        estado.textContent = `Corrección de Cuadre autorizada para ${fecha}.`;
+        estado.className = 'fecha-estado advertencia-fecha';
+        return;
+      }
+      if (!data.ok) {
+        estado.textContent = data.mensaje;
+        estado.className = 'fecha-estado existe';
+        return;
+      }
+      const dias = data.periodo?.length ?? 1;
+      estado.textContent = dias > 1
+        ? `Período: ${data.periodo[0]} → ${fecha} (${dias} días del período)`
+        : 'Fecha disponible para cuadre.';
+      estado.className = 'fecha-estado libre';
+      return;
+    }
+
+    if (currentModule === 'plataformas') {
+      if (fecha === hoyStr()) {
+        estado.textContent = data.existe
+          ? 'Puedes seguir corrigiendo plataformas hoy.'
+          : 'Puedes registrar plataformas libremente hoy.';
+        estado.className = 'fecha-estado libre';
+        return;
+      }
+
+      if (adminOverride.plataformas) {
+        estado.textContent = `Corrección de plataformas autorizada para ${fecha}.`;
+        estado.className = 'fecha-estado advertencia-fecha';
+        return;
+      }
+
+      estado.innerHTML = `Para guardar plataformas en ${fecha} necesitas admin. <button class="btn-inline-editar" id="btn-inline-editar">Autorizar</button>`;
+      estado.className = 'fecha-estado existe';
+      btnGuardar.disabled = true;
+      document.getElementById('btn-inline-editar')?.addEventListener('click', () => autorizarModulo());
+      return;
+    }
 
     if (currentModule === 'contadores') {
       if (data.existe && !adminOverride.contadores) {
@@ -1530,14 +1601,28 @@ async function cargarDatosCaja(fecha) {
     });
     setNumeroInputValue('total_monedas', data.total_monedas || '');
     setNumeroInputValue('billetes_viejos', data.billetes_viejos || '');
-    setNumeroInputValue('venta_practisistemas', data.venta_practisistemas || '');
-    setNumeroInputValue('venta_deportivas', data.venta_deportivas || '', true);
     calcularCaja();
     eliminarDraftCaja(fecha);
     setCajaEditable(adminOverride.caja);
   } catch {
     if (!aplicarDraftCaja(fecha)) limpiarCaja();
     setCajaEditable(true);
+  }
+}
+
+async function cargarDatosPlataformas(fecha) {
+  try {
+    const res = await fetch(`/api/modulos/plataformas/fecha/${fecha}/datos`);
+    if (!res.ok) {
+      limpiarPlataformas();
+      return;
+    }
+    const data = await res.json();
+    setNumeroInputValue('venta_practisistemas', data.venta_practisistemas || '');
+    setNumeroInputValue('venta_deportivas', data.venta_deportivas || '', true);
+    calcularPlataformas();
+  } catch {
+    limpiarPlataformas();
   }
 }
 
@@ -1598,6 +1683,14 @@ async function cargarVistaModulo(modulo, fecha) {
   if (!fecha) return;
   if (modulo === 'caja') {
     await cargarDatosCaja(fecha);
+    return;
+  }
+  if (modulo === 'plataformas') {
+    await cargarDatosPlataformas(fecha);
+    return;
+  }
+  if (modulo === 'cuadre') {
+    await cargarDatosCuadre(fecha);
     return;
   }
   await cargarDatosModuloItems(modulo, fecha);
@@ -1981,19 +2074,16 @@ function validarCaja() {
     }
   }
 
-  for (const id of ['total_monedas', 'billetes_viejos', 'venta_practisistemas']) {
+  for (const id of ['total_monedas', 'billetes_viejos']) {
     const raw = document.getElementById(id).value;
     const val = raw === '' ? 0 : parseNumeroTexto(raw);
     if (isNaN(val) || val < 0) return `Valor inválido en ${id.replace(/_/g, ' ')}.`;
   }
-
-  const vdRaw = document.getElementById('venta_deportivas').value;
-  const vd = vdRaw === '' ? 0 : parseNumeroTexto(vdRaw, true);
-  if (isNaN(vd)) return 'Valor inválido en venta deportivas.';
   return null;
 }
 
 function validarModuloItems(modulo) {
+  if (modulo === 'plataformas') return validarPlataformas();
   if (modulo === 'gastos') return validarGasto();
   if (modulo === 'prestamos') return validarPrestamo();
   if (modulo === 'movimientos') return validarMovimiento();
@@ -2011,6 +2101,8 @@ async function guardar() {
 
   const error = currentModule === 'caja'
     ? validarCaja()
+    : currentModule === 'plataformas'
+      ? validarPlataformas()
     : currentModule === 'contadores'
       ? validarContadores()
     : currentModule === 'bonos'
@@ -2048,9 +2140,18 @@ async function guardar() {
           billetes,
           total_monedas: parsePositivo('total_monedas'),
           billetes_viejos: parsePositivo('billetes_viejos'),
+          forzar: adminOverride.caja,
+        }),
+      });
+    } else if (currentModule === 'plataformas') {
+      res = await fetch('/api/modulos/plataformas/guardar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fecha,
           venta_practisistemas: parsePositivo('venta_practisistemas'),
           venta_deportivas: parseNumeroInput('venta_deportivas', true) || 0,
-          forzar: adminOverride.caja,
+          forzar: adminOverride.plataformas,
         }),
       });
     } else if (currentModule === 'contadores') {
@@ -2089,6 +2190,12 @@ async function guardar() {
       limpiarCaja();
       setCajaEditable(false);
       mostrarMensaje(`✓ ${data.mensaje} — Total caja física: ${fmt(data.total_caja_fisica)} — ${data.fecha_hora_registro.slice(0, 10)} ${hora12}`, 'ok');
+    } else if (currentModule === 'plataformas') {
+      resetOverride('plataformas');
+      moduleDates.plataformas = fecha;
+      document.getElementById('fecha').value = fecha;
+      await cargarVistaModulo('plataformas', fecha);
+      mostrarMensaje(`✓ ${data.mensaje} — Total plataformas: ${fmt(data.total_plataformas)} — ${data.fecha_hora_registro.slice(0, 10)} ${hora12}`, 'ok');
     } else if (currentModule === 'bonos' || currentModule === 'prestamos') {
       return;
     } else {
@@ -2311,11 +2418,13 @@ async function init() {
 
   moduleDates = {
     caja: sugerirFechaModulo('caja'),
+    plataformas: sugerirFechaModulo('plataformas'),
     gastos: sugerirFechaModulo('gastos'),
     bonos: sugerirFechaModulo('bonos'),
     prestamos: sugerirFechaModulo('prestamos'),
     movimientos: sugerirFechaModulo('movimientos'),
     contadores: sugerirFechaModulo('contadores'),
+    cuadre: sugerirFechaModulo('cuadre'),
   };
   const _savedModule = sessionStorage.getItem('lastModule');
   currentModule = (_savedModule && enabledModules.includes(_savedModule))
@@ -2347,18 +2456,34 @@ async function init() {
     });
   });
 
-  ['total_monedas', 'billetes_viejos', 'venta_practisistemas', 'venta_deportivas'].forEach(id => {
+  ['total_monedas', 'billetes_viejos'].forEach(id => {
     const el = document.getElementById(id);
-    formatearInputNumerico(el, id === 'venta_deportivas');
+    formatearInputNumerico(el, false);
     el.addEventListener('input', calcularCaja);
-    el.addEventListener('input', () => formatearInputNumerico(el, id === 'venta_deportivas'));
-    el.addEventListener('focus', () => limpiarFormatoInputNumerico(el, id === 'venta_deportivas'));
-    el.addEventListener('blur', () => formatearInputNumerico(el, id === 'venta_deportivas'));
+    el.addEventListener('input', () => formatearInputNumerico(el, false));
+    el.addEventListener('focus', () => limpiarFormatoInputNumerico(el, false));
+    el.addEventListener('blur', () => formatearInputNumerico(el, false));
     el.addEventListener('input', () => guardarDraftCaja());
     el.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
         e.preventDefault();
         moverAlSiguiente(el);
+      }
+    });
+  });
+
+  ['venta_practisistemas', 'venta_deportivas'].forEach(id => {
+    const el = document.getElementById(id);
+    const allowNegative = id === 'venta_deportivas';
+    formatearInputNumerico(el, allowNegative);
+    el.addEventListener('input', calcularPlataformas);
+    el.addEventListener('input', () => formatearInputNumerico(el, allowNegative));
+    el.addEventListener('focus', () => limpiarFormatoInputNumerico(el, allowNegative));
+    el.addEventListener('blur', () => formatearInputNumerico(el, allowNegative));
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('btn-guardar').focus();
       }
     });
   });
@@ -2374,6 +2499,9 @@ async function init() {
       limpiarFormularioBonos();
       actualizarBonosVisuales();
       actualizarAccionesBonos();
+    } else if (currentModule === 'plataformas') {
+      limpiarPlataformas();
+      calcularPlataformas();
     } else if (currentModule === 'prestamos') {
       limpiarFormularioPrestamos();
       actualizarPrestamosVisuales();
@@ -2436,6 +2564,11 @@ async function init() {
   document.getElementById('btn-prestamo-registrar').addEventListener('click', registrarPrestamo);
   document.getElementById('btn-gasto-registrar').addEventListener('click', registrarGasto);
   document.getElementById('btn-movimiento-registrar').addEventListener('click', registrarMovimiento);
+  document.getElementById('btn-cuadre-guardar').addEventListener('click', guardarCuadre);
+  const cuadreBaseInput = document.getElementById('cuadre-base-input');
+  cuadreBaseInput.addEventListener('input', () => formatearInputNumerico(cuadreBaseInput, false));
+  cuadreBaseInput.addEventListener('focus', () => limpiarFormatoInputNumerico(cuadreBaseInput, false));
+  cuadreBaseInput.addEventListener('blur', () => formatearInputNumerico(cuadreBaseInput, false));
   document.getElementById('btn-bono-editar-ultimo').addEventListener('click', editarUltimoBono);
   document.getElementById('btn-bono-eliminar-ultimo').addEventListener('click', eliminarUltimoBono);
   document.getElementById('contadores-body').addEventListener('click', e => {
@@ -2566,5 +2699,265 @@ async function init() {
     if (e.target === e.currentTarget) cerrarModalEditar();
   });
 }
+
+// ─── CUADRE ──────────────────────────────────────────────────────────────────
+
+async function cargarDatosCuadre(fecha) {
+  const contenido = document.getElementById('cuadre-contenido');
+  const bloqueado = document.getElementById('cuadre-bloqueado');
+  contenido.classList.add('oculto');
+  bloqueado.classList.add('oculto');
+  cuadreDatos = null;
+
+  try {
+    const estadoRes = await fetch(`/api/modulos/cuadre/fecha/${fecha}/estado`);
+    const estado = await estadoRes.json();
+
+    // Ya guardado y sin override → vista de solo lectura
+    if (estado.existe && !adminOverride.cuadre) {
+      const datosRes = await fetch(`/api/modulos/cuadre/fecha/${fecha}/datos`);
+      if (datosRes.ok) {
+        renderCuadreGuardado(await datosRes.json(), fecha);
+        contenido.classList.remove('oculto');
+        return;
+      }
+    }
+
+    // Precondiciones no cumplidas → bloquear
+    if (!estado.ok) {
+      document.getElementById('cuadre-bloqueado-msg').textContent = estado.mensaje;
+      bloqueado.classList.remove('oculto');
+      return;
+    }
+
+    // Calcular
+    const calcRes = await fetch(`/api/modulos/cuadre/calcular/${fecha}`);
+    const datos = await calcRes.json();
+    if (!datos.ok) {
+      document.getElementById('cuadre-bloqueado-msg').textContent = datos.mensaje;
+      bloqueado.classList.remove('oculto');
+      return;
+    }
+
+    cuadreDatos = { ...datos, fecha };
+    renderCuadre(datos, estado.existe && adminOverride.cuadre);
+    contenido.classList.remove('oculto');
+  } catch {
+    document.getElementById('cuadre-bloqueado-msg').textContent = 'Error al cargar los datos del cuadre.';
+    bloqueado.classList.remove('oculto');
+  }
+}
+
+function renderCuadre(datos, esOverride) {
+  // Período
+  const periodo = datos.periodo || [];
+  const txtPeriodo = periodo.length > 1
+    ? `Período: ${periodo[0]} → ${periodo[periodo.length - 1]} (${periodo.length} días del período)`
+    : periodo.length === 1 ? `Fecha: ${periodo[0]}` : 'Sin días en el período';
+  document.getElementById('cuadre-periodo-texto').textContent = txtPeriodo;
+
+  // Base anterior
+  const tieneBase = datos.tiene_base_anterior;
+  document.getElementById('cuadre-base-display').textContent = tieneBase ? fmt(datos.base_anterior) : '';
+  document.getElementById('cuadre-base-display').classList.toggle('oculto', !tieneBase);
+  const inputWrap = document.getElementById('cuadre-base-input-wrap');
+  inputWrap.classList.toggle('oculto', tieneBase);
+  if (!tieneBase) {
+    setNumeroInputValue('cuadre-base-input', '');
+  }
+
+  // Contadores
+  const contBody = document.getElementById('cuadre-contadores-body');
+  contBody.innerHTML = '';
+  const contItems = datos.contadores?.items || [];
+  contItems.forEach((item, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${idx + 1}</td><td>${item.nombre}</td><td>${item.yield_actual}</td><td>${fmt(item.resultado)}</td>`;
+    contBody.appendChild(tr);
+  });
+  if (!contItems.length) {
+    contBody.innerHTML = '<tr><td colspan="4" class="bonos-vacio">Sin datos de Contadores.</td></tr>';
+  }
+  document.getElementById('cuadre-contadores-total').textContent = fmt(datos.contadores?.total ?? 0);
+
+  // Bonos
+  const bonosBody = document.getElementById('cuadre-bonos-body');
+  bonosBody.innerHTML = '';
+  const top5 = datos.bonos?.top5 || [];
+  top5.forEach(b => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${b.cliente}</td><td>${fmt(b.total)}</td>`;
+    bonosBody.appendChild(tr);
+  });
+  if (!top5.length) {
+    bonosBody.innerHTML = '<tr><td colspan="2" class="bonos-vacio">Sin bonos en el período.</td></tr>';
+  }
+  document.getElementById('cuadre-bonos-total').textContent = fmt(datos.bonos?.total ?? 0);
+
+  // Plataformas
+  document.getElementById('cuadre-plataformas-practi').textContent = fmt(datos.plataformas?.total_practisistemas ?? 0);
+  const cuadrePlatDeport = document.getElementById('cuadre-plataformas-deport');
+  const totalDeportivas = datos.plataformas?.total_deportivas ?? 0;
+  cuadrePlatDeport.textContent = fmt(totalDeportivas);
+  cuadrePlatDeport.className = 'resumen-valor' + (totalDeportivas < 0 ? ' cuadre-negativo' : '');
+  document.getElementById('cuadre-plataformas-total').textContent = fmt(datos.plataformas?.total ?? 0);
+
+  // Gastos
+  const gastosBody = document.getElementById('cuadre-gastos-body');
+  gastosBody.innerHTML = '';
+  const gastos = datos.gastos?.items || [];
+  gastos.forEach(g => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${g.concepto}</td><td>${fmt(g.valor)}</td>`;
+    gastosBody.appendChild(tr);
+  });
+  if (!gastos.length) {
+    gastosBody.innerHTML = '<tr><td colspan="2" class="bonos-vacio">Sin gastos en el período.</td></tr>';
+  }
+  document.getElementById('cuadre-gastos-total').textContent = fmt(datos.gastos?.total ?? 0);
+
+  // Préstamos
+  document.getElementById('cuadre-prestamos-salida').textContent = fmt(datos.prestamos?.total_salida ?? 0);
+  document.getElementById('cuadre-prestamos-entrada').textContent = fmt(datos.prestamos?.total_entrada ?? 0);
+  const netoPrest = datos.prestamos?.neto ?? 0;
+  const netoPrestEl = document.getElementById('cuadre-prestamos-neto');
+  netoPrestEl.textContent = fmt(netoPrest);
+  netoPrestEl.className = 'resumen-valor ' + (netoPrest >= 0 ? 'cuadre-positivo' : 'cuadre-negativo');
+  const resumenPrest = datos.prestamos?.resumen || [];
+  const prestBody = document.getElementById('cuadre-prestamos-body');
+  const prestDetWrap = document.getElementById('cuadre-prestamos-detalle-wrap');
+  prestBody.innerHTML = '';
+  if (resumenPrest.length) {
+    resumenPrest.forEach(p => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${p.persona}</td><td>${fmt(p.prestamos)}</td><td>${fmt(p.pagos)}</td><td>${fmt(p.neto)}</td>`;
+      prestBody.appendChild(tr);
+    });
+    prestDetWrap.classList.remove('oculto');
+  } else {
+    prestDetWrap.classList.add('oculto');
+  }
+
+  // Movimientos
+  document.getElementById('cuadre-mov-ingresos').textContent = fmt(datos.movimientos?.total_ingresos ?? 0);
+  document.getElementById('cuadre-mov-salidas').textContent = fmt(datos.movimientos?.total_salidas ?? 0);
+
+  // Caja física
+  const desg = datos.caja_desglose || {};
+  const cajaBody = document.getElementById('cuadre-caja-body');
+  cajaBody.innerHTML = '';
+  const billetes = desg.billetes || {};
+  [100000, 50000, 20000, 10000, 5000, 2000].forEach(d => {
+    const b = billetes[String(d)];
+    if (!b || b.subtotal === 0) return;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>$ ${d.toLocaleString('es-CO')}</td><td>${fmt(b.subtotal)}</td>`;
+    cajaBody.appendChild(tr);
+  });
+  document.getElementById('cuadre-caja-monedas').textContent = fmt(desg.total_monedas ?? 0);
+  document.getElementById('cuadre-caja-viejos').textContent = fmt(desg.billetes_viejos ?? 0);
+  document.getElementById('cuadre-caja-total').textContent = fmt(datos.caja_fisica ?? 0);
+
+  // Balance
+  document.getElementById('cuadre-balance-base').textContent = fmt(datos.base_anterior ?? 0);
+  document.getElementById('cuadre-teorica').textContent = fmt(datos.caja_teorica ?? 0);
+  document.getElementById('cuadre-fisica').textContent = fmt(datos.caja_fisica ?? 0);
+  document.getElementById('cuadre-base-nueva').textContent = fmt(datos.base_nueva ?? 0);
+  const dif = datos.diferencia ?? 0;
+  const difEl = document.getElementById('cuadre-diferencia');
+  difEl.textContent = fmt(dif);
+  difEl.className = 'resumen-valor ' + (dif === 0 ? '' : dif > 0 ? 'cuadre-positivo' : 'cuadre-negativo');
+  document.getElementById('cuadre-diferencia-label').textContent =
+    dif === 0 ? 'CUADRE EXACTO' : dif > 0 ? 'SOBRANTE' : 'FALTANTE';
+
+  // Botones
+  document.getElementById('cuadre-acciones').classList.remove('oculto');
+  document.getElementById('cuadre-guardado-info').classList.add('oculto');
+}
+
+function renderCuadreGuardado(datos, fecha) {
+  document.getElementById('cuadre-periodo-texto').textContent =
+    `Período: ${datos.fecha_inicio_periodo} → ${fecha} — Guardado: ${datos.fecha_hora_registro}`;
+
+  document.getElementById('cuadre-base-display').textContent = fmt(datos.base_anterior);
+  document.getElementById('cuadre-base-display').classList.remove('oculto');
+  document.getElementById('cuadre-base-input-wrap').classList.add('oculto');
+
+  // Secciones simplificadas con totales guardados
+  document.getElementById('cuadre-contadores-body').innerHTML =
+    `<tr><td colspan="4" class="bonos-vacio cuadre-resumen-guardado">Total: ${fmt(datos.total_contadores)}</td></tr>`;
+  document.getElementById('cuadre-contadores-total').textContent = fmt(datos.total_contadores);
+
+  document.getElementById('cuadre-bonos-body').innerHTML =
+    `<tr><td colspan="2" class="bonos-vacio cuadre-resumen-guardado">Total: ${fmt(datos.total_bonos)}</td></tr>`;
+  document.getElementById('cuadre-bonos-total').textContent = fmt(datos.total_bonos);
+
+  document.getElementById('cuadre-plataformas-practi').textContent = fmt(datos.total_practisistemas);
+  const cuadrePlatDeport = document.getElementById('cuadre-plataformas-deport');
+  cuadrePlatDeport.textContent = fmt(datos.total_deportivas);
+  cuadrePlatDeport.className = 'resumen-valor' + (datos.total_deportivas < 0 ? ' cuadre-negativo' : '');
+  document.getElementById('cuadre-plataformas-total').textContent = fmt((datos.total_practisistemas || 0) + (datos.total_deportivas || 0));
+
+  document.getElementById('cuadre-gastos-body').innerHTML =
+    `<tr><td colspan="2" class="bonos-vacio cuadre-resumen-guardado">Total: ${fmt(datos.total_gastos)}</td></tr>`;
+  document.getElementById('cuadre-gastos-total').textContent = fmt(datos.total_gastos);
+
+  document.getElementById('cuadre-prestamos-salida').textContent = fmt(datos.total_prestamos_salida);
+  document.getElementById('cuadre-prestamos-entrada').textContent = fmt(datos.total_prestamos_entrada);
+  document.getElementById('cuadre-prestamos-neto').textContent = fmt(datos.neto_prestamos);
+  document.getElementById('cuadre-prestamos-detalle-wrap').classList.add('oculto');
+
+  document.getElementById('cuadre-mov-ingresos').textContent = fmt(datos.total_mov_ingresos);
+  document.getElementById('cuadre-mov-salidas').textContent = fmt(datos.total_mov_salidas);
+
+  document.getElementById('cuadre-caja-body').innerHTML = '';
+  document.getElementById('cuadre-caja-monedas').textContent = '';
+  document.getElementById('cuadre-caja-viejos').textContent = '';
+  document.getElementById('cuadre-caja-total').textContent = fmt(datos.caja_fisica);
+
+  document.getElementById('cuadre-balance-base').textContent = fmt(datos.base_anterior);
+  document.getElementById('cuadre-teorica').textContent = fmt(datos.caja_teorica);
+  document.getElementById('cuadre-fisica').textContent = fmt(datos.caja_fisica);
+  document.getElementById('cuadre-base-nueva').textContent = fmt(datos.base_nueva);
+  const dif = datos.diferencia;
+  const difEl = document.getElementById('cuadre-diferencia');
+  difEl.textContent = fmt(dif);
+  difEl.className = 'resumen-valor ' + (dif === 0 ? '' : dif > 0 ? 'cuadre-positivo' : 'cuadre-negativo');
+  document.getElementById('cuadre-diferencia-label').textContent =
+    dif === 0 ? 'CUADRE EXACTO' : dif > 0 ? 'SOBRANTE' : 'FALTANTE';
+
+  document.getElementById('cuadre-acciones').classList.add('oculto');
+  const info = document.getElementById('cuadre-guardado-info');
+  info.textContent = `Cuadre guardado. Para corregir usa el botón admin.`;
+  info.classList.remove('oculto');
+}
+
+async function guardarCuadre() {
+  if (!cuadreDatos) return;
+  const fecha = cuadreDatos.fecha;
+  const tieneBase = cuadreDatos.tiene_base_anterior;
+  const base_anterior = tieneBase
+    ? cuadreDatos.base_anterior
+    : (parseNumeroInput('cuadre-base-input') || 0);
+
+  const res = await fetch('/api/modulos/cuadre/guardar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha, base_anterior, forzar: adminOverride.cuadre }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    mostrarMensaje(data.mensaje, 'advertencia');
+    return;
+  }
+  resetOverride('cuadre');
+  await cargarDatosCuadre(fecha);
+  await verificarFechaActual();
+  const tipo = data.diferencia === 0 ? 'ok' : 'advertencia';
+  const label = data.diferencia === 0 ? 'Cuadre exacto' : data.diferencia > 0 ? `Sobrante: ${fmt(data.diferencia)}` : `Faltante: ${fmt(data.diferencia)}`;
+  mostrarMensaje(`✓ ${data.mensaje} — ${label}`, tipo);
+}
+
+// ─── FIN CUADRE ───────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', init);

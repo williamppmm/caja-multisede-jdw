@@ -95,15 +95,32 @@ def _iter_referencias_previas(item_id: str, fecha_actual: date) -> list[dict]:
     return eventos
 
 
-def obtener_referencia_vigente(item_id: str, fecha_actual: date) -> dict | None:
-    eventos = _iter_referencias_previas(item_id, fecha_actual)
+def _construir_eventos_por_item(fecha_actual: date, catalogo: list[dict] | None = None) -> dict[str, list[dict]]:
+    catalogo_map = {item["item_id"]: item for item in (catalogo or obtener_catalogo())}
+    eventos_por_item: dict[str, list[dict]] = {}
+    for evento in excel_service.obtener_historial_contadores(fecha_actual):
+        item_id = evento.get("item_id")
+        if not item_id:
+            continue
+        evento = dict(evento)
+        evento["nombre"] = catalogo_map.get(item_id, {}).get("nombre", item_id)
+        eventos_por_item.setdefault(item_id, []).append(evento)
+
+    for eventos in eventos_por_item.values():
+        eventos.sort(key=lambda e: (e["fecha"], 1 if e["tipo"] == "referencia_critica" else 0))
+
+    return eventos_por_item
+
+
+def obtener_referencia_vigente(item_id: str, fecha_actual: date, eventos_por_item: dict[str, list[dict]] | None = None) -> dict | None:
+    eventos = eventos_por_item.get(item_id, []) if eventos_por_item is not None else _iter_referencias_previas(item_id, fecha_actual)
     if not eventos:
         return None
     return eventos[-1]
 
 
-def obtener_ultimo_registro_real(item_id: str, fecha_actual: date) -> dict | None:
-    eventos = _iter_referencias_previas(item_id, fecha_actual)
+def obtener_ultimo_registro_real(item_id: str, fecha_actual: date, eventos_por_item: dict[str, list[dict]] | None = None) -> dict | None:
+    eventos = eventos_por_item.get(item_id, []) if eventos_por_item is not None else _iter_referencias_previas(item_id, fecha_actual)
     registros = [evento for evento in eventos if evento.get("tipo") == "registro"]
     if not registros:
         return None
@@ -112,14 +129,15 @@ def obtener_ultimo_registro_real(item_id: str, fecha_actual: date) -> dict | Non
 
 def construir_base_fecha(fecha: date) -> dict:
     catalogo = obtener_catalogo()
+    eventos_por_item = _construir_eventos_por_item(fecha, catalogo)
     guardados = excel_service.obtener_datos_contadores_fecha(fecha, fecha.year)
     existe = bool(guardados)
     filas = []
     fecha_hora_registro = ""
 
     for item in catalogo:
-        ref = obtener_referencia_vigente(item["item_id"], fecha)
-        ultimo_registro = obtener_ultimo_registro_real(item["item_id"], fecha)
+        ref = obtener_referencia_vigente(item["item_id"], fecha, eventos_por_item)
+        ultimo_registro = obtener_ultimo_registro_real(item["item_id"], fecha, eventos_por_item)
         guardado = guardados.get(item["item_id"], {})
         actual_entradas = int(guardado.get("entradas", 0))
         actual_salidas = int(guardado.get("salidas", 0))
@@ -199,6 +217,7 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
             "mensaje": "No hay items configurados en Contadores. Agrégalos desde Administración.",
             "fecha": str(entrada.fecha),
         }
+    eventos_por_item = _construir_eventos_por_item(entrada.fecha, list(catalogo.values()))
 
     fecha_str = str(entrada.fecha)
 
@@ -220,7 +239,7 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
         if meta.get("pausado", False):
             continue  # Máquina en pausa — omitir silenciosamente
 
-        ref = obtener_referencia_vigente(fila.item_id, entrada.fecha)
+        ref = obtener_referencia_vigente(fila.item_id, entrada.fecha, eventos_por_item)
         alerta = bool(ref) and (
             fila.entradas < int(ref.get("entradas", 0))
             or fila.salidas < int(ref.get("salidas", 0))

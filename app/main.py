@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 from app.runtime_paths import get_web_dir
 from app.routers import modules, settings as settings_router
 
-app = FastAPI(title="Caja Diaria")
+app = FastAPI(title="ContabilidadJDW")
 
 WEB_DIR = get_web_dir()
 app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")

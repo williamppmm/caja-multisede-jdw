@@ -20,6 +20,7 @@ settings.json
 bonos_clientes.json
 gastos_conceptos.json
 prestamos_personas.json
+movimientos_conceptos.json
 contadores_items.json
 *.xlsx
 ~$*.xlsx

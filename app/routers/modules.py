@@ -11,11 +11,14 @@ from app.models.caja_models import (
     ModuloItemsRespuesta,
     MovimientoEntrada,
     MovimientoRespuesta,
+    PlataformasEntrada,
+    PlataformasRespuesta,
     PrestamoEntrada,
     PrestamoRespuesta,
 )
 from app.models.contadores_models import ContadoresEntrada, ContadoresRespuesta
-from app.services import bonos_service, caja_service, contadores_service, excel_service, movimientos_service, nombres_service, prestamos_service, settings_service
+from app.models.cuadre_models import CuadreEntrada, CuadreRespuesta
+from app.services import bonos_service, caja_service, contadores_service, cuadre_service, excel_service, movimientos_service, nombres_service, prestamos_service, settings_service
 
 router = APIRouter(prefix="/api/modulos")
 
@@ -24,6 +27,12 @@ router = APIRouter(prefix="/api/modulos")
 def guardar_caja(entrada: CajaEntrada):
     resultado = caja_service.guardar_caja(entrada)
     return CajaRespuesta(**resultado)
+
+
+@router.post("/plataformas/guardar", response_model=PlataformasRespuesta)
+def guardar_plataformas(entrada: PlataformasEntrada):
+    resultado = caja_service.guardar_plataformas(entrada)
+    return PlataformasRespuesta(**resultado)
 
 
 @router.post("/contadores/guardar", response_model=ContadoresRespuesta)
@@ -48,6 +57,18 @@ def datos_fecha_caja(fecha: str):
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
     datos = excel_service.obtener_datos_caja_fecha(d, d.year)
+    if datos is None:
+        raise HTTPException(status_code=404, detail="No hay datos para esa fecha")
+    return datos
+
+
+@router.get("/plataformas/fecha/{fecha}/datos")
+def datos_fecha_plataformas(fecha: str):
+    try:
+        d = date.fromisoformat(fecha)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+    datos = excel_service.obtener_datos_plataformas_fecha(d, d.year)
     if datos is None:
         raise HTTPException(status_code=404, detail="No hay datos para esa fecha")
     return datos
@@ -82,6 +103,53 @@ def registrar_movimiento(entrada: MovimientoEntrada):
 @router.get("/prestamos/datos")
 def datos_prestamos():
     return prestamos_service.obtener_registros()
+
+
+@router.get("/cuadre/fecha/{fecha}/estado")
+def estado_cuadre(fecha: str):
+    try:
+        d = date.fromisoformat(fecha)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+    existe = excel_service.fecha_existe_modulo("cuadre", d, d.year)
+    preconds = cuadre_service.verificar_precondiciones(d)
+    return {"fecha": fecha, "existe": existe, "requiere_admin": existe, **preconds}
+
+
+@router.get("/cuadre/calcular/{fecha}")
+def calcular_cuadre_fecha(fecha: str):
+    try:
+        d = date.fromisoformat(fecha)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+    preconds = cuadre_service.verificar_precondiciones(d)
+    if not preconds["ok"]:
+        return {"ok": False, **preconds}
+    base = preconds["base_anterior"] if preconds["tiene_base_anterior"] else 0.0
+    datos = cuadre_service.calcular_cuadre(d, base)
+    return {"ok": True, **preconds, **datos}
+
+
+@router.get("/cuadre/fecha/{fecha}/datos")
+def datos_fecha_cuadre(fecha: str):
+    try:
+        d = date.fromisoformat(fecha)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+    datos = excel_service.obtener_datos_cuadre_fecha(d, d.year)
+    if datos is None:
+        raise HTTPException(status_code=404, detail="No hay Cuadre guardado para esa fecha")
+    return datos
+
+
+@router.post("/cuadre/guardar", response_model=CuadreRespuesta)
+def guardar_cuadre(entrada: CuadreEntrada):
+    preconds = cuadre_service.verificar_precondiciones(entrada.fecha)
+    if not preconds["ok"]:
+        return CuadreRespuesta(ok=False, mensaje=preconds["mensaje"], fecha=str(entrada.fecha))
+    base = preconds["base_anterior"] if preconds["tiene_base_anterior"] else entrada.base_anterior
+    resultado = cuadre_service.guardar_cuadre(entrada, base)
+    return CuadreRespuesta(**resultado)
 
 
 @router.get("/bonos/fecha/{fecha}/datos")
@@ -210,9 +278,13 @@ def eliminar_ultimo_bono(body: dict):
 
 @router.get("/{modulo}/fecha/{fecha}/estado")
 def consultar_fecha_modulo(modulo: str, fecha: str):
-    if modulo not in {"caja", "gastos", "bonos", "prestamos", "movimientos", "contadores"}:
+    if modulo not in {"caja", "plataformas", "gastos", "bonos", "prestamos", "movimientos", "contadores", "cuadre"}:
         raise HTTPException(status_code=404, detail="Modulo no soportado")
     try:
+        if modulo == "cuadre":
+            existe = excel_service.fecha_existe_modulo("cuadre", date.fromisoformat(fecha), date.fromisoformat(fecha).year)
+            preconds = cuadre_service.verificar_precondiciones(date.fromisoformat(fecha))
+            return {"fecha": fecha, "existe": existe, "requiere_admin": existe, **preconds}
         if modulo == "contadores":
             existe = contadores_service.fecha_existe(date.fromisoformat(fecha))
             return {
@@ -228,12 +300,17 @@ def consultar_fecha_modulo(modulo: str, fecha: str):
 
 @router.get("/{modulo}/ultima")
 def ultima_modulo(modulo: str):
-    if modulo not in {"caja", "gastos", "bonos", "prestamos", "movimientos", "contadores"}:
+    if modulo not in {"caja", "plataformas", "gastos", "bonos", "prestamos", "movimientos", "contadores", "cuadre"}:
         raise HTTPException(status_code=404, detail="Modulo no soportado")
     if modulo == "contadores":
         ultima_fecha = contadores_service.obtener_ultima_fecha()
         if ultima_fecha is None:
             return {"fecha": None, "mensaje": "Sin registros en Contadores"}
+        return {"fecha": str(ultima_fecha)}
+    if modulo == "cuadre":
+        ultima_fecha = cuadre_service.obtener_ultima_fecha_cuadre()
+        if ultima_fecha is None:
+            return {"fecha": None, "mensaje": "Sin cuadres registrados"}
         return {"fecha": str(ultima_fecha)}
     year = date.today().year
     ultima_fecha = excel_service.obtener_ultima_fecha_modulo(modulo, year)

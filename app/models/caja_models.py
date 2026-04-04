@@ -14,8 +14,6 @@ class CajaEntrada(BaseModel):
     billetes: Dict[str, int]
     total_monedas: float
     billetes_viejos: float
-    venta_practisistemas: float
-    venta_deportivas: float
     forzar: bool = False
 
     @field_validator("billetes")
@@ -31,11 +29,25 @@ class CajaEntrada(BaseModel):
                 raise ValueError(f"Cantidad inválida para {denom}: debe ser entero >= 0")
         return v
 
-    @field_validator("total_monedas", "billetes_viejos", "venta_practisistemas")
+    @field_validator("total_monedas", "billetes_viejos")
     @classmethod
     def validar_no_negativo(cls, v):
         if v < 0:
             raise ValueError("El valor no puede ser negativo")
+        return v
+
+
+class PlataformasEntrada(BaseModel):
+    fecha: date
+    venta_practisistemas: float = 0
+    venta_deportivas: float = 0
+    forzar: bool = False
+
+    @field_validator("venta_practisistemas")
+    @classmethod
+    def validar_practisistemas(cls, v):
+        if v < 0:
+            raise ValueError("La venta de Practisistemas no puede ser negativa")
         return v
 
 
@@ -136,6 +148,16 @@ class CajaRespuesta(BaseModel):
     fecha: str = ""
     total_billetes: float = 0
     total_caja_fisica: float = 0
+    fecha_hora_registro: str = ""
+
+
+class PlataformasRespuesta(BaseModel):
+    ok: bool
+    mensaje: str
+    fecha: str = ""
+    venta_practisistemas: float = 0
+    venta_deportivas: float = 0
+    total_plataformas: float = 0
     fecha_hora_registro: str = ""
 
 

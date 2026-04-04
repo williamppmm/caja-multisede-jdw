@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from app.config import DENOMINACIONES
-from app.models.caja_models import CajaEntrada, ModuloItemsEntrada
+from app.models.caja_models import CajaEntrada, ModuloItemsEntrada, PlataformasEntrada
 from app.services import excel_service, nombres_service
 
 
@@ -35,9 +35,6 @@ def construir_filas_caja(entrada: CajaEntrada, timestamp: datetime) -> tuple[lis
 
     filas.append([fecha, "manual", "Total monedas", 0, 0, 0, entrada.total_monedas, timestamp])
     filas.append([fecha, "manual", "Billetes viejos", 0, 0, 0, entrada.billetes_viejos, timestamp])
-    filas.append([fecha, "informativo", "Venta Practisistemas", 0, 0, 0, entrada.venta_practisistemas, timestamp])
-    filas.append([fecha, "informativo", "Venta Deportivas", 0, 0, 0, entrada.venta_deportivas, timestamp])
-
     total_caja_fisica = total_billetes + entrada.total_monedas + entrada.billetes_viejos
     filas.append([fecha, "resumen", "Total caja fisica", 0, 0, 0, total_caja_fisica, timestamp])
     return filas, total_billetes, total_caja_fisica
@@ -89,6 +86,43 @@ def guardar_caja(entrada: CajaEntrada) -> dict:
     }
 
 
+def guardar_plataformas(entrada: PlataformasEntrada) -> dict:
+    year = entrada.fecha.year
+    hoy = date.today()
+
+    if entrada.fecha != hoy and not entrada.forzar:
+        return {
+            "ok": False,
+            "mensaje": "Solo puedes guardar plataformas en la fecha actual. Para corregir otra fecha necesitas admin.",
+            "fecha": str(entrada.fecha),
+        }
+
+    try:
+        reemplazar_fecha = entrada.fecha if entrada.forzar else None
+        timestamp = datetime.now().replace(microsecond=0)
+        total = float(entrada.venta_practisistemas or 0) + float(entrada.venta_deportivas or 0)
+        filas = [[
+            entrada.fecha,
+            float(entrada.venta_practisistemas or 0),
+            float(entrada.venta_deportivas or 0),
+            total,
+            timestamp,
+        ]]
+        excel_service.guardar_filas_modulo("plataformas", filas, year, reemplazar_fecha=reemplazar_fecha)
+    except excel_service.ArchivoCajaOcupadoError as exc:
+        return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
+
+    return {
+        "ok": True,
+        "mensaje": "Plataformas guardadas correctamente",
+        "fecha": str(entrada.fecha),
+        "venta_practisistemas": float(entrada.venta_practisistemas or 0),
+        "venta_deportivas": float(entrada.venta_deportivas or 0),
+        "total_plataformas": total,
+        "fecha_hora_registro": timestamp.isoformat(),
+    }
+
+
 def guardar_items_modulo(modulo: str, entrada: ModuloItemsEntrada) -> dict:
     year = entrada.fecha.year
     hoy = date.today()
@@ -133,11 +167,11 @@ def consultar_estado_modulo(modulo: str, fecha_str: str) -> dict:
     fecha = date.fromisoformat(fecha_str)
     existe = excel_service.fecha_existe_modulo(modulo, fecha, fecha.year)
     requiere_admin = modulo == "caja" and existe
-    if modulo in ROW_TYPES:
+    if modulo in ROW_TYPES or modulo == "plataformas":
         requiere_admin = fecha != date.today()
     return {
         "fecha": fecha_str,
         "existe": existe,
         "requiere_admin": requiere_admin,
-        "editable_libre": modulo in ROW_TYPES and fecha == date.today(),
+        "editable_libre": (modulo in ROW_TYPES or modulo == "plataformas") and fecha == date.today(),
     }
