@@ -190,6 +190,13 @@ input[type="number"]::-webkit-outer-spin-button {
   border: 1px solid #bbb;
   border-radius: 5px;
   font-size: 1rem;
+  text-align: left;
+}
+
+.campo-manual input[inputmode="numeric"],
+.bonos-valor input,
+.movimientos-valor input,
+.gastos-valor input {
   text-align: right;
 }
 
@@ -895,6 +902,7 @@ input[type="number"]::-webkit-outer-spin-button {
   border: 1px solid #bbb;
   border-radius: 5px;
   font-size: 0.93rem;
+  text-align: left;
 }
 
 .gasto-fila input[type="number"],
@@ -1182,12 +1190,18 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .campo-config input[type="text"],
+.campo-config input[type="password"],
 .campo-config select {
   width: 100%;
   padding: 8px 10px;
   border: 1px solid #bbb;
   border-radius: 5px;
   font-size: 0.95rem;
+}
+
+.campo-config input[type="text"],
+.campo-config input[type="password"] {
+  text-align: left;
 }
 
 .campo-config-label {
