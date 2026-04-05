@@ -459,7 +459,6 @@ function filaDesdeDataset(row) {
     refEntradas: Number(row.dataset.refEntradas || 0),
     refSalidas: Number(row.dataset.refSalidas || 0),
     refJackpot: Number(row.dataset.refJackpot || 0),
-    refCancelled: Number(row.dataset.refCancelled || 0),
     refYield: Number(row.dataset.refYield || 0),
     refFecha: row.dataset.refFecha || '',
     refTipo: row.dataset.refTipo || 'sin_referencia',
@@ -476,12 +475,10 @@ function leerContadoresDraftActual() {
       entradas: row.querySelector(`[data-role="entradas"]`)?.value || '',
       salidas: row.querySelector(`[data-role="salidas"]`)?.value || '',
       jackpot: row.querySelector(`[data-role="jackpot"]`)?.value || '',
-      cancelled: row.querySelector(`[data-role="cancelled"]`)?.value || '',
       critica_autorizada: row.dataset.criticaAutorizada === '1',
       ref_entradas: row.querySelector(`[data-role="critica-entradas"]`)?.value || '',
       ref_salidas: row.querySelector(`[data-role="critica-salidas"]`)?.value || '',
       ref_jackpot: row.querySelector(`[data-role="critica-jackpot"]`)?.value || '',
-      ref_cancelled: row.querySelector(`[data-role="critica-cancelled"]`)?.value || '',
       observacion: row.querySelector(`[data-role="critica-observacion"]`)?.value || '',
     };
   });
@@ -505,7 +502,7 @@ function applyContadoresDraft(fecha) {
   draft.items.forEach(item => {
     const row = document.querySelector(`#contadores-body tr[data-item-id="${item.item_id}"]`);
     if (!row) return;
-    ['entradas', 'salidas', 'jackpot', 'cancelled'].forEach(role => {
+    ['entradas', 'salidas', 'jackpot'].forEach(role => {
       const input = row.querySelector(`[data-role="${role}"]`);
       if (input) input.value = item[role] || '';
     });
@@ -515,7 +512,6 @@ function applyContadoresDraft(fecha) {
       'critica-entradas': item.ref_entradas,
       'critica-salidas': item.ref_salidas,
       'critica-jackpot': item.ref_jackpot,
-      'critica-cancelled': item.ref_cancelled,
       'critica-observacion': item.observacion,
     };
     Object.entries(mapaCritica).forEach(([role, value]) => {
@@ -536,7 +532,7 @@ function valorTextoContador(row, role) {
 }
 
 function filaContadorTieneCaptura(row) {
-  return ['entradas', 'salidas', 'jackpot', 'cancelled'].some(role => valorTextoContador(row, role) !== '');
+  return ['entradas', 'salidas', 'jackpot'].some(role => valorTextoContador(row, role) !== '');
 }
 
 function filaContadorCompleta(row) {
@@ -548,7 +544,6 @@ function camposPrincipalesContadores() {
     '#contadores-body tr[data-item-id] [data-role="entradas"]',
     '#contadores-body tr[data-item-id] [data-role="salidas"]',
     '#contadores-body tr[data-item-id] [data-role="jackpot"]',
-    '#contadores-body tr[data-item-id] [data-role="cancelled"]',
   ].join(', ');
   return [...document.querySelectorAll(selector)];
 }
@@ -566,7 +561,11 @@ function formatRefTexto(fila) {
   if (!fila.referencia || fila.referencia.tipo === 'sin_referencia') {
     return 'Sin referencia previa';
   }
-  const tipo = fila.referencia.tipo === 'referencia_critica' ? 'Crítica' : 'Normal';
+  const tipo = fila.referencia.tipo === 'referencia_critica'
+    ? 'Crítica'
+    : fila.referencia.tipo === 'referencia_inicial'
+      ? 'Inicial'
+      : 'Normal';
   const fecha = fila.referencia.fecha || '--';
   return `${tipo}: ${fecha}`;
 }
@@ -592,7 +591,6 @@ function renderContadores(items = [], total = 0) {
     tr.dataset.refEntradas = String(fila.referencia?.entradas || 0);
     tr.dataset.refSalidas = String(fila.referencia?.salidas || 0);
     tr.dataset.refJackpot = String(fila.referencia?.jackpot || 0);
-    tr.dataset.refCancelled = String(fila.referencia?.cancelled || 0);
     tr.dataset.refYield = String(fila.referencia?.yield || 0);
     tr.dataset.refFecha = fila.referencia?.fecha || '';
     tr.dataset.refTipo = fila.referencia?.tipo || 'sin_referencia';
@@ -634,7 +632,6 @@ function renderContadores(items = [], total = 0) {
                   <input type="text" inputmode="numeric" data-role="critica-entradas" placeholder="Ref. Entradas" value="${limpiarNumeroTexto((fila.ref_entradas_guardada ?? fila.referencia?.entradas) || 0)}" />
                   <input type="text" inputmode="numeric" data-role="critica-salidas" placeholder="Ref. Salidas" value="${limpiarNumeroTexto((fila.ref_salidas_guardada ?? fila.referencia?.salidas) || 0)}" />
                   <input type="text" inputmode="numeric" data-role="critica-jackpot" placeholder="Ref. Jackpot" value="${limpiarNumeroTexto((fila.ref_jackpot_guardada ?? fila.referencia?.jackpot) || 0)}" />
-                  <input type="text" inputmode="numeric" data-role="critica-cancelled" placeholder="Ref. Cancelled" value="${limpiarNumeroTexto((fila.ref_cancelled_guardada ?? fila.referencia?.cancelled) || 0)}" />
                 </div>
                 <textarea data-role="critica-observacion" class="oculto" aria-hidden="true" tabindex="-1" readonly>${fila.observacion_referencia || fila.motivo_referencia || OBSERVACION_CRITICA_DEFAULT}</textarea>
                 <div class="contador-critica-confirm">
@@ -658,7 +655,6 @@ function renderContadores(items = [], total = 0) {
         <td>${crearInputContador('entradas', fila.entradas)}</td>
         <td>${crearInputContador('salidas', fila.salidas)}</td>
         <td>${crearInputContador('jackpot', fila.jackpot)}</td>
-        <td>${crearInputContador('cancelled', fila.cancelled)}</td>
         <td class="contador-yield" data-role="yield-actual">${limpiarNumeroTexto(fila.yield_actual || 0, true)}</td>
         <td data-role="yield-ref">${limpiarNumeroTexto(fila.referencia?.yield || 0, true)}<span class="contador-ref-texto">${fila.referencia?.fecha || 'Base 0'}</span></td>
         <td class="contador-resultado ${fila.resultado_monetario < 0 ? 'negativo' : ''}" data-role="resultado">${fmt(fila.resultado_monetario || 0)}</td>
@@ -687,7 +683,6 @@ function recalcularFilaContador(row) {
   const entradas = valorContadorRow(row, 'entradas');
   const salidas = valorContadorRow(row, 'salidas');
   const jackpot = valorContadorRow(row, 'jackpot');
-  const cancelled = valorContadorRow(row, 'cancelled');
   const usaCritica = row.dataset.criticaAutorizada === '1';
   const detalleCritica = row.querySelector('.contador-critica-detalle');
 
@@ -695,7 +690,6 @@ function recalcularFilaContador(row) {
     entradas < fila.refEntradas
     || salidas < fila.refSalidas
     || jackpot < fila.refJackpot
-    || cancelled < fila.refCancelled
   );
   row.classList.remove('contador-alerta');
   if (detalleCritica) {
@@ -725,11 +719,10 @@ function recalcularFilaContador(row) {
       valorContadorRow(row, 'critica-entradas')
       - valorContadorRow(row, 'critica-salidas')
       - valorContadorRow(row, 'critica-jackpot')
-      - valorContadorRow(row, 'critica-cancelled')
     )
     : fila.refYield;
 
-  const yieldActual = entradas - salidas - jackpot - cancelled;
+  const yieldActual = entradas - salidas - jackpot;
   const resultado = (yieldActual - refYield) * fila.denominacion;
   row.querySelector('[data-role="yield-actual"]').textContent = limpiarNumeroTexto(yieldActual, true);
   row.querySelector('[data-role="yield-ref"]').innerHTML = `${limpiarNumeroTexto(refYield, true)}<span class="contador-ref-texto">${usaCritica ? 'Autorizado' : (fila.refFecha || 'Base 0')}</span>`;
@@ -792,7 +785,7 @@ function manejarEventoContadores(target) {
     formatearInputNumerico(target, false, false);
   }
   // Al editar campos de referencia crítica, se pierde la autorización previa
-  if (target.matches('[data-role="critica-entradas"],[data-role="critica-salidas"],[data-role="critica-jackpot"],[data-role="critica-cancelled"]')) {
+  if (target.matches('[data-role="critica-entradas"],[data-role="critica-salidas"],[data-role="critica-jackpot"]')) {
     const row = target.closest('tr');
     if (row && row.dataset.criticaAutorizada === '1') {
       row.dataset.criticaAutorizada = '0';
@@ -827,7 +820,6 @@ function confirmarReferenciaCritica(row) {
     'critica-entradas': row.dataset.refEntradas || '0',
     'critica-salidas': row.dataset.refSalidas || '0',
     'critica-jackpot': row.dataset.refJackpot || '0',
-    'critica-cancelled': row.dataset.refCancelled || '0',
   };
   Object.entries(defaults).forEach(([role, value]) => {
     const input = row.querySelector(`[data-role="${role}"]`);
@@ -1297,9 +1289,8 @@ function limpiarModuloActual() {
       entradas: 0,
       salidas: 0,
       jackpot: 0,
-      cancelled: 0,
       yield_actual: 0,
-      referencia: { tipo: 'sin_referencia', fecha: '', entradas: 0, salidas: 0, jackpot: 0, cancelled: 0, yield: 0 },
+      referencia: { tipo: 'sin_referencia', fecha: '', entradas: 0, salidas: 0, jackpot: 0, yield: 0 },
       resultado_monetario: 0,
       alerta: false,
     })), 0);
@@ -1848,7 +1839,7 @@ function validarContadores() {
       return `Completa Entradas y Salidas para ${row.dataset.nombre}.`;
     }
 
-    for (const role of ['entradas', 'salidas', 'jackpot', 'cancelled']) {
+    for (const role of ['entradas', 'salidas', 'jackpot']) {
       const value = row.querySelector(`[data-role="${role}"]`)?.value || '';
       const num = value === '' ? 0 : parseNumeroTexto(value);
       if (isNaN(num) || num < 0) {
@@ -1859,15 +1850,13 @@ function validarContadores() {
     const entradas = valorContadorRow(row, 'entradas');
     const salidas = valorContadorRow(row, 'salidas');
     const jackpot = valorContadorRow(row, 'jackpot');
-    const cancelled = valorContadorRow(row, 'cancelled');
     const alerta = entradas < Number(row.dataset.refEntradas || 0)
       || salidas < Number(row.dataset.refSalidas || 0)
-      || jackpot < Number(row.dataset.refJackpot || 0)
-      || cancelled < Number(row.dataset.refCancelled || 0);
+      || jackpot < Number(row.dataset.refJackpot || 0);
     const usaCritica = row.dataset.criticaAutorizada === '1';
 
     if (alerta && !usaCritica) {
-      return `${row.dataset.nombre}: hay valores menores a la referencia en Entradas, Salidas, Jackpot o Cancelled. Abre "Referencia crítica", ajusta los valores y confirma con la contraseña.`;
+      return `${row.dataset.nombre}: hay valores menores a la referencia en Entradas, Salidas o Jackpot. Abre "Referencia crítica", ajusta los valores y confirma con la contraseña.`;
     }
 
     if (usaCritica) {
@@ -1899,13 +1888,11 @@ async function guardarContadores() {
       entradas: valorContadorRow(row, 'entradas'),
       salidas: valorContadorRow(row, 'salidas'),
       jackpot: valorContadorRow(row, 'jackpot'),
-      cancelled: valorContadorRow(row, 'cancelled'),
       usar_referencia_critica: usarReferenciaCritica,
       referencia_critica: usarReferenciaCritica ? {
         entradas: valorContadorRow(row, 'critica-entradas'),
         salidas: valorContadorRow(row, 'critica-salidas'),
         jackpot: valorContadorRow(row, 'critica-jackpot'),
-        cancelled: valorContadorRow(row, 'critica-cancelled'),
         observacion: observacionCritica,
       } : null,
     };
@@ -1937,30 +1924,100 @@ function parseCatalogoTextarea(id) {
     .filter(Boolean);
 }
 
-function parseContadoresCatalogoTextarea() {
-  return (document.getElementById('admin-contadores-catalogo')?.value || '')
-    .split(/\r?\n/)
-    .map(linea => linea.trim())
-    .filter(Boolean)
-    .map(linea => {
-      const partes = linea.split('|').map(parte => parte.trim());
-      const [item_id = '', nombre = '', denominacion = '0'] = partes;
-      return {
-        item_id,
-        nombre: nombre || item_id,
-        denominacion: Number(limpiarNumeroTexto(denominacion)) || 0,
-        activo: true,
-      };
-    })
-    .filter(item => item.item_id && item.nombre && item.denominacion > 0);
+// ── Catálogo contadores — grid ─────────────────────────────────────
+
+function _crearFilaCatalogoContadores(item = {}) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" class="admin-grid-input" data-field="item_id" value="${item.item_id || ''}" placeholder="M01" maxlength="20" /></td>
+    <td><input type="text" class="admin-grid-input" data-field="nombre" value="${item.nombre || ''}" placeholder="Ruleta 1" maxlength="50" /></td>
+    <td><input type="text" inputmode="numeric" class="admin-grid-input admin-grid-num" data-field="denominacion" value="${limpiarNumeroTexto(item.denominacion) || ''}" placeholder="100" /></td>
+    <td><button type="button" class="btn-admin-grid-remove" tabindex="-1" title="Eliminar">×</button></td>
+  `;
+  tr.querySelector('.btn-admin-grid-remove').addEventListener('click', () => tr.remove());
+  return tr;
 }
 
-function setContadoresCatalogoTextarea(items = []) {
-  const el = document.getElementById('admin-contadores-catalogo');
-  if (!el) return;
-  el.value = (items || [])
-    .map(item => `${item.item_id} | ${item.nombre} | ${item.denominacion}`)
-    .join('\n');
+function renderContadoresCatalogoGrid(items = []) {
+  const body = document.getElementById('admin-contadores-grid-body');
+  if (!body) return;
+  body.innerHTML = '';
+  (items || []).forEach(item => body.appendChild(_crearFilaCatalogoContadores(item)));
+}
+
+function parseContadoresCatalogoGrid() {
+  return [...document.querySelectorAll('#admin-contadores-grid-body tr')].flatMap(tr => {
+    const item_id = tr.querySelector('[data-field="item_id"]')?.value.trim();
+    const nombre = tr.querySelector('[data-field="nombre"]')?.value.trim();
+    const denominacion = Number(limpiarNumeroTexto(tr.querySelector('[data-field="denominacion"]')?.value || '')) || 0;
+    if (!item_id || !nombre || denominacion <= 0) return [];
+    return [{ item_id, nombre, denominacion, activo: true }];
+  });
+}
+
+// ── Startup referencias — grid ──────────────────────────────────────
+
+function renderStartupContadoresGrid(refs = {}, catalogItems = []) {
+  const body = document.getElementById('admin-startup-grid-body');
+  const tabla = document.getElementById('admin-startup-grid-tabla');
+  const sinItems = document.getElementById('admin-startup-sin-items');
+  if (!body) return;
+  body.innerHTML = '';
+  if (!catalogItems.length) {
+    tabla?.classList.add('oculto');
+    sinItems?.classList.remove('oculto');
+    return;
+  }
+  tabla?.classList.remove('oculto');
+  sinItems?.classList.add('oculto');
+
+  const _fila = (id, nombre, ref, huerfano = false) => {
+    const tr = document.createElement('tr');
+    tr.dataset.itemId = id;
+    if (huerfano) tr.className = 'admin-grid-huerfano';
+    tr.innerHTML = `
+      <td class="admin-grid-id-cell">${id}${huerfano ? ' <span class="admin-grid-huerfano-label">(sin ítem)</span>' : ''}</td>
+      <td class="admin-grid-nombre-cell">${nombre}</td>
+      <td><input type="text" inputmode="numeric" class="admin-grid-input admin-grid-num" data-field="entradas" value="${ref.entradas ?? 0}" /></td>
+      <td><input type="text" inputmode="numeric" class="admin-grid-input admin-grid-num" data-field="salidas" value="${ref.salidas ?? 0}" /></td>
+      <td><input type="text" inputmode="numeric" class="admin-grid-input admin-grid-num" data-field="jackpot" value="${ref.jackpot ?? 0}" /></td>
+    `;
+    return tr;
+  };
+
+  const idsEnCatalogo = new Set(catalogItems.map(i => i.item_id));
+  catalogItems.forEach(item => body.appendChild(_fila(item.item_id, item.nombre, refs[item.item_id] || {})));
+  Object.entries(refs).forEach(([id, ref]) => {
+    if (!idsEnCatalogo.has(id)) body.appendChild(_fila(id, '—', ref, true));
+  });
+}
+
+function parseStartupContadoresGrid() {
+  const result = {};
+  document.querySelectorAll('#admin-startup-grid-body tr[data-item-id]').forEach(tr => {
+    result[tr.dataset.itemId] = {
+      entradas: Number(limpiarNumeroTexto(tr.querySelector('[data-field="entradas"]')?.value || '')) || 0,
+      salidas:  Number(limpiarNumeroTexto(tr.querySelector('[data-field="salidas"]')?.value  || '')) || 0,
+      jackpot:  Number(limpiarNumeroTexto(tr.querySelector('[data-field="jackpot"]')?.value  || '')) || 0,
+    };
+  });
+  return result;
+}
+
+function sincronizarReferenciasCatalogo() {
+  const itemsCatalogo = parseContadoresCatalogoGrid();
+  const refActual = parseStartupContadoresGrid();
+  const idsEnCatalogo = new Set(itemsCatalogo.map(i => i.item_id));
+  const nuevas = {};
+  for (const item of itemsCatalogo) {
+    nuevas[item.item_id] = refActual[item.item_id] || { entradas: 0, salidas: 0, jackpot: 0 };
+  }
+  for (const [id, ref] of Object.entries(refActual)) {
+    if (!idsEnCatalogo.has(id)) nuevas[id] = ref;
+  }
+  const agregados = itemsCatalogo.filter(i => !refActual[i.item_id]).length;
+  renderStartupContadoresGrid(nuevas, itemsCatalogo);
+  return agregados;
 }
 
 function setCatalogoTextarea(id, items = []) {
@@ -1986,7 +2043,19 @@ async function cargarCatalogosAdmin() {
   setCatalogoTextarea('admin-gastos-catalogo', gastosData.conceptos || []);
   setCatalogoTextarea('admin-prestamos-catalogo', prestamosData.nombres || []);
   setCatalogoTextarea('admin-movimientos-catalogo', movimientosData.conceptos || []);
-  setContadoresCatalogoTextarea(contadoresData.items || []);
+  renderContadoresCatalogoGrid(contadoresData.items || []);
+}
+
+async function cargarStartupAdmin() {
+  const res = await fetch('/api/settings/startup');
+  const data = res.ok ? await res.json() : { enabled: false, fecha_inicio: '', caja_inicial: 0, contadores: {} };
+  const enabledEl = document.getElementById('admin-startup-enabled');
+  const dateEl = document.getElementById('admin-startup-date');
+  const cashEl = document.getElementById('admin-startup-cash');
+  if (enabledEl) enabledEl.checked = Boolean(data.enabled);
+  if (dateEl) dateEl.value = data.fecha_inicio || '';
+  if (cashEl) cashEl.value = data.caja_inicial ? formatNumeroTexto(data.caja_inicial) : '';
+  renderStartupContadoresGrid(data.contadores || {}, parseContadoresCatalogoGrid());
 }
 
 async function editarUltimoBono() {
@@ -2287,6 +2356,9 @@ async function ingresarAdmin() {
   try {
     await cargarCatalogosAdmin();
   } catch { /* ignore */ }
+  try {
+    await cargarStartupAdmin();
+  } catch { /* ignore */ }
 
   document.getElementById('admin-login-section').classList.add('oculto');
   document.getElementById('admin-config-section').classList.remove('oculto');
@@ -2333,7 +2405,18 @@ async function guardarAdmin() {
     await fetch('/api/modulos/catalogos/contadores', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: parseContadoresCatalogoTextarea() }),
+      body: JSON.stringify({ items: parseContadoresCatalogoGrid() }),
+    });
+    const itemsAgregados = sincronizarReferenciasCatalogo();
+    await fetch('/api/settings/startup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        enabled: document.getElementById('admin-startup-enabled')?.checked || false,
+        fecha_inicio: document.getElementById('admin-startup-date')?.value || '',
+        caja_inicial: parseNumeroTexto(document.getElementById('admin-startup-cash')?.value || '') || 0,
+        contadores: parseStartupContadoresGrid(),
+      }),
     });
     configDefaultDate = body.default_date;
     configModoEntrada = body.modo_entrada;
@@ -2358,7 +2441,8 @@ async function guardarAdmin() {
     await cargarVistaModulo(currentModule, moduleDates[currentModule]);
     await verificarFechaActual();
 
-    msg.textContent = `Configuración guardada. Módulo por defecto: ${MODULE_META[defaultModule].label}.`;
+    msg.textContent = `Configuración guardada. Módulo por defecto: ${MODULE_META[defaultModule].label}.`
+      + (itemsAgregados > 0 ? ` Se agregaron ${itemsAgregados} ítem(s) nuevo(s) a Referencias iniciales con valores en 0.` : '');
     msg.className = 'config-msg ok';
     msg.classList.remove('oculto');
     setTimeout(() => msg.classList.add('oculto'), 2500);
@@ -2472,6 +2556,14 @@ async function init() {
     });
   });
 
+  const startupCashInput = document.getElementById('admin-startup-cash');
+  if (startupCashInput) {
+    formatearInputNumerico(startupCashInput, false, true);
+    startupCashInput.addEventListener('focus', () => limpiarFormatoInputNumerico(startupCashInput, false));
+    startupCashInput.addEventListener('blur', () => formatearInputNumerico(startupCashInput, false, true));
+    startupCashInput.addEventListener('input', () => formatearInputNumerico(startupCashInput, false, true));
+  }
+
   ['venta_practisistemas', 'venta_deportivas'].forEach(id => {
     const el = document.getElementById(id);
     const allowNegative = id === 'venta_deportivas';
@@ -2541,6 +2633,12 @@ async function init() {
   document.getElementById('btn-admin-ingresar').addEventListener('click', ingresarAdmin);
   document.getElementById('btn-admin-guardar').addEventListener('click', guardarAdmin);
   document.getElementById('btn-admin-buscar-carpeta').addEventListener('click', buscarCarpetaDatos);
+  document.getElementById('btn-admin-contadores-add').addEventListener('click', () => {
+    const body = document.getElementById('admin-contadores-grid-body');
+    const fila = _crearFilaCatalogoContadores();
+    body.appendChild(fila);
+    fila.querySelector('[data-field="item_id"]')?.focus();
+  });
   document.getElementById('btn-admin-importar-bonos').addEventListener('click', importarNombresBonos);
   document.getElementById('admin-pass').addEventListener('keydown', e => {
     if (e.key === 'Enter') ingresarAdmin();
@@ -2841,6 +2939,10 @@ function renderCuadre(datos, esOverride) {
   // Movimientos
   document.getElementById('cuadre-mov-ingresos').textContent = fmt(datos.movimientos?.total_ingresos ?? 0);
   document.getElementById('cuadre-mov-salidas').textContent = fmt(datos.movimientos?.total_salidas ?? 0);
+  const netoMov = (datos.movimientos?.neto ?? 0);
+  const netoMovEl = document.getElementById('cuadre-mov-neto');
+  netoMovEl.textContent = fmt(netoMov);
+  netoMovEl.className = 'resumen-valor ' + (netoMov >= 0 ? 'cuadre-positivo' : 'cuadre-negativo');
 
   // Caja física
   const desg = datos.caja_desglose || {};
@@ -2909,6 +3011,7 @@ function renderCuadreGuardado(datos, fecha) {
 
   document.getElementById('cuadre-mov-ingresos').textContent = fmt(datos.total_mov_ingresos);
   document.getElementById('cuadre-mov-salidas').textContent = fmt(datos.total_mov_salidas);
+  document.getElementById('cuadre-mov-neto').textContent = fmt(datos.neto_movimientos ?? 0);
 
   document.getElementById('cuadre-caja-body').innerHTML = '';
   document.getElementById('cuadre-caja-monedas').textContent = '';

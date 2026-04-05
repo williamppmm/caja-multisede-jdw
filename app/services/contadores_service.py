@@ -4,7 +4,7 @@ from pathlib import Path
 
 from app.config import BASE_DIR
 from app.models.contadores_models import ContadorCatalogoItem, ContadoresEntrada
-from app.services import excel_service
+from app.services import excel_service, startup_state_service
 
 
 CATALOGO_PATH = BASE_DIR / "contadores_items.json"
@@ -25,8 +25,8 @@ def _guardar_json(path: Path, data) -> None:
         json.dump(data, fh, indent=2, ensure_ascii=False)
 
 
-def _yield(entradas: int, salidas: int, jackpot: int, cancelled: int) -> int:
-    return int(entradas) - int(salidas) - int(jackpot) - int(cancelled)
+def _yield(entradas: int, salidas: int, jackpot: int) -> int:
+    return int(entradas) - int(salidas) - int(jackpot)
 
 
 def obtener_catalogo() -> list[dict]:
@@ -115,6 +115,22 @@ def _construir_eventos_por_item(fecha_actual: date, catalogo: list[dict] | None 
 def obtener_referencia_vigente(item_id: str, fecha_actual: date, eventos_por_item: dict[str, list[dict]] | None = None) -> dict | None:
     eventos = eventos_por_item.get(item_id, []) if eventos_por_item is not None else _iter_referencias_previas(item_id, fecha_actual)
     if not eventos:
+        startup_date = startup_state_service.get_startup_date()
+        startup_ref = startup_state_service.get_startup_reference(item_id)
+        if startup_date is not None and startup_ref and startup_date <= fecha_actual:
+            return {
+                "tipo": "referencia_inicial",
+                "fecha": str(startup_date),
+                "entradas": int(startup_ref.get("entradas", 0)),
+                "salidas": int(startup_ref.get("salidas", 0)),
+                "jackpot": int(startup_ref.get("jackpot", 0)),
+                "yield": _yield(
+                    startup_ref.get("entradas", 0),
+                    startup_ref.get("salidas", 0),
+                    startup_ref.get("jackpot", 0),
+                ),
+                "observacion": "referencia inicial",
+            }
         return None
     return eventos[-1]
 
@@ -145,17 +161,12 @@ def construir_base_fecha(fecha: date) -> dict:
             "jackpot",
             ultimo_registro.get("jackpot", ref.get("jackpot", 0) if ref else 0) if ultimo_registro else (ref.get("jackpot", 0) if ref else 0),
         ))
-        actual_cancelled = int(guardado.get(
-            "cancelled",
-            ultimo_registro.get("cancelled", ref.get("cancelled", 0) if ref else 0) if ultimo_registro else (ref.get("cancelled", 0) if ref else 0),
-        ))
-        yield_actual = _yield(actual_entradas, actual_salidas, actual_jackpot, actual_cancelled)
+        yield_actual = _yield(actual_entradas, actual_salidas, actual_jackpot)
         yield_ref = int(ref.get("yield", 0)) if ref else 0
         alerta = bool(ref) and (
             actual_entradas < int(ref.get("entradas", 0))
             or actual_salidas < int(ref.get("salidas", 0))
             or actual_jackpot < int(ref.get("jackpot", 0))
-            or actual_cancelled < int(ref.get("cancelled", 0))
         )
 
         fhr = guardado.get("fecha_hora_registro", "")
@@ -173,7 +184,6 @@ def construir_base_fecha(fecha: date) -> dict:
             "entradas": actual_entradas,
             "salidas": actual_salidas,
             "jackpot": actual_jackpot,
-            "cancelled": actual_cancelled,
             "yield_actual": yield_actual,
             "referencia": {
                 "tipo": ref.get("tipo", "sin_referencia") if ref else "sin_referencia",
@@ -181,7 +191,6 @@ def construir_base_fecha(fecha: date) -> dict:
                 "entradas": int(ref.get("entradas", 0)) if ref else 0,
                 "salidas": int(ref.get("salidas", 0)) if ref else 0,
                 "jackpot": int(ref.get("jackpot", 0)) if ref else 0,
-                "cancelled": int(ref.get("cancelled", 0)) if ref else 0,
                 "yield": yield_ref,
                 "observacion": ref.get("observacion", "") if ref else "",
             },
@@ -193,7 +202,6 @@ def construir_base_fecha(fecha: date) -> dict:
             "ref_entradas_guardada": guardado.get("ref_entradas"),
             "ref_salidas_guardada": guardado.get("ref_salidas"),
             "ref_jackpot_guardada": guardado.get("ref_jackpot"),
-            "ref_cancelled_guardada": guardado.get("ref_cancelled"),
             "fecha_hora_registro": fhr,
             "pausado": bool(item.get("pausado", False)),
         })
@@ -244,7 +252,6 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
             fila.entradas < int(ref.get("entradas", 0))
             or fila.salidas < int(ref.get("salidas", 0))
             or fila.jackpot < int(ref.get("jackpot", 0))
-            or fila.cancelled < int(ref.get("cancelled", 0))
         )
         if alerta and not fila.usar_referencia_critica:
             alertas += 1
@@ -255,7 +262,6 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
         ref_entradas = None
         ref_salidas = None
         ref_jackpot = None
-        ref_cancelled = None
 
         if fila.usar_referencia_critica:
             if not entrada.forzar or fila.referencia_critica is None:
@@ -268,19 +274,17 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
             ref_entradas = ref_crit.entradas
             ref_salidas = ref_crit.salidas
             ref_jackpot = ref_crit.jackpot
-            ref_cancelled = ref_crit.cancelled
             ref_efectiva = {
                 "tipo": "referencia_critica",
                 "fecha": fecha_str,
                 "entradas": ref_entradas,
                 "salidas": ref_salidas,
                 "jackpot": ref_jackpot,
-                "cancelled": ref_cancelled,
-                "yield": _yield(ref_entradas, ref_salidas, ref_jackpot, ref_cancelled),
+                "yield": _yield(ref_entradas, ref_salidas, ref_jackpot),
             }
             observacion_ref = ref_crit.observacion
 
-        yield_actual = _yield(fila.entradas, fila.salidas, fila.jackpot, fila.cancelled)
+        yield_actual = _yield(fila.entradas, fila.salidas, fila.jackpot)
         yield_referencia = int(ref_efectiva.get("yield", 0)) if ref_efectiva else 0
         resultado_unidades = yield_actual - yield_referencia
         resultado_monetario = resultado_unidades * int(meta["denominacion"])
@@ -292,7 +296,6 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
             "entradas": fila.entradas,
             "salidas": fila.salidas,
             "jackpot": fila.jackpot,
-            "cancelled": fila.cancelled,
             "yield_actual": yield_actual,
             "yield_referencia": yield_referencia,
             "resultado_unidades": resultado_unidades,
@@ -301,13 +304,12 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
             "ref_entradas": ref_entradas,
             "ref_salidas": ref_salidas,
             "ref_jackpot": ref_jackpot,
-            "ref_cancelled": ref_cancelled,
         })
 
     if alertas:
         return {
             "ok": False,
-            "mensaje": "Hay items con valores inferiores a su referencia vigente en Entradas, Salidas, Jackpot o Cancelled. Usa admin y registra referencia crítica para continuar.",
+            "mensaje": "Hay items con valores inferiores a su referencia vigente en Entradas, Salidas o Jackpot. Usa admin y registra referencia crítica para continuar.",
             "fecha": fecha_str,
             "alertas": alertas,
         }
@@ -324,12 +326,10 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
             item["entradas"],
             item["salidas"],
             item["jackpot"],
-            item["cancelled"],
             item["yield_actual"],
             item["ref_entradas"],    # None when no critical reference
             item["ref_salidas"],
             item["ref_jackpot"],
-            item["ref_cancelled"],
             item["yield_referencia"],
             item["observacion"],
             item["resultado_monetario"],

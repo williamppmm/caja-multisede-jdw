@@ -7,10 +7,9 @@ class ReferenciaCriticaEntrada(BaseModel):
     entradas: int = 0
     salidas: int = 0
     jackpot: int = 0
-    cancelled: int = 0
     observacion: str = ""
 
-    @field_validator("entradas", "salidas", "jackpot", "cancelled")
+    @field_validator("entradas", "salidas", "jackpot")
     @classmethod
     def validar_no_negativo(cls, value: int) -> int:
         if value < 0:
@@ -28,7 +27,6 @@ class ContadorFilaEntrada(BaseModel):
     entradas: int = 0
     salidas: int = 0
     jackpot: int = 0
-    cancelled: int = 0
     usar_referencia_critica: bool = False
     referencia_critica: ReferenciaCriticaEntrada | None = None
 
@@ -40,7 +38,7 @@ class ContadorFilaEntrada(BaseModel):
             raise ValueError("El identificador del item es obligatorio")
         return texto
 
-    @field_validator("entradas", "salidas", "jackpot", "cancelled")
+    @field_validator("entradas", "salidas", "jackpot")
     @classmethod
     def validar_contadores(cls, value: int) -> int:
         if value < 0:

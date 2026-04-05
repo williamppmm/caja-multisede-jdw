@@ -22,6 +22,7 @@ gastos_conceptos.json
 prestamos_personas.json
 movimientos_conceptos.json
 contadores_items.json
+startup_state.json
 *.xlsx
 ~$*.xlsx
 *.lock

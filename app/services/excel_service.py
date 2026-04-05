@@ -90,12 +90,10 @@ CONTADORES_HEADERS = [
     "entradas",
     "salidas",
     "jackpot",
-    "cancelled",
     "yield_actual",
     "ref_entradas",
     "ref_salidas",
     "ref_jackpot",
-    "ref_cancelled",
     "yield_referencia",
     "observacion",
     "resultado_monetario",
@@ -257,9 +255,8 @@ def _escribir_encabezados(ws, modulo: str):
     elif modulo == "contadores":
         widths = {
             "A": 14, "B": 20, "C": 26, "D": 14, "E": 12,
-            "F": 12, "G": 12, "H": 12, "I": 14, "J": 12,
-            "K": 12, "L": 12, "M": 12, "N": 14,
-            "O": 30, "P": 18, "Q": 22,
+            "F": 12, "G": 12, "H": 14, "I": 12, "J": 12,
+            "K": 12, "L": 14, "M": 30, "N": 18, "O": 22,
         }
     elif modulo == "cuadre":
         widths = {
@@ -414,8 +411,8 @@ def _formatear_filas_recientes_contadores(ws, cantidad_filas: int) -> None:
     start_row = last_row - cantidad_filas + 1
     for row_num in range(start_row, last_row + 1):
         ws.cell(row_num, 1).number_format = "YYYY-MM-DD"   # fecha
-        ws.cell(row_num, 16).number_format = "#,##0"        # resultado_monetario
-        ws.cell(row_num, 17).number_format = "YYYY-MM-DD HH:mm:SS"  # fecha_hora_registro
+        ws.cell(row_num, 14).number_format = "#,##0"        # resultado_monetario
+        ws.cell(row_num, 15).number_format = "YYYY-MM-DD HH:mm:SS"  # fecha_hora_registro
 
 
 def fecha_existe_modulo(modulo: str, fecha: date, year: int) -> bool:
@@ -695,7 +692,6 @@ def obtener_datos_contadores_fecha(fecha: date, year: int) -> dict:
                 "entradas": data["entradas"],
                 "salidas": data["salidas"],
                 "jackpot": data["jackpot"],
-                "cancelled": data["cancelled"],
                 "yield_actual": data["yield_actual"],
                 "yield_referencia": data["yield_referencia"],
                 "resultado_unidades": data["yield_actual"] - data["yield_referencia"],
@@ -704,7 +700,6 @@ def obtener_datos_contadores_fecha(fecha: date, year: int) -> dict:
                 "ref_entradas": data["ref_entradas"],
                 "ref_salidas": data["ref_salidas"],
                 "ref_jackpot": data["ref_jackpot"],
-                "ref_cancelled": data["ref_cancelled"],
                 "fecha_hora_registro": data["fecha_hora_registro"],
             }
     return result
@@ -746,7 +741,6 @@ def obtener_historial_contadores(hasta_fecha: date) -> list[dict]:
                         "entradas": data["entradas"],
                         "salidas": data["salidas"],
                         "jackpot": data["jackpot"],
-                        "cancelled": data["cancelled"],
                         "yield": data["yield_actual"],
                         "observacion": observacion,
                     })
@@ -754,7 +748,6 @@ def obtener_historial_contadores(hasta_fecha: date) -> list[dict]:
                         ref_e = int(data["ref_entradas"] or 0)
                         ref_s = int(data["ref_salidas"] or 0)
                         ref_j = int(data["ref_jackpot"] or 0)
-                        ref_c = int(data["ref_cancelled"] or 0)
                         eventos.append({
                             "tipo": "referencia_critica",
                             "fecha": fecha_str,
@@ -762,8 +755,7 @@ def obtener_historial_contadores(hasta_fecha: date) -> list[dict]:
                             "entradas": ref_e,
                             "salidas": ref_s,
                             "jackpot": ref_j,
-                            "cancelled": ref_c,
-                            "yield": ref_e - ref_s - ref_j - ref_c,
+                            "yield": ref_e - ref_s - ref_j,
                             "observacion": observacion,
                         })
     return eventos
@@ -782,24 +774,22 @@ def _obtener_paths_excel_sede() -> list[Path]:
 
 
 def _parsear_fila_contadores(row) -> dict:
-    # fecha,item_id,nombre,denom,entradas,salidas,jackpot,cancelled,yield_actual,
-    # ref_entradas,ref_salidas,ref_jackpot,ref_cancelled,yield_referencia,observacion,
+    # fecha,item_id,nombre,denom,entradas,salidas,jackpot,yield_actual,
+    # ref_entradas,ref_salidas,ref_jackpot,yield_referencia,observacion,
     # resultado_monetario,fecha_hora_registro
     return {
         "item_id": str(row[1] or "").strip(),
         "entradas": int(row[4] or 0),
         "salidas": int(row[5] or 0),
         "jackpot": int(row[6] or 0),
-        "cancelled": int(row[7] or 0),
-        "yield_actual": int(row[8] or 0),
-        "yield_referencia": int(row[13] or 0),
-        "resultado_monetario": float(row[15] or 0),
-        "observacion": str(row[14] or ""),
-        "ref_entradas": int(row[9]) if row[9] is not None else None,
-        "ref_salidas": int(row[10]) if row[10] is not None else None,
-        "ref_jackpot": int(row[11]) if row[11] is not None else None,
-        "ref_cancelled": int(row[12]) if row[12] is not None else None,
-        "fecha_hora_registro": row[16].isoformat() if isinstance(row[16], datetime) else str(row[16] or ""),
+        "yield_actual": int(row[7] or 0),
+        "yield_referencia": int(row[11] or 0),
+        "resultado_monetario": float(row[13] or 0),
+        "observacion": str(row[12] or ""),
+        "ref_entradas": int(row[8]) if row[8] is not None else None,
+        "ref_salidas": int(row[9]) if row[9] is not None else None,
+        "ref_jackpot": int(row[10]) if row[10] is not None else None,
+        "fecha_hora_registro": row[14].isoformat() if isinstance(row[14], datetime) else str(row[14] or ""),
     }
 
 

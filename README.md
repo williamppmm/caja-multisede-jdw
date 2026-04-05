@@ -1,195 +1,220 @@
 # CajaJDW — Capturadora Multimódulo
 
-Aplicación local para registrar arqueos de caja, gastos, bonos y un prototipo funcional de contadores por sede, guardando un archivo anual independiente por cada sede.
+Aplicación local para capturar información diaria de caja por sede y guardarla en archivos Excel anuales, pensados tanto como respaldo operativo como fuente para análisis posterior en Excel o Power Query.
+
+La app corre localmente en cada equipo, abre una interfaz web en el navegador y escribe sobre un libro anual por sede dentro de una carpeta compartida, por ejemplo Dropbox.
 
 ## Qué hace
 
-- Captura arqueos diarios de caja desde una interfaz web local.
-- Registra gastos del día en hoja separada por sede.
-- Registra bonos del día con nombre de cliente en hoja separada por sede.
-- Registra préstamos a personas y pagos a cuenta, con saldo pendiente en tiempo real.
-- Incluye un módulo local de Contadores para capturar Entradas, Salidas, Jackpot y Cancelled por ítem.
-- Guarda la información en archivos anuales por sede: `Contadores_Barbacoas_2026.xlsx`.
-- Soporte multi-sede: cada equipo configura su sede y escribe en su propio libro anual.
-- Configura la carpeta compartida (ej. Dropbox) desde el panel de administración.
-- Migra automáticamente hojas en formato antiguo (`RegistrosDiarios`) al nuevo esquema por sede.
-- Muestra un mensaje claro si el archivo está ocupado al momento de guardar.
-- Modo de ingreso configurable: por cantidad de billetes o por total por denominación.
-- Corrección de registros existentes protegida por contraseña de administrador.
-- Autocompletado de clientes (bonos) y conceptos (gastos) a partir de catálogos locales.
+- Registra arqueos de caja.
+- Registra plataformas.
+- Registra gastos.
+- Registra bonos por cliente.
+- Registra préstamos y pagos por persona.
+- Registra movimientos extraordinarios.
+- Registra contadores por ítem.
+- Calcula el cuadre del período.
+- Guarda todo en archivos Excel anuales por sede.
+
+## Enfoque de trabajo
+
+- cada equipo usa la app localmente
+- cada equipo configura su sede
+- cada sede escribe en su propio archivo anual
+- el Excel sigue siendo útil como respaldo, consulta y fuente para Power Query
+
+Ejemplos de archivos:
+
+- `Contadores_Barbacoas_2026.xlsx`
+- `Contadores_Satinga_2026.xlsx`
+- `Contadores_SanJose_2026.xlsx`
 
 ## Tecnologías
 
-- Python + FastAPI
+- Python 3.11+
+- FastAPI
+- Uvicorn
 - OpenPyXL
 - Pydantic
-- HTML, CSS y JavaScript (sin dependencias externas de frontend)
+- HTML, CSS y JavaScript
+- PyInstaller para el `.exe`
 
-## Estructura del proyecto
+## Estructura resumida
 
-```
+```text
 app/
-  main.py                  # Punto de entrada FastAPI (factory)
-  config.py                # Constantes, denominaciones y get_excel_path()
-  runtime_paths.py         # Resolución de rutas (desarrollo / EXE)
+  main.py
+  config.py
+  runtime_paths.py
   models/
-    caja_models.py         # Modelos Pydantic de Caja, Gastos, Bonos y Préstamos
-    contadores_models.py   # Modelos Pydantic de Contadores y catálogo de ítems
   routers/
-    modules.py             # Endpoints /api/modulos/* (caja, gastos, bonos, préstamos, contadores)
-    settings.py            # Endpoints /api/settings/* y /api/app/shutdown
   services/
-    caja_service.py        # Lógica de negocio para caja, gastos y estado de módulos
-    excel_service.py       # Lectura y escritura de Excel (openpyxl)
-    settings_service.py    # Configuración local y diálogos de carpeta
-    bonos_service.py       # Operaciones individuales sobre bonos
-    prestamos_service.py   # Lógica de negocio para préstamos y pagos
-    nombres_service.py     # Catálogos locales (clientes, personas y conceptos)
-    contadores_service.py  # Catálogo, referencias y lógica de Contadores
 web/
-  index.html               # Interfaz principal
-  app.js                   # Lógica de frontend
-  styles.css               # Estilos
-  assets/
-    favicon.ico
-launcher.py                # Arranca el servidor, detecta puerto libre y abre el navegador
-CajaJDW.spec               # Configuración de PyInstaller para el EXE
+  index.html
+  app.js
+  styles.css
+scripts/
+launcher.py
+CajaJDW.spec
+README.md
+docs/
+  analisis-tecnico.md
 ```
 
-## Requisitos
+## Instalación local
 
-- Python 3.11 o superior
-- Acceso a la carpeta compartida donde vivirán los archivos Excel anuales por sede
-
-## Instalación local (desarrollo)
+### Desarrollo
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate        # Windows
+.venv\Scripts\activate
 pip install -r requirements.txt
-```
-
-## Instalación rápida en Windows
-
-1. Descargar o clonar el proyecto en una carpeta local.
-2. Ejecutar `Instalar Caja.bat` con doble clic.
-   - Crea `.venv`, instala dependencias y crea el acceso directo `Iniciar Caja` en el escritorio.
-
-También puedes ejecutar directamente `scripts/install_windows.ps1` desde PowerShell.
-
-## Distribuir como EXE (sin Python)
-
-Para equipos sin Python instalado:
-
-1. En un equipo de preparación, ejecutar `Instalar Caja.bat`.
-2. Luego ejecutar `Construir EXE.bat`.
-3. El ejecutable quedará en `dist\CajaJDW.exe`.
-
-El EXE:
-- Se construye a partir de `CajaJDW.spec`, que excluye paquetes no utilizados para reducir su tamaño.
-- Al abrirse, levanta el servidor local automáticamente y abre la interfaz en el navegador.
-- No requiere consola ni instalación adicional en el equipo de destino.
-- Detecta automáticamente un puerto libre entre 8000 y 8009 si el predeterminado está ocupado.
-
-## Ejecución en desarrollo
-
-```bash
 python launcher.py
 ```
 
-O con recarga automática:
+Con recarga automática:
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-En Windows, después de instalar, también puedes usar `Iniciar Caja.bat`.
+### Instalación rápida en Windows
+
+1. Descargar o clonar el proyecto.
+2. Ejecutar `Instalar Caja.bat`.
+
+También puedes usar:
+
+```powershell
+scripts/install_windows.ps1
+```
+
+### Construcción del EXE
+
+1. Ejecutar `Instalar Caja.bat`.
+2. Ejecutar `Construir EXE.bat`.
+3. El ejecutable quedará en `dist\CajaJDW.exe`.
+
+Características del EXE:
+
+- abre el servidor local automáticamente
+- abre la interfaz en el navegador
+- no requiere consola visible
+- detecta un puerto libre entre 8000 y 8009
 
 ## Configuración inicial por equipo
 
-Después de abrir la app por primera vez:
+Después de abrir la app:
 
-1. Entrar al menú de administración (ícono ⚙ en la esquina superior derecha).
-2. Definir la **sede** que usará ese equipo (ej. `Barbacoas`).
-3. Elegir la carpeta donde se crearán los archivos anuales por sede.
-4. Seleccionar los módulos a habilitar (Caja, Gastos, Bonos).
+1. Entrar a Administración.
+2. Definir la sede.
+3. Elegir la carpeta donde se guardarán los libros.
+4. Seleccionar los módulos habilitados.
+5. Elegir el módulo por defecto si aplica.
 
-La configuración se guarda en `settings.json` localmente en cada equipo.
-
-## Archivos anuales y carpeta compartida
-
-La app genera un archivo por año y por sede dentro de la carpeta configurada:
-
-```
-C:\Users\Usuario\Dropbox\Contabilidad\Caja\
-  Contadores_Barbacoas_2025.xlsx
-  Contadores_Barbacoas_2026.xlsx
-  Contadores_Magui_2026.xlsx
-  ...
-```
-
-El año se toma automáticamente de la fecha del registro, por lo que al cambiar de año no se necesita hacer nada.
-
-## Uso con varias sedes
-
-Cada equipo configura una sede distinta. Todos pueden apuntar a la misma carpeta compartida, pero cada uno escribirá en su propio archivo anual:
-
-| Sede        | Archivo anual                          | Hojas internas (según módulos habilitados)                                             |
-|-------------|----------------------------------------|----------------------------------------------------------------------------------------|
-| Barbacoas   | `Contadores_Barbacoas_2026.xlsx`       | `CajaBarbacoas`, `GastosBarbacoas`, `BonosBarbacoas`, `PrestamosBarbacoas`, `ContadoresBarbacoas` |
-| SanJose     | `Contadores_SanJose_2026.xlsx`         | `CajaSanJose`, `GastosSanJose`, `BonosSanJose`, `PrestamosSanJose`, `ContadoresSanJose` |
-| Satinga     | `Contadores_Satinga_2026.xlsx`         | `CajaSatinga`, `GastosSatinga`, `BonosSatinga`, `PrestamosSatinga`, `ContadoresSatinga` |
-
-Esto facilita consolidar información con Power Query u otros procesos contables y reduce conflictos de sincronización entre sedes.
+La configuración se guarda en `settings.json`.
 
 ## Módulos disponibles
 
-| Módulo         | Descripción                                                        | Restricción de fecha                               |
-|----------------|--------------------------------------------------------------------|----------------------------------------------------||
-| **Caja**       | Arqueo de billetes + monedas + ventas informativas                 | Requiere admin para corregir una fecha ya guardada |
-| **Gastos**     | Lista de gastos del día con concepto y valor                       | Hoy sin restricción; otro día requiere admin       |
-| **Bonos**      | Lista de bonos del día con cliente y valor                         | Hoy sin restricción; otro día requiere admin       |
-| **Préstamos**  | Registro de préstamos a personas y pagos asociados; saldo en tiempo real | Solo fecha actual sin restricción; otro día requiere admin |
-| **Contadores** | Captura por ítem de Entradas, Salidas, Jackpot y Cancelled         | Requiere admin para corregir una fecha ya guardada |
+| Módulo | Uso principal | Regla de edición |
+|---|---|---|
+| `Caja` | Arqueo físico del día | si la fecha ya existe, requiere admin |
+| `Plataformas` | Ventas de plataformas | fecha actual libre, otra fecha requiere admin |
+| `Gastos` | Egresos del día | fecha actual libre, otra fecha requiere admin |
+| `Bonos` | Bonos por cliente | fecha actual libre, otra fecha requiere admin |
+| `Prestamos` | Préstamos y pagos | fecha actual libre, otra fecha requiere admin |
+| `Movimientos` | Ingresos y salidas extraordinarias | fecha actual libre, otra fecha requiere admin |
+| `Contadores` | Captura por ítem con referencias | si la fecha ya existe, requiere admin |
+| `Cuadre` | Consolidación del período | si ya existe, corregir requiere admin |
 
 ## Catálogos locales
 
-La app mantiene archivos locales en el mismo directorio que el EXE (o raíz del proyecto en desarrollo):
+La app mantiene catálogos JSON por equipo:
 
-| Archivo                                  | Contenido                                         |
-|------------------------------------------|---------------------------------------------------|
-| `bonos_clientes.json`                    | Nombres de clientes para bonos                    |
-| `gastos_conceptos.json`                  | Conceptos usados en gastos                        |
-| `prestamos_personas.json`                | Nombres de personas para préstamos                |
-| `contadores_items.json`                  | Catálogo de ítems de Contadores                   |
-| `settings.json`                          | Configuración local del equipo                    |
+- `bonos_clientes.json`
+- `gastos_conceptos.json`
+- `prestamos_personas.json`
+- `movimientos_conceptos.json`
+- `contadores_items.json`
+- `settings.json`
 
-Estos archivos se actualizan automáticamente al usar la app. Son locales a cada equipo y no se comparten por Dropbox.
+Estos archivos son locales y no se comparten por Dropbox.
 
-## Concurrencia y bloqueos
+## Uso con varias sedes
 
-La app incluye un bloqueo de archivo para evitar guardados simultáneos en el mismo equipo. Al usar un archivo distinto por sede, el riesgo de conflicto por Dropbox baja mucho. Aun así, si dos personas de la misma sede escriben sobre el mismo archivo al mismo tiempo, sigue existiendo posibilidad de conflicto porque no hay un servidor central coordinando escrituras.
+Cada sede debe escribir en su propio libro anual.
 
-## Archivos que no se versionan
+Ventajas:
 
-```
+- reduce conflictos
+- facilita consolidación
+- mantiene el libro más claro para revisión manual
+
+Ejemplo:
+
+| Sede | Archivo |
+|---|---|
+| Barbacoas | `Contadores_Barbacoas_2026.xlsx` |
+| SanJose | `Contadores_SanJose_2026.xlsx` |
+| Satinga | `Contadores_Satinga_2026.xlsx` |
+
+## Límite importante con Dropbox
+
+La app usa un bloqueo local `.lock` para reducir guardados simultáneos en el mismo equipo, pero no tiene coordinación central entre varios equipos.
+
+Eso significa:
+
+- funciona bien si cada sede trabaja sobre su propio archivo
+- puede haber conflictos si dos equipos de la misma sede escriben el mismo libro casi al mismo tiempo
+
+## Compatibilidad actual
+
+- objetivo principal: Windows
+- Linux: posible a futuro, pero todavía no es prioridad ni está completamente preparado
+
+## Documentación técnica
+
+El análisis técnico completo del proyecto quedó separado aquí:
+
+[docs/analisis-tecnico.md](/c:/Users/User/Desktop/Caja/docs/analisis-tecnico.md)
+
+Ese documento cubre:
+
+- arquitectura completa
+- lógica por módulo
+- persistencia Excel
+- riesgos y limitaciones
+- prioridades de prueba
+- recomendaciones de evolución futura
+
+## Archivos que normalmente no deben versionarse
+
+```text
 settings.json
 bonos_clientes.json
 gastos_conceptos.json
 prestamos_personas.json
+movimientos_conceptos.json
 contadores_items.json
+startup_state.json
 *.xlsx
-~$*.xlsx          # Archivos temporales de Excel
+~$*.xlsx
 *.lock
 ```
 
-## Archivos de apoyo en Windows
+## Scripts auxiliares
 
-| Archivo                          | Función                                                  |
-|----------------------------------|----------------------------------------------------------|
-| `Instalar Caja.bat`              | Crea el entorno virtual e instala todo                   |
-| `Iniciar Caja.bat`               | Abre la capturadora local (modo desarrollo)              |
-| `Construir EXE.bat`              | Genera `dist\CajaJDW.exe` usando `CajaJDW.spec`          |
-| `scripts/install_windows.ps1`    | Instalador detallado en PowerShell                       |
-| `scripts/build_windows_exe.ps1`  | Construye el EXE con PyInstaller usando el spec          |
-| `CajaJDW.spec`                   | Configuración del EXE: exclusiones, recursos y optimización |
+| Archivo | Función |
+|---|---|
+| `Instalar Caja.bat` | instalación rápida |
+| `Iniciar Caja.bat` | inicio local |
+| `Construir EXE.bat` | build del ejecutable |
+| `scripts/install_windows.ps1` | instalación detallada |
+| `scripts/build_windows_exe.ps1` | build detallado del EXE |
+| `CajaJDW.spec` | configuración de PyInstaller |
+
+## Estado actual
+
+El proyecto ya es usable como herramienta operativa diaria si se trabaja por sede y se acepta que el Excel sigue siendo la fuente principal.
+
+Su siguiente límite natural, si crece la concurrencia o la exigencia de seguridad, será migrar la operación central a una base de datos y dejar Excel como respaldo o salida analítica.

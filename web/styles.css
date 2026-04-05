@@ -423,6 +423,42 @@ input[type="number"]::-webkit-outer-spin-button {
   margin-top: 14px;
 }
 
+/* Historial colapsable (Gastos, Bonos, Préstamos, Movimientos) */
+.modulo-panel .card details > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 2px 0 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #2f3f5a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #edf1f7;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modulo-panel .card details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.modulo-panel .card details > summary::after {
+  content: '+';
+  font-size: 1rem;
+  color: #2F5496;
+  font-weight: 700;
+}
+
+.modulo-panel .card details[open] > summary::after {
+  content: '−';
+}
+
+.modulo-panel .card details > summary:hover {
+  color: #2F5496;
+}
+
 .bonos-listado-wrap {
   margin-top: 12px;
   overflow-x: auto;
@@ -600,7 +636,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .contador-critica-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 8px;
 }
@@ -1354,14 +1390,11 @@ input[type="number"]::-webkit-outer-spin-button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 18px 0 8px;
+  margin-bottom: 12px;
   gap: 8px;
 }
 
 .cuadre-seccion-header h2 {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #2f3f5a;
   margin: 0;
 }
 
@@ -1545,4 +1578,108 @@ table.cuadre-tabla td.num {
   .cuadre-resumen-grid { grid-template-columns: 1fr 1fr; }
   .cuadre-caja-extras { flex-direction: column; }
   .cuadre-diferencia-row { flex-direction: column; gap: 6px; text-align: center; }
+}
+
+/* ── Admin grids (catálogo y referencias) ─────────────────────── */
+
+.admin-grid-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  margin-bottom: 10px;
+}
+
+.admin-grid-tabla th {
+  text-align: left;
+  color: #2F5496;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 6px 6px 8px;
+  border-bottom: 2px solid #dce3ef;
+  white-space: nowrap;
+}
+
+.admin-grid-tabla td {
+  padding: 3px 4px;
+  vertical-align: middle;
+}
+
+.admin-grid-input {
+  width: 100%;
+  padding: 5px 7px;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  background: #fff;
+}
+
+.admin-grid-input:focus {
+  outline: 2px solid #2F5496;
+  border-color: #2F5496;
+}
+
+.admin-grid-num {
+  text-align: right;
+  width: 90px;
+}
+
+.admin-grid-id-cell {
+  font-weight: 700;
+  color: #2f3f5a;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  padding: 3px 6px;
+}
+
+.admin-grid-nombre-cell {
+  color: #555;
+  font-size: 0.88rem;
+  padding: 3px 6px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-grid-huerfano .admin-grid-id-cell,
+.admin-grid-huerfano .admin-grid-nombre-cell {
+  opacity: 0.5;
+  font-style: italic;
+}
+
+.admin-grid-huerfano-label {
+  font-size: 0.72rem;
+  color: #c0392b;
+  font-weight: 400;
+}
+
+.btn-admin-grid-remove {
+  background: none;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  color: #c0392b;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 7px;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.btn-admin-grid-remove:hover {
+  background: #fff1f0;
+  border-color: #c0392b;
+}
+
+.admin-grid-add-row {
+  margin-top: 8px;
+}
+
+.admin-startup-sin-items {
+  color: #6b7a99;
+  font-style: italic;
+  font-size: 0.88rem;
+  padding: 10px 0 4px;
 }

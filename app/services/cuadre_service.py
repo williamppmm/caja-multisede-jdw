@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta
 
 from app.config import DENOMINACIONES
-from app.services import excel_service
+from app.services import excel_service, startup_state_service
 
 
 def obtener_ultima_fecha_cuadre(antes_de: date | None = None) -> date | None:
@@ -40,6 +40,10 @@ def obtener_ultima_fecha_cuadre(antes_de: date | None = None) -> date | None:
 def obtener_base_anterior_valor(fecha_cuadre: date) -> float | None:
     ultima = obtener_ultima_fecha_cuadre(fecha_cuadre)
     if ultima is None:
+        startup_date = startup_state_service.get_startup_date()
+        startup_cash = startup_state_service.get_startup_cash()
+        if startup_date is not None and startup_cash is not None and startup_date <= fecha_cuadre:
+            return float(startup_cash)
         return None
     datos = excel_service.obtener_datos_cuadre_fecha(ultima, ultima.year)
     if datos is None:
@@ -47,10 +51,34 @@ def obtener_base_anterior_valor(fecha_cuadre: date) -> float | None:
     return float(datos.get("base_nueva", 0))
 
 
+def _obtener_primera_fecha_operativa_desde(fecha_inicio: date, fecha_cuadre: date) -> date | None:
+    modulos = ["caja", "contadores", "plataformas", "gastos", "bonos", "prestamos", "movimientos"]
+    candidata = None
+    for year in range(fecha_inicio.year, fecha_cuadre.year + 1):
+        for modulo in modulos:
+            for fecha_str in excel_service.obtener_fechas_modulo_año(modulo, year):
+                try:
+                    fecha_reg = date.fromisoformat(fecha_str)
+                except ValueError:
+                    continue
+                if fecha_reg < fecha_inicio or fecha_reg > fecha_cuadre:
+                    continue
+                if candidata is None or fecha_reg < candidata:
+                    candidata = fecha_reg
+    return candidata
+
+
 def calcular_periodo(fecha_cuadre: date) -> list[date]:
     """Días calendario entre el último cuadre previo y la fecha actual, inclusive."""
     ultima_cuadre = obtener_ultima_fecha_cuadre(fecha_cuadre)
-    start = (ultima_cuadre + timedelta(days=1)) if ultima_cuadre else fecha_cuadre
+    if ultima_cuadre:
+        start = ultima_cuadre + timedelta(days=1)
+    else:
+        startup_date = startup_state_service.get_startup_date()
+        if startup_date is not None and startup_date <= fecha_cuadre:
+            start = _obtener_primera_fecha_operativa_desde(startup_date, fecha_cuadre) or fecha_cuadre
+        else:
+            start = fecha_cuadre
 
     periodo = []
     current = start

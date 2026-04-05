@@ -36,6 +36,7 @@
     <section id="panel-caja" class="modulo-panel">
       <section class="card">
         <h2>Billetes</h2>
+        <p class="modulo-ayuda">Registra el efectivo en caja al cierre del día. Ingresa la cantidad de cada denominación.</p>
         <table class="tabla-billetes">
           <thead>
             <tr>
@@ -93,8 +94,8 @@
 
     <section id="panel-plataformas" class="modulo-panel oculto">
       <section class="card">
-        <h2>Plataformas</h2>
-        <p class="modulo-ayuda">Registra las ventas del día de plataformas. Este módulo sí se acumula en el Cuadre aunque no se haya hecho Caja en días anteriores.</p>
+        <h2>Ventas del día</h2>
+        <p class="modulo-ayuda">Registra las ventas del día de plataformas. Este módulo se acumula en el Cuadre aunque no se haya hecho Caja en días anteriores.</p>
         <div class="grid-manuales">
           <div class="campo-manual">
             <label for="venta_practisistemas">Venta Practisistemas</label>
@@ -108,7 +109,7 @@
       </section>
 
       <section class="card card-resumen">
-        <h2>Resumen Plataformas</h2>
+        <h2>Resumen</h2>
         <div class="resumen-grid resumen-grid-simple">
           <div class="resumen-item">
             <span class="resumen-label">Venta Practisistemas</span>
@@ -378,13 +379,14 @@
     <section id="panel-contadores" class="modulo-panel oculto">
       <section class="card">
         <h2>Contadores del día</h2>
-        <p class="modulo-ayuda">Captura Entradas, Salidas, Jackpot y Cancelled por ítem. Si Entradas o Salidas bajan frente a la referencia vigente, se requerirá admin y referencia crítica.</p>
+        <p class="modulo-ayuda">Captura Entradas, Salidas y Jackpot por ítem. Si algún valor baja frente a la referencia vigente, se requerirá admin y referencia crítica.</p>
         <div class="gasto-total-row contadores-resumen-top">
           <span>Total resultado del día</span>
           <span id="contadores-total">$ 0</span>
         </div>
       </section>
       <section class="card">
+        <h2>Ítems del día</h2>
         <div id="contadores-empty" class="modulo-ayuda oculto">No hay ítems configurados. Agrégalos desde Administración para comenzar a usar Contadores.</div>
         <div class="bonos-listado-wrap">
           <table class="bonos-tabla contadores-tabla">
@@ -395,7 +397,6 @@
                 <th>Entradas</th>
                 <th>Salidas</th>
                 <th>Jackpot</th>
-                <th>Cancelled</th>
                 <th>Yield actual</th>
                 <th>Yield ref.</th>
                 <th>Resultado</th>
@@ -527,9 +528,13 @@
               <span class="resumen-label">Total ingresos</span>
               <span id="cuadre-mov-ingresos" class="resumen-valor"></span>
             </div>
-            <div class="resumen-item resumen-total">
+            <div class="resumen-item">
               <span class="resumen-label">Total salidas</span>
               <span id="cuadre-mov-salidas" class="resumen-valor"></span>
+            </div>
+            <div class="resumen-item resumen-total">
+              <span class="resumen-label">Neto en caja</span>
+              <span id="cuadre-mov-neto" class="resumen-valor"></span>
             </div>
           </div>
         </section>
@@ -672,6 +677,31 @@
           </div>
         </section>
         <section class="admin-section">
+          <h4 class="admin-section-title">Día 0</h4>
+          <div class="campo-config">
+            <label><input type="checkbox" id="admin-startup-enabled" /> Activar estado inicial del sistema</label>
+            <p class="modal-desc">Úsalo para definir el arranque contable formal de la aplicación sin crear ventas ficticias ni editar el Excel manualmente.</p>
+          </div>
+          <div class="campo-config">
+            <span class="campo-config-label">Fecha de inicio operativo</span>
+            <input type="date" id="admin-startup-date" />
+          </div>
+          <div class="campo-config">
+            <span class="campo-config-label">Caja inicial</span>
+            <input type="text" inputmode="numeric" id="admin-startup-cash" placeholder="0" />
+            <p class="modal-desc">Esta caja inicial se usará como base anterior del primer Cuadre cuando todavía no exista un cuadre previo.</p>
+          </div>
+          <div class="campo-config">
+            <span class="campo-config-label">Referencias iniciales de Contadores</span>
+            <p id="admin-startup-sin-items" class="admin-startup-sin-items oculto">Agrega ítems al catálogo de Contadores para configurar las referencias iniciales.</p>
+            <table class="admin-grid-tabla oculto" id="admin-startup-grid-tabla">
+              <thead><tr><th>ID</th><th>Nombre</th><th>Entradas</th><th>Salidas</th><th>Jackpot</th></tr></thead>
+              <tbody id="admin-startup-grid-body"></tbody>
+            </table>
+            <p class="modal-desc" style="margin-top:8px">Los valores son los contadores físicos del día de arranque. Al guardar, los ítems nuevos del catálogo se agregan automáticamente con 0.</p>
+          </div>
+        </section>
+        <section class="admin-section">
           <h4 class="admin-section-title">Autocompletado</h4>
           <details class="admin-catalogo">
             <summary>Clientes de bonos</summary>
@@ -704,8 +734,12 @@
           <details class="admin-catalogo">
             <summary>Ítems de contadores</summary>
             <div class="admin-catalogo-body">
-              <textarea id="admin-contadores-catalogo" class="catalogo-editor" rows="8" placeholder="ID | Nombre visible | Denominación"></textarea>
-              <p class="modal-desc">Usa una línea por ítem. Ejemplo: <strong>M01 | Ruleta 1 | 100</strong>. Esto solo define el catálogo operativo de Contadores.</p>
+              <table class="admin-grid-tabla">
+                <thead><tr><th>ID</th><th>Nombre</th><th>Denom.</th><th></th></tr></thead>
+                <tbody id="admin-contadores-grid-body"></tbody>
+              </table>
+              <button type="button" id="btn-admin-contadores-add" class="btn btn-secondary admin-grid-add-row">+ Agregar ítem</button>
+              <p class="modal-desc" style="margin-top:8px">ID corto (ej. <strong>M01</strong>), nombre visible y denominación en pesos.</p>
             </div>
           </details>
         </section>
