@@ -2,17 +2,16 @@ const DENOMINACIONES = [100000, 50000, 20000, 10000, 5000, 2000];
 const CONTRASENA = '1980';
 const OBSERVACION_CRITICA_DEFAULT = 'reinicio técnico';
 const MODULE_META = {
-  caja: { label: 'Caja', panelId: 'panel-caja', dateLabel: 'Fecha del arqueo', defaultDate: () => configDefaultDate === 'yesterday' ? ayerStr() : hoyStr() },
-  plataformas: { label: 'Plataformas', panelId: 'panel-plataformas', dateLabel: 'Fecha de plataformas', defaultDate: () => hoyStr() },
-  gastos: { label: 'Gastos', panelId: 'panel-gastos', dateLabel: 'Fecha de gastos', defaultDate: () => hoyStr() },
-  bonos: { label: 'Bonos', panelId: 'panel-bonos', dateLabel: 'Fecha de bonos', defaultDate: () => hoyStr() },
-  prestamos: { label: 'Prestamos', panelId: 'panel-prestamos', dateLabel: 'Fecha de préstamos', defaultDate: () => hoyStr() },
-  movimientos: { label: 'Movimientos', panelId: 'panel-movimientos', dateLabel: 'Fecha de movimientos', defaultDate: () => hoyStr() },
-  contadores: { label: 'Contadores', panelId: 'panel-contadores', dateLabel: 'Fecha de contadores', defaultDate: () => hoyStr() },
-  cuadre: { label: 'Cuadre', panelId: 'panel-cuadre', dateLabel: 'Fecha del cuadre', defaultDate: () => hoyStr() },
+  caja: { label: 'Caja', panelId: 'panel-caja', dateLabel: 'Fecha del arqueo' },
+  plataformas: { label: 'Plataformas', panelId: 'panel-plataformas', dateLabel: 'Fecha de plataformas' },
+  gastos: { label: 'Gastos', panelId: 'panel-gastos', dateLabel: 'Fecha de gastos' },
+  bonos: { label: 'Bonos', panelId: 'panel-bonos', dateLabel: 'Fecha de bonos' },
+  prestamos: { label: 'Prestamos', panelId: 'panel-prestamos', dateLabel: 'Fecha de préstamos' },
+  movimientos: { label: 'Movimientos', panelId: 'panel-movimientos', dateLabel: 'Fecha de movimientos' },
+  contadores: { label: 'Contadores', panelId: 'panel-contadores', dateLabel: 'Fecha de contadores' },
+  cuadre: { label: 'Cuadre', panelId: 'panel-cuadre', dateLabel: 'Fecha del cuadre' },
 };
 
-let configDefaultDate = 'today';
 let configModoEntrada = 'cantidad';
 let configSede = 'Principal';
 let configDataDir = '';
@@ -20,7 +19,7 @@ let enabledModules = ['caja', 'gastos'];
 let defaultModule = 'caja';
 let currentModule = 'caja';
 let moduleDates = {};
-let adminOverride = { caja: false, plataformas: false, gastos: false, bonos: false, prestamos: false, movimientos: false, contadores: false, cuadre: false };
+let adminOverride = { caja: null, plataformas: null, gastos: null, bonos: null, prestamos: null, movimientos: null, contadores: null, cuadre: null };
 let cuadreDatos = null;
 let debounceTimer = null;
 let pendingAdminAction = null;
@@ -817,7 +816,7 @@ function confirmarReferenciaCritica(row) {
   const passField = row.querySelector('[data-role="critica-password"]');
   const passError = row.querySelector('.critica-pass-error');
   const pass = (passField?.value || '').trim();
-  const ok = adminOverride.contadores || pass === CONTRASENA;
+  const ok = isOverrideActive('contadores') || pass === CONTRASENA;
   if (!ok) {
     if (passError) { passError.textContent = 'Contraseña incorrecta.'; passError.classList.remove('oculto'); }
     if (passField) { passField.value = ''; passField.focus(); }
@@ -850,7 +849,7 @@ async function togglePausaContador(btn) {
   const passField = detalle?.querySelector('[data-role="pausa-password"]');
   const passError = detalle?.querySelector('.pausa-pass-error');
   const pass = (passField?.value || '').trim();
-  const ok = adminOverride.contadores || pass === CONTRASENA;
+  const ok = isOverrideActive('contadores') || pass === CONTRASENA;
   if (!ok) {
     if (passError) { passError.textContent = 'Contraseña incorrecta.'; passError.classList.remove('oculto'); }
     if (passField) { passField.value = ''; passField.focus(); }
@@ -1344,24 +1343,40 @@ function actualizarPaneles() {
 }
 
 function sugerirFechaModulo(modulo) {
-  return MODULE_META[modulo].defaultDate();
+  return hoyStr();
 }
 
 function _persistirFechasModulo() {
   try { sessionStorage.setItem('moduleDates', JSON.stringify(moduleDates)); } catch {}
 }
 
-function aplicarFechaModulo(modulo, usarDefault = false) {
-  if (usarDefault || !moduleDates[modulo]) {
-    moduleDates[modulo] = sugerirFechaModulo(modulo);
-  }
-  document.getElementById('fecha').value = moduleDates[modulo];
+function setSharedModuleDate(fecha) {
+  const activa = fecha || hoyStr();
+  Object.keys(MODULE_META).forEach(modulo => {
+    moduleDates[modulo] = activa;
+  });
   _persistirFechasModulo();
 }
 
+function aplicarFechaModulo(modulo, usarDefault = false) {
+  if (usarDefault || !moduleDates[modulo]) {
+    setSharedModuleDate(sugerirFechaModulo(modulo));
+  }
+  document.getElementById('fecha').value = moduleDates[modulo];
+}
+
 function resetOverride(modulo) {
-  adminOverride[modulo] = false;
+  adminOverride[modulo] = null;
   ocultarBanner();
+}
+
+function isOverrideActive(modulo, fecha = null) {
+  const fechaObjetivo = fecha || document.getElementById('fecha')?.value || '';
+  return Boolean(adminOverride[modulo] && adminOverride[modulo] === fechaObjetivo);
+}
+
+function setOverride(modulo, fecha) {
+  adminOverride[modulo] = fecha || document.getElementById('fecha')?.value || null;
 }
 
 async function activarModulo(modulo) {
@@ -1423,13 +1438,13 @@ async function verificarFechaActual() {
     btnGuardar.disabled = false;
 
     if (currentModule === 'cuadre') {
-      if (data.existe && !adminOverride.cuadre) {
+      if (data.existe && !isOverrideActive('cuadre', fecha)) {
         estado.innerHTML = `El Cuadre de ${fecha} ya existe. <button class="btn-inline-editar" id="btn-inline-editar">Corregir (admin)</button>`;
         estado.className = 'fecha-estado existe';
         document.getElementById('btn-inline-editar')?.addEventListener('click', () => autorizarModulo());
         return;
       }
-      if (adminOverride.cuadre) {
+      if (isOverrideActive('cuadre', fecha)) {
         estado.textContent = `Corrección de Cuadre autorizada para ${fecha}.`;
         estado.className = 'fecha-estado advertencia-fecha';
         return;
@@ -1456,7 +1471,7 @@ async function verificarFechaActual() {
         return;
       }
 
-      if (adminOverride.plataformas) {
+      if (isOverrideActive('plataformas', fecha)) {
         estado.textContent = `Corrección de plataformas autorizada para ${fecha}.`;
         estado.className = 'fecha-estado advertencia-fecha';
         return;
@@ -1470,7 +1485,7 @@ async function verificarFechaActual() {
     }
 
     if (currentModule === 'contadores') {
-      if (data.existe && !adminOverride.contadores) {
+      if (data.existe && !isOverrideActive('contadores', fecha)) {
         estado.innerHTML = `Contadores de ${fecha} ya existen. <button class="btn-inline-editar" id="btn-inline-editar">Corregir (admin)</button>`;
         estado.className = 'fecha-estado existe';
         btnGuardar.disabled = true;
@@ -1478,7 +1493,7 @@ async function verificarFechaActual() {
         return;
       }
 
-      if (adminOverride.contadores) {
+      if (isOverrideActive('contadores', fecha)) {
         estado.textContent = `Corrección de contadores autorizada para ${fecha}.`;
         estado.className = 'fecha-estado advertencia-fecha';
         return;
@@ -1490,7 +1505,7 @@ async function verificarFechaActual() {
     }
 
     if (currentModule === 'caja') {
-      if (data.existe && !adminOverride.caja) {
+      if (data.existe && !isOverrideActive('caja', fecha)) {
         estado.innerHTML = `La caja de ${fecha} ya existe. <button class="btn-inline-editar" id="btn-inline-editar">Corregir (admin)</button>`;
         estado.className = 'fecha-estado existe';
         btnGuardar.disabled = true;
@@ -1498,7 +1513,7 @@ async function verificarFechaActual() {
         return;
       }
 
-      if (adminOverride.caja) {
+      if (isOverrideActive('caja', fecha)) {
         estado.textContent = `Corrección de caja autorizada para ${fecha}.`;
         estado.className = 'fecha-estado advertencia-fecha';
         return;
@@ -1519,7 +1534,7 @@ async function verificarFechaActual() {
       return;
     }
 
-    if (adminOverride[currentModule]) {
+    if (isOverrideActive(currentModule, fecha)) {
       estado.textContent = `Corrección de ${MODULE_META[currentModule].label.toLowerCase()} autorizada para ${fecha}.`;
       estado.className = 'fecha-estado advertencia-fecha';
       return;
@@ -1573,7 +1588,7 @@ async function autorizarModulo() {
     titulo,
     descripcion,
     onSuccess: async () => {
-      adminOverride[modulo] = true;
+      setOverride(modulo, fecha);
       mostrarBanner(`${titulo} autorizada: ${fecha}`);
       await cargarVistaModulo(modulo, fecha);
       await verificarFechaActual();
@@ -1597,7 +1612,7 @@ async function cargarDatosCaja(fecha) {
     const res = await fetch(`/api/modulos/caja/fecha/${fecha}/datos`);
     if (!res.ok) {
       limpiarCaja();
-      setCajaEditable(adminOverride.caja);
+      setCajaEditable(isOverrideActive('caja', fecha));
       return;
     }
     const data = await res.json();
@@ -1610,7 +1625,7 @@ async function cargarDatosCaja(fecha) {
     setNumeroInputValue('billetes_viejos', data.billetes_viejos || '');
     calcularCaja();
     eliminarDraftCaja(fecha);
-    setCajaEditable(adminOverride.caja);
+    setCajaEditable(isOverrideActive('caja', fecha));
   } catch {
     if (!aplicarDraftCaja(fecha)) limpiarCaja();
     setCajaEditable(true);
@@ -1672,11 +1687,11 @@ async function cargarDatosContadores(fecha) {
     }
     const data = await res.json();
     renderContadores(data.items || [], data.total_resultado || 0);
-    if (!data.existe && !adminOverride.contadores) {
+    if (!data.existe && !isOverrideActive('contadores', fecha)) {
       setContadoresEditable(true);
       applyContadoresDraft(fecha);
     } else {
-      setContadoresEditable(Boolean(adminOverride.contadores) || !data.existe);
+      setContadoresEditable(Boolean(isOverrideActive('contadores', fecha)) || !data.existe);
       if (!data.existe) applyContadoresDraft(fecha);
     }
   } catch {
@@ -1716,7 +1731,7 @@ async function registrarBono() {
   const res = await fetch('/api/modulos/bonos/registrar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, cliente, valor, forzar: adminOverride.bonos }),
+    body: JSON.stringify({ fecha, cliente, valor, forzar: isOverrideActive('bonos', fecha) }),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -1729,7 +1744,6 @@ async function registrarBono() {
   await cargarBonosDelDia(fecha);
   actualizarBonosVisuales();
   mostrarMensaje(`✓ ${data.mensaje} — ${data.cliente}: ${fmt(data.valor)} — Total día: ${fmt(data.total_dia)}`, 'ok');
-  resetOverride('bonos');
   await verificarFechaActual();
   document.getElementById('bono-cliente').focus();
 }
@@ -1748,7 +1762,7 @@ async function registrarPrestamo() {
   const res = await fetch('/api/modulos/prestamos/registrar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, persona, tipo_movimiento, valor, forzar: adminOverride.prestamos }),
+    body: JSON.stringify({ fecha, persona, tipo_movimiento, valor, forzar: isOverrideActive('prestamos', fecha) }),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -1761,7 +1775,6 @@ async function registrarPrestamo() {
   await cargarPrestamosDelDia(fecha);
   actualizarPrestamosVisuales();
   mostrarMensaje(`✓ ${data.mensaje} — ${data.persona}: ${fmt(data.valor)} — Saldo pendiente: ${fmt(data.saldo_pendiente)}`, 'ok');
-  resetOverride('prestamos');
   await verificarFechaActual();
   document.getElementById('prestamo-persona').focus();
 }
@@ -1781,7 +1794,7 @@ async function registrarMovimiento() {
   const res = await fetch('/api/modulos/movimientos/registrar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, tipo_movimiento, concepto, valor, observacion, forzar: adminOverride.movimientos }),
+    body: JSON.stringify({ fecha, tipo_movimiento, concepto, valor, observacion, forzar: isOverrideActive('movimientos', fecha) }),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -1794,7 +1807,6 @@ async function registrarMovimiento() {
   await cargarMovimientosDelDia(fecha);
   actualizarMovimientosVisuales();
   mostrarMensaje(`✓ ${data.mensaje} — ${data.concepto}: ${fmt(data.valor)} — Neto día: ${fmt(data.neto)}`, 'ok');
-  resetOverride('movimientos');
   await verificarFechaActual();
   document.getElementById('movimiento-concepto').focus();
 }
@@ -1821,7 +1833,7 @@ async function registrarGasto() {
   const res = await fetch('/api/modulos/gastos/guardar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, items: [{ concepto, valor }], forzar: adminOverride.gastos }),
+    body: JSON.stringify({ fecha, items: [{ concepto, valor }], forzar: isOverrideActive('gastos', fecha) }),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -1833,7 +1845,6 @@ async function registrarGasto() {
   renderExpenseConcepts();
   await cargarDatosModuloItems('gastos', fecha);
   mostrarMensaje(`✓ ${data.mensaje} — ${concepto}: ${fmt(valor)} — Total día: ${fmt(data.total)}`, 'ok');
-  resetOverride('gastos');
   await verificarFechaActual();
   document.getElementById('gasto-concepto').focus();
 }
@@ -1912,7 +1923,7 @@ async function guardarContadores() {
   const res = await fetch('/api/modulos/contadores/guardar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, items, forzar: adminOverride.contadores || items.some(i => i.usar_referencia_critica) }),
+    body: JSON.stringify({ fecha, items, forzar: isOverrideActive('contadores', fecha) || items.some(i => i.usar_referencia_critica) }),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -1921,7 +1932,6 @@ async function guardarContadores() {
   }
 
   eliminarDraftContadores(fecha);
-  resetOverride('contadores');
   await cargarDatosContadores(fecha);
   await verificarFechaActual();
   mostrarMensaje(`✓ ${data.mensaje} — Resultado total: ${fmt(data.total_resultado || 0)}`, 'ok');
@@ -2219,7 +2229,7 @@ async function guardar() {
           billetes,
           total_monedas: parsePositivo('total_monedas'),
           billetes_viejos: parsePositivo('billetes_viejos'),
-          forzar: adminOverride.caja,
+          forzar: isOverrideActive('caja', fecha),
         }),
       });
     } else if (currentModule === 'plataformas') {
@@ -2230,7 +2240,7 @@ async function guardar() {
           fecha,
           venta_practisistemas: parsePositivo('venta_practisistemas'),
           venta_deportivas: parseNumeroInput('venta_deportivas', true) || 0,
-          forzar: adminOverride.plataformas,
+          forzar: isOverrideActive('plataformas', fecha),
         }),
       });
     } else if (currentModule === 'contadores') {
@@ -2262,26 +2272,21 @@ async function guardar() {
     const hora12 = dt.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 
     if (currentModule === 'caja') {
-      resetOverride('caja');
-      moduleDates.caja = fecha;
+      setSharedModuleDate(fecha);
       document.getElementById('fecha').value = fecha;
       eliminarDraftCaja(fecha);
       limpiarCaja();
       setCajaEditable(false);
       mostrarMensaje(`✓ ${data.mensaje} — Total caja física: ${fmt(data.total_caja_fisica)} — ${data.fecha_hora_registro.slice(0, 10)} ${hora12}`, 'ok');
     } else if (currentModule === 'plataformas') {
-      resetOverride('plataformas');
-      moduleDates.plataformas = fecha;
-      _persistirFechasModulo();
+      setSharedModuleDate(fecha);
       document.getElementById('fecha').value = fecha;
       await cargarVistaModulo('plataformas', fecha);
       mostrarMensaje(`✓ ${data.mensaje} — Total plataformas: ${fmt(data.total_plataformas)} — ${data.fecha_hora_registro.slice(0, 10)} ${hora12}`, 'ok');
     } else if (currentModule === 'bonos' || currentModule === 'prestamos') {
       return;
     } else {
-      if (adminOverride[currentModule]) resetOverride(currentModule);
-      moduleDates[currentModule] = fecha;
-      _persistirFechasModulo();
+      setSharedModuleDate(fecha);
       document.getElementById('fecha').value = fecha;
       await cargarVistaModulo(currentModule, fecha);
       mostrarMensaje(`✓ ${data.mensaje} — Total ${MODULE_META[currentModule].label.toLowerCase()}: ${fmt(data.total)} — ${data.fecha_hora_registro.slice(0, 10)} ${hora12}`, 'ok');
@@ -2352,7 +2357,6 @@ async function ingresarAdmin() {
   try {
     const res = await fetch('/api/settings');
     const settings = await res.json();
-    document.querySelector(`input[name="default_date"][value="${settings.default_date || 'today'}"]`).checked = true;
     document.querySelector(`input[name="modo_entrada"][value="${settings.modo_entrada || 'cantidad'}"]`).checked = true;
     document.querySelectorAll('input[name="enabled_modules"]').forEach(el => {
       el.checked = (settings.enabled_modules || ['caja']).includes(el.value);
@@ -2380,7 +2384,6 @@ async function guardarAdmin() {
   const msg = document.getElementById('admin-config-msg');
   const enabled = obtenerModulosMarcadosAdmin();
   const body = {
-    default_date: document.querySelector('input[name="default_date"]:checked')?.value || 'today',
     modo_entrada: document.querySelector('input[name="modo_entrada"]:checked')?.value || 'cantidad',
     enabled_modules: enabled,
     default_module: document.getElementById('admin-default-module').value || enabled[0],
@@ -2430,7 +2433,6 @@ async function guardarAdmin() {
         contadores: parseStartupContadoresGrid(),
       }),
     });
-    configDefaultDate = body.default_date;
     configModoEntrada = body.modo_entrada;
     enabledModules = body.enabled_modules;
     defaultModule = body.default_module;
@@ -2450,7 +2452,7 @@ async function guardarAdmin() {
     renderTabs();
     actualizarPaneles();
     aplicarModoEntrada();
-    aplicarFechaModulo(currentModule, true);
+    aplicarFechaModulo(currentModule);
     await cargarVistaModulo(currentModule, moduleDates[currentModule]);
     await verificarFechaActual();
 
@@ -2505,7 +2507,6 @@ async function init() {
   try {
     const res = await fetch('/api/settings');
     const settings = await res.json();
-    configDefaultDate = settings.default_date || 'today';
     configModoEntrada = settings.modo_entrada || 'cantidad';
     configSede = settings.sede || 'Principal';
     configDataDir = settings.data_dir || '';
@@ -2516,16 +2517,21 @@ async function init() {
   let _savedDates = null;
   try { _savedDates = JSON.parse(sessionStorage.getItem('moduleDates') || 'null'); } catch {}
   const _isReload = !!_savedDates;
-  moduleDates = {
-    caja: (_savedDates?.caja) || sugerirFechaModulo('caja'),
-    plataformas: (_savedDates?.plataformas) || sugerirFechaModulo('plataformas'),
-    gastos: (_savedDates?.gastos) || sugerirFechaModulo('gastos'),
-    bonos: (_savedDates?.bonos) || sugerirFechaModulo('bonos'),
-    prestamos: (_savedDates?.prestamos) || sugerirFechaModulo('prestamos'),
-    movimientos: (_savedDates?.movimientos) || sugerirFechaModulo('movimientos'),
-    contadores: (_savedDates?.contadores) || sugerirFechaModulo('contadores'),
-    cuadre: (_savedDates?.cuadre) || sugerirFechaModulo('cuadre'),
-  };
+  const savedSharedDate = _savedDates && typeof _savedDates === 'object'
+    ? (
+      _savedDates.caja
+      || _savedDates.plataformas
+      || _savedDates.gastos
+      || _savedDates.bonos
+      || _savedDates.prestamos
+      || _savedDates.movimientos
+      || _savedDates.contadores
+      || _savedDates.cuadre
+      || hoyStr()
+    )
+    : hoyStr();
+  moduleDates = {};
+  setSharedModuleDate(savedSharedDate);
   if (_isReload) {
     try { cajaDrafts = JSON.parse(sessionStorage.getItem('cajaDrafts') || '{}'); } catch { cajaDrafts = {}; }
     try { contadoresDrafts = JSON.parse(sessionStorage.getItem('contadoresDrafts') || '{}'); } catch { contadoresDrafts = {}; }
@@ -2604,8 +2610,7 @@ async function init() {
     const fechaAnterior = moduleDates[currentModule];
     if (currentModule === 'caja') guardarDraftCaja(fechaAnterior);
     if (currentModule === 'contadores') guardarDraftContadores(fechaAnterior);
-    moduleDates[currentModule] = e.target.value;
-    _persistirFechasModulo();
+    setSharedModuleDate(e.target.value);
     if (currentModule !== 'caja') resetOverride(currentModule);
     if (currentModule === 'caja') resetOverride('caja');
     if (currentModule === 'bonos') {
@@ -2639,7 +2644,6 @@ async function init() {
   document.getElementById('btn-finalizar').addEventListener('click', cerrarAplicacion);
   document.getElementById('btn-cancelar-edicion').addEventListener('click', async () => {
     resetOverride(currentModule);
-    moduleDates[currentModule] = sugerirFechaModulo(currentModule);
     aplicarFechaModulo(currentModule);
     if (currentModule === 'bonos') limpiarFormularioBonos();
     if (currentModule === 'prestamos') limpiarFormularioPrestamos();
@@ -2704,7 +2708,7 @@ async function init() {
     if (!e.target.matches('.contador-critica-detalle')) return;
     if (!e.target.open) return;
     const row = e.target.closest('tr');
-    if (row && row.dataset.guardado === '1' && adminOverride.contadores) {
+    if (row && row.dataset.guardado === '1' && isOverrideActive('contadores')) {
       row.dataset.guardado = '0';
       recalcularFilaContador(row);
     }
@@ -2869,7 +2873,7 @@ async function cargarDatosCuadre(fecha) {
     const estado = await estadoRes.json();
 
     // Ya guardado y sin override → vista de solo lectura
-    if (estado.existe && !adminOverride.cuadre) {
+    if (estado.existe && !isOverrideActive('cuadre', fecha)) {
       const datosRes = await fetch(`/api/modulos/cuadre/fecha/${fecha}/datos`);
       if (datosRes.ok) {
         renderCuadreGuardado(await datosRes.json(), fecha);
@@ -3103,14 +3107,13 @@ async function guardarCuadre() {
   const res = await fetch('/api/modulos/cuadre/guardar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, base_anterior, forzar: adminOverride.cuadre }),
+    body: JSON.stringify({ fecha, base_anterior, forzar: isOverrideActive('cuadre', fecha) }),
   });
   const data = await res.json();
   if (!data.ok) {
     mostrarMensaje(data.mensaje, 'advertencia');
     return;
   }
-  resetOverride('cuadre');
   await cargarDatosCuadre(fecha);
   await verificarFechaActual();
   const tipo = data.diferencia === 0 ? 'ok' : 'advertencia';

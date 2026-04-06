@@ -13,7 +13,6 @@ def _default_sede() -> str:
 
 
 _DEFAULTS = {
-    "default_date": "today",
     "modo_entrada": "cantidad",
     "sede": _default_sede(),
     "data_dir": str(BASE_DIR),
@@ -67,7 +66,7 @@ def get_settings() -> dict:
 def save_settings(data: dict) -> None:
     global _settings_cache, _settings_cache_mtime
 
-    allowed = {"default_date", "modo_entrada", "sede", "data_dir", "enabled_modules", "default_module"}
+    allowed = {"modo_entrada", "sede", "data_dir", "enabled_modules", "default_module"}
     cleaned = {k: v for k, v in data.items() if k in allowed}
     if "sede" in cleaned:
         cleaned["sede"] = str(cleaned["sede"]).strip()
