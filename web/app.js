@@ -18,6 +18,7 @@ let configDataDir = '';
 let enabledModules = ['caja', 'gastos'];
 let defaultModule = 'caja';
 let currentModule = 'caja';
+const cajaInputSessionToken = `caja_${Date.now().toString(36)}`;
 let moduleDates = {};
 let adminOverride = { caja: null, plataformas: null, gastos: null, bonos: null, prestamos: null, movimientos: null, contadores: null, cuadre: null };
 let cuadreDatos = null;
@@ -193,11 +194,56 @@ function buildTablaBilletes() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>$ ${d.toLocaleString('es-CO')}</td>
-      <td><input type="text" inputmode="numeric" id="cant_${d}" placeholder="0" class="input-billete" /></td>
-      <td><input type="text" inputmode="numeric" id="sub_${d}" placeholder="0" class="input-billete" /></td>
+      <td><input type="text" inputmode="numeric" id="cant_${d}" placeholder="0" class="input-billete" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" /></td>
+      <td><input type="text" inputmode="numeric" id="sub_${d}" placeholder="0" class="input-billete" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" /></td>
     `;
     tbody.appendChild(tr);
   });
+}
+
+function configurarCajaSinAutocompletar() {
+  const ids = [
+    ...DENOMINACIONES.flatMap(d => [`cant_${d}`, `sub_${d}`]),
+    'total_monedas',
+    'billetes_viejos',
+  ];
+
+  ids.forEach(id => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.autocomplete = 'off';
+    input.setAttribute('autocorrect', 'off');
+    input.setAttribute('autocapitalize', 'off');
+    input.setAttribute('spellcheck', 'false');
+    input.setAttribute('data-form-type', 'other');
+    input.name = `${id}_${cajaInputSessionToken}`;
+  });
+}
+
+function desactivarSugerenciasFormulario() {
+  const campos = [...document.querySelectorAll('input, textarea')];
+  campos.forEach((input, index) => {
+    const tipo = (input.type || '').toLowerCase();
+    if (['hidden', 'radio', 'checkbox', 'button', 'submit'].includes(tipo)) return;
+
+    input.autocomplete = 'off';
+    input.setAttribute('autocorrect', 'off');
+    input.setAttribute('autocapitalize', 'off');
+    input.setAttribute('spellcheck', 'false');
+    input.setAttribute('data-form-type', 'other');
+
+    if (tipo !== 'date') {
+      const base = input.id || input.name || `field_${index}`;
+      input.name = `${base}_${cajaInputSessionToken}`;
+    }
+  });
+}
+
+function observarNuevosCamposFormulario() {
+  const observer = new MutationObserver(() => {
+    desactivarSugerenciasFormulario();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 }
 
 function camposEditablesBilletes() {
@@ -331,47 +377,15 @@ function actualizarMovimientosVisuales() {
 }
 
 function renderBonusNames() {
-  const list = document.getElementById('bonos-clientes-lista');
-  if (!list) return;
-  list.innerHTML = '';
-  bonusNames.forEach(nombre => {
-    const option = document.createElement('option');
-    option.value = nombre;
-    list.appendChild(option);
-  });
 }
 
 function renderExpenseConcepts() {
-  const list = document.getElementById('gastos-conceptos-lista');
-  if (!list) return;
-  list.innerHTML = '';
-  expenseConcepts.forEach(concepto => {
-    const option = document.createElement('option');
-    option.value = concepto;
-    list.appendChild(option);
-  });
 }
 
 function renderMovementConcepts() {
-  const list = document.getElementById('movimientos-conceptos-lista');
-  if (!list) return;
-  list.innerHTML = '';
-  movementConcepts.forEach(concepto => {
-    const option = document.createElement('option');
-    option.value = concepto;
-    list.appendChild(option);
-  });
 }
 
 function renderLoanNames() {
-  const list = document.getElementById('prestamos-personas-lista');
-  if (!list) return;
-  list.innerHTML = '';
-  loanNames.forEach(nombre => {
-    const option = document.createElement('option');
-    option.value = nombre;
-    list.appendChild(option);
-  });
 }
 
 async function cargarBonusNames() {
@@ -2506,6 +2520,9 @@ async function cerrarAplicacion() {
 
 async function init() {
   buildTablaBilletes();
+  desactivarSugerenciasFormulario();
+  observarNuevosCamposFormulario();
+  configurarCajaSinAutocompletar();
   await cargarBonusNames();
   await cargarLoanNames();
   await cargarExpenseConcepts();
@@ -2786,7 +2803,6 @@ async function init() {
   document.getElementById('gasto-concepto').addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
-      autocompletarConceptoGasto();
       document.getElementById('gasto-valor').focus();
       document.getElementById('gasto-valor').select();
     }
@@ -2800,7 +2816,6 @@ async function init() {
   document.getElementById('bono-cliente').addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
-      autocompletarClienteBono();
       document.getElementById('bono-valor').focus();
       document.getElementById('bono-valor').select();
     }
@@ -2808,7 +2823,6 @@ async function init() {
   document.getElementById('prestamo-persona').addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
-      autocompletarPersonaPrestamo();
       actualizarResumenPersonaPrestamo();
       document.getElementById('prestamo-valor').focus();
       document.getElementById('prestamo-valor').select();
@@ -2817,7 +2831,6 @@ async function init() {
   document.getElementById('movimiento-concepto').addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
-      autocompletarConceptoMovimiento();
       document.getElementById('movimiento-valor').focus();
       document.getElementById('movimiento-valor').select();
     }
