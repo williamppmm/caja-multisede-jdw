@@ -96,6 +96,10 @@ function parsePositivo(id) {
   return isNaN(v) || v < 0 ? 0 : v;
 }
 
+function esTextoSoloNumeros(texto) {
+  return /^\d+$/.test(String(texto || '').trim());
+}
+
 function dateToStr(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -1184,7 +1188,7 @@ function validarBono() {
   const valorRaw = document.getElementById('bono-valor').value;
   const valor = valorRaw === '' ? 0 : Number(valorRaw);
   if (!cliente) return 'Debes ingresar el nombre del cliente.';
-  if (/^\d+$/.test(cliente)) return 'El nombre del cliente no puede ser solo números.';
+  if (esTextoSoloNumeros(cliente)) return 'El nombre del cliente no puede ser solo números.';
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de bono mayor que cero.';
   return null;
 }
@@ -1193,7 +1197,7 @@ function validarPrestamo() {
   const persona = document.getElementById('prestamo-persona').value.trim();
   const valor = parseNumeroInput('prestamo-valor');
   if (!persona) return 'Debes ingresar el nombre de la persona.';
-  if (/^\d+$/.test(persona)) return 'El nombre de la persona no puede ser solo números.';
+  if (esTextoSoloNumeros(persona)) return 'El nombre de la persona no puede ser solo números.';
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de préstamo mayor que cero.';
   if (obtenerTipoPrestamoSeleccionado() === 'pago') {
     const resumen = obtenerResumenPersonaPrestamo(persona);
@@ -1205,8 +1209,11 @@ function validarPrestamo() {
 
 function validarMovimiento() {
   const concepto = document.getElementById('movimiento-concepto').value.trim();
+  const observacion = document.getElementById('movimiento-observacion').value.trim();
   const valor = parseNumeroInput('movimiento-valor');
   if (!concepto) return 'Debes ingresar el concepto del movimiento.';
+  if (esTextoSoloNumeros(concepto)) return 'El concepto del movimiento no puede ser solo números.';
+  if (observacion && esTextoSoloNumeros(observacion)) return 'La observación no puede contener solo números.';
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de movimiento mayor que cero.';
   return null;
 }
@@ -1816,6 +1823,7 @@ function validarGasto() {
   const valorRaw = document.getElementById('gasto-valor').value;
   const valor = valorRaw === '' ? 0 : parseNumeroTexto(valorRaw);
   if (!concepto) return 'Debes ingresar la descripción del gasto.';
+  if (esTextoSoloNumeros(concepto)) return 'La descripción del gasto no puede ser solo números.';
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de gasto mayor que cero.';
   return null;
 }

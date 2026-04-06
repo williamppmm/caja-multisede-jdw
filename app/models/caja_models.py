@@ -4,9 +4,25 @@ from typing import Dict, List
 from pydantic import BaseModel, field_validator
 
 
+def _validar_texto_no_numerico_puro(value: str, nombre_campo: str, obligatorio: bool = True) -> str:
+    texto = str(value or "").strip()
+    if not texto:
+        if obligatorio:
+            raise ValueError(f"El campo {nombre_campo} es obligatorio")
+        return ""
+    if texto.isdigit():
+        raise ValueError(f"El campo {nombre_campo} no puede contener solo números")
+    return texto
+
+
 class ConceptoValorItem(BaseModel):
     concepto: str = ""
     valor: float = 0
+
+    @field_validator("concepto")
+    @classmethod
+    def validar_concepto(cls, v):
+        return _validar_texto_no_numerico_puro(v, "concepto")
 
 
 class CajaEntrada(BaseModel):
@@ -66,10 +82,7 @@ class BonoEntrada(BaseModel):
     @field_validator("cliente")
     @classmethod
     def validar_cliente(cls, v):
-        texto = str(v or "").strip()
-        if not texto:
-            raise ValueError("El nombre del cliente es obligatorio")
-        return texto
+        return _validar_texto_no_numerico_puro(v, "nombre del cliente")
 
     @field_validator("valor")
     @classmethod
@@ -89,10 +102,7 @@ class PrestamoEntrada(BaseModel):
     @field_validator("persona")
     @classmethod
     def validar_persona(cls, v):
-        texto = str(v or "").strip()
-        if not texto:
-            raise ValueError("El nombre de la persona es obligatorio")
-        return texto
+        return _validar_texto_no_numerico_puro(v, "nombre de la persona")
 
     @field_validator("tipo_movimiento")
     @classmethod
@@ -129,10 +139,12 @@ class MovimientoEntrada(BaseModel):
     @field_validator("concepto")
     @classmethod
     def validar_concepto(cls, v):
-        texto = str(v or "").strip()
-        if not texto:
-            raise ValueError("El concepto es obligatorio")
-        return texto
+        return _validar_texto_no_numerico_puro(v, "concepto")
+
+    @field_validator("observacion")
+    @classmethod
+    def validar_observacion(cls, v):
+        return _validar_texto_no_numerico_puro(v, "observación", obligatorio=False)
 
     @field_validator("valor")
     @classmethod
