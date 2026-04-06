@@ -77,7 +77,7 @@ def fecha_existe(fecha: date) -> bool:
 
 
 def obtener_ultima_fecha() -> date | None:
-    return excel_service.obtener_ultima_fecha_modulo("contadores", date.today().year)
+    return excel_service.obtener_ultima_fecha_modulo_global("contadores")
 
 
 def _iter_referencias_previas(item_id: str, fecha_actual: date) -> list[dict]:
@@ -198,6 +198,7 @@ def construir_base_fecha(fecha: date) -> dict:
             "resultado_monetario": float(guardado.get("resultado_monetario", (yield_actual - yield_ref) * int(item["denominacion"]))),
             "alerta": alerta,
             "usar_referencia_critica": usar_critica,
+            "produccion_pre_reset_guardada": int(guardado.get("produccion_pre_reset", 0)),
             "observacion_referencia": observacion_guardada,
             "ref_entradas_guardada": guardado.get("ref_entradas"),
             "ref_salidas_guardada": guardado.get("ref_salidas"),
@@ -287,7 +288,8 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
         yield_actual = _yield(fila.entradas, fila.salidas, fila.jackpot)
         yield_referencia = int(ref_efectiva.get("yield", 0)) if ref_efectiva else 0
         resultado_unidades = yield_actual - yield_referencia
-        resultado_monetario = resultado_unidades * int(meta["denominacion"])
+        produccion_pre_reset = int(fila.produccion_pre_reset) if fila.usar_referencia_critica else 0
+        resultado_monetario = resultado_unidades * int(meta["denominacion"]) + produccion_pre_reset
 
         filas_guardadas.append({
             "item_id": fila.item_id,
@@ -298,6 +300,7 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
             "jackpot": fila.jackpot,
             "yield_actual": yield_actual,
             "yield_referencia": yield_referencia,
+            "produccion_pre_reset": produccion_pre_reset,
             "resultado_unidades": resultado_unidades,
             "resultado_monetario": resultado_monetario,
             "observacion": observacion_ref,
@@ -331,6 +334,7 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
             item["ref_salidas"],
             item["ref_jackpot"],
             item["yield_referencia"],
+            item["produccion_pre_reset"],
             item["observacion"],
             item["resultado_monetario"],
             timestamp_dt,

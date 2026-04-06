@@ -443,7 +443,9 @@ function setContadoresEditable(editable) {
   getContadoresInputs().forEach(input => {
     input.readOnly = contadoresLocked;
     if (input.tagName === 'INPUT') input.disabled = false;
-    input.tabIndex = contadoresLocked ? -1 : 0;
+    // Crítica inputs are always excluded from tab order; only .contador-campo fields navigate with Tab/Enter
+    const esCritica = input.closest('.contador-critica');
+    input.tabIndex = (contadoresLocked || esCritica) ? -1 : 0;
     input.classList.toggle('input-readonly', contadoresLocked);
   });
   document.querySelectorAll('.btn-confirmar-critica').forEach(btn => {
@@ -479,7 +481,7 @@ function leerContadoresDraftActual() {
       ref_entradas: row.querySelector(`[data-role="critica-entradas"]`)?.value || '',
       ref_salidas: row.querySelector(`[data-role="critica-salidas"]`)?.value || '',
       ref_jackpot: row.querySelector(`[data-role="critica-jackpot"]`)?.value || '',
-      observacion: row.querySelector(`[data-role="critica-observacion"]`)?.value || '',
+      produccion_pre_reset: row.querySelector(`[data-role="critica-pre-reset"]`)?.value || '',
     };
   });
   return { items: rows };
@@ -489,11 +491,13 @@ function guardarDraftContadores(fechaOverride = null) {
   const fecha = fechaOverride || document.getElementById('fecha')?.value;
   if (!fecha || contadoresLocked) return;
   contadoresDrafts[fecha] = leerContadoresDraftActual();
+  try { sessionStorage.setItem('contadoresDrafts', JSON.stringify(contadoresDrafts)); } catch {}
 }
 
 function eliminarDraftContadores(fecha) {
   if (!fecha) return;
   delete contadoresDrafts[fecha];
+  try { sessionStorage.setItem('contadoresDrafts', JSON.stringify(contadoresDrafts)); } catch {}
 }
 
 function applyContadoresDraft(fecha) {
@@ -512,7 +516,7 @@ function applyContadoresDraft(fecha) {
       'critica-entradas': item.ref_entradas,
       'critica-salidas': item.ref_salidas,
       'critica-jackpot': item.ref_jackpot,
-      'critica-observacion': item.observacion,
+      'critica-pre-reset': item.produccion_pre_reset,
     };
     Object.entries(mapaCritica).forEach(([role, value]) => {
       const input = row.querySelector(`[data-role="${role}"]`);
@@ -633,7 +637,10 @@ function renderContadores(items = [], total = 0) {
                   <input type="text" inputmode="numeric" data-role="critica-salidas" placeholder="Ref. Salidas" value="${limpiarNumeroTexto((fila.ref_salidas_guardada ?? fila.referencia?.salidas) || 0)}" />
                   <input type="text" inputmode="numeric" data-role="critica-jackpot" placeholder="Ref. Jackpot" value="${limpiarNumeroTexto((fila.ref_jackpot_guardada ?? fila.referencia?.jackpot) || 0)}" />
                 </div>
-                <textarea data-role="critica-observacion" class="oculto" aria-hidden="true" tabindex="-1" readonly>${fila.observacion_referencia || fila.motivo_referencia || OBSERVACION_CRITICA_DEFAULT}</textarea>
+                <div class="contador-critica-pre-reset">
+                  <label class="critica-pre-reset-label">Prod. antes del reset</label>
+                  <input type="text" inputmode="numeric" data-role="critica-pre-reset" placeholder="0" value="${limpiarNumeroTexto(fila.produccion_pre_reset_guardada || 0)}" />
+                </div>
                 <div class="contador-critica-confirm">
                   <input type="password" data-role="critica-password" placeholder="Contraseña admin" autocomplete="off" />
                   <button type="button" class="btn-confirmar-critica">Confirmar</button>
@@ -693,8 +700,9 @@ function recalcularFilaContador(row) {
   );
   row.classList.remove('contador-alerta');
   if (detalleCritica) {
-    // Mostrar la sección solo cuando hay alerta activa o cuando aún no se ha guardado y ya fue autorizada.
-    detalleCritica.classList.toggle('oculto', !(alerta || (usaCritica && row.dataset.guardado !== '1')));
+    // Mostrar cuando: hay alerta, está autorizado, o el panel ya está abierto (el usuario lo expandió para editar).
+    detalleCritica.classList.toggle('oculto', !(alerta || usaCritica || detalleCritica.open));
+    // Si ya está guardado, mantener colapsado (solo summary visible), no expandido automáticamente.
     if (row.dataset.guardado === '1') detalleCritica.open = false;
   }
 
@@ -723,7 +731,8 @@ function recalcularFilaContador(row) {
     : fila.refYield;
 
   const yieldActual = entradas - salidas - jackpot;
-  const resultado = (yieldActual - refYield) * fila.denominacion;
+  const preReset = usaCritica ? (valorContadorRow(row, 'critica-pre-reset') || 0) : 0;
+  const resultado = (yieldActual - refYield) * fila.denominacion + preReset;
   row.querySelector('[data-role="yield-actual"]').textContent = limpiarNumeroTexto(yieldActual, true);
   row.querySelector('[data-role="yield-ref"]').innerHTML = `${limpiarNumeroTexto(refYield, true)}<span class="contador-ref-texto">${usaCritica ? 'Autorizado' : (fila.refFecha || 'Base 0')}</span>`;
   const resultadoEl = row.querySelector('[data-role="resultado"]');
@@ -784,8 +793,8 @@ function manejarEventoContadores(target) {
   if (target.matches('.contador-campo')) {
     formatearInputNumerico(target, false, false);
   }
-  // Al editar campos de referencia crítica, se pierde la autorización previa
-  if (target.matches('[data-role="critica-entradas"],[data-role="critica-salidas"],[data-role="critica-jackpot"]')) {
+  // Al editar cualquier campo de referencia crítica, se pierde la autorización y hay que reconfirmar
+  if (target.matches('[data-role="critica-entradas"],[data-role="critica-salidas"],[data-role="critica-jackpot"],[data-role="critica-pre-reset"]')) {
     const row = target.closest('tr');
     if (row && row.dataset.criticaAutorizada === '1') {
       row.dataset.criticaAutorizada = '0';
@@ -1252,11 +1261,13 @@ function guardarDraftCaja(fechaOverride = null) {
   const fecha = fechaOverride || document.getElementById('fecha')?.value;
   if (!fecha || cajaLocked) return;
   cajaDrafts[fecha] = obtenerDraftCajaActual();
+  try { sessionStorage.setItem('cajaDrafts', JSON.stringify(cajaDrafts)); } catch {}
 }
 
 function eliminarDraftCaja(fecha) {
   if (!fecha) return;
   delete cajaDrafts[fecha];
+  try { sessionStorage.setItem('cajaDrafts', JSON.stringify(cajaDrafts)); } catch {}
 }
 
 function aplicarDraftCaja(fecha) {
@@ -1336,11 +1347,16 @@ function sugerirFechaModulo(modulo) {
   return MODULE_META[modulo].defaultDate();
 }
 
+function _persistirFechasModulo() {
+  try { sessionStorage.setItem('moduleDates', JSON.stringify(moduleDates)); } catch {}
+}
+
 function aplicarFechaModulo(modulo, usarDefault = false) {
   if (usarDefault || !moduleDates[modulo]) {
     moduleDates[modulo] = sugerirFechaModulo(modulo);
   }
   document.getElementById('fecha').value = moduleDates[modulo];
+  _persistirFechasModulo();
 }
 
 function resetOverride(modulo) {
@@ -1859,10 +1875,6 @@ function validarContadores() {
       return `${row.dataset.nombre}: hay valores menores a la referencia en Entradas, Salidas o Jackpot. Abre "Referencia crítica", ajusta los valores y confirma con la contraseña.`;
     }
 
-    if (usaCritica) {
-      const observacion = row.querySelector('[data-role="critica-observacion"]');
-      if (observacion && !observacion.value.trim()) observacion.value = OBSERVACION_CRITICA_DEFAULT;
-    }
   }
 
   return null;
@@ -1880,9 +1892,6 @@ async function guardarContadores() {
     .filter(row => row.dataset.pausado !== '1')
     .map(row => {
     const usarReferenciaCritica = row.dataset.criticaAutorizada === '1';
-    const observacionCritica = usarReferenciaCritica
-      ? (row.querySelector('[data-role="critica-observacion"]')?.value.trim() || OBSERVACION_CRITICA_DEFAULT)
-      : null;
     const item = {
       item_id: row.dataset.itemId,
       entradas: valorContadorRow(row, 'entradas'),
@@ -1893,8 +1902,9 @@ async function guardarContadores() {
         entradas: valorContadorRow(row, 'critica-entradas'),
         salidas: valorContadorRow(row, 'critica-salidas'),
         jackpot: valorContadorRow(row, 'critica-jackpot'),
-        observacion: observacionCritica,
+        observacion: OBSERVACION_CRITICA_DEFAULT,
       } : null,
+      produccion_pre_reset: usarReferenciaCritica ? (valorContadorRow(row, 'critica-pre-reset') || 0) : 0,
     };
     return item;
   });
@@ -2262,6 +2272,7 @@ async function guardar() {
     } else if (currentModule === 'plataformas') {
       resetOverride('plataformas');
       moduleDates.plataformas = fecha;
+      _persistirFechasModulo();
       document.getElementById('fecha').value = fecha;
       await cargarVistaModulo('plataformas', fecha);
       mostrarMensaje(`✓ ${data.mensaje} — Total plataformas: ${fmt(data.total_plataformas)} — ${data.fecha_hora_registro.slice(0, 10)} ${hora12}`, 'ok');
@@ -2270,6 +2281,7 @@ async function guardar() {
     } else {
       if (adminOverride[currentModule]) resetOverride(currentModule);
       moduleDates[currentModule] = fecha;
+      _persistirFechasModulo();
       document.getElementById('fecha').value = fecha;
       await cargarVistaModulo(currentModule, fecha);
       mostrarMensaje(`✓ ${data.mensaje} — Total ${MODULE_META[currentModule].label.toLowerCase()}: ${fmt(data.total)} — ${data.fecha_hora_registro.slice(0, 10)} ${hora12}`, 'ok');
@@ -2433,6 +2445,7 @@ async function guardarAdmin() {
     enabledModules.forEach(modulo => {
       if (!moduleDates[modulo]) moduleDates[modulo] = sugerirFechaModulo(modulo);
     });
+    _persistirFechasModulo();
     currentModule = enabledModules.includes(currentModule) ? currentModule : defaultModule;
     renderTabs();
     actualizarPaneles();
@@ -2500,16 +2513,23 @@ async function init() {
     defaultModule = settings.default_module || enabledModules[0];
   } catch { /* defaults */ }
 
+  let _savedDates = null;
+  try { _savedDates = JSON.parse(sessionStorage.getItem('moduleDates') || 'null'); } catch {}
+  const _isReload = !!_savedDates;
   moduleDates = {
-    caja: sugerirFechaModulo('caja'),
-    plataformas: sugerirFechaModulo('plataformas'),
-    gastos: sugerirFechaModulo('gastos'),
-    bonos: sugerirFechaModulo('bonos'),
-    prestamos: sugerirFechaModulo('prestamos'),
-    movimientos: sugerirFechaModulo('movimientos'),
-    contadores: sugerirFechaModulo('contadores'),
-    cuadre: sugerirFechaModulo('cuadre'),
+    caja: (_savedDates?.caja) || sugerirFechaModulo('caja'),
+    plataformas: (_savedDates?.plataformas) || sugerirFechaModulo('plataformas'),
+    gastos: (_savedDates?.gastos) || sugerirFechaModulo('gastos'),
+    bonos: (_savedDates?.bonos) || sugerirFechaModulo('bonos'),
+    prestamos: (_savedDates?.prestamos) || sugerirFechaModulo('prestamos'),
+    movimientos: (_savedDates?.movimientos) || sugerirFechaModulo('movimientos'),
+    contadores: (_savedDates?.contadores) || sugerirFechaModulo('contadores'),
+    cuadre: (_savedDates?.cuadre) || sugerirFechaModulo('cuadre'),
   };
+  if (_isReload) {
+    try { cajaDrafts = JSON.parse(sessionStorage.getItem('cajaDrafts') || '{}'); } catch { cajaDrafts = {}; }
+    try { contadoresDrafts = JSON.parse(sessionStorage.getItem('contadoresDrafts') || '{}'); } catch { contadoresDrafts = {}; }
+  }
   const _savedModule = sessionStorage.getItem('lastModule');
   currentModule = (_savedModule && enabledModules.includes(_savedModule))
     ? _savedModule
@@ -2585,6 +2605,7 @@ async function init() {
     if (currentModule === 'caja') guardarDraftCaja(fechaAnterior);
     if (currentModule === 'contadores') guardarDraftContadores(fechaAnterior);
     moduleDates[currentModule] = e.target.value;
+    _persistirFechasModulo();
     if (currentModule !== 'caja') resetOverride(currentModule);
     if (currentModule === 'caja') resetOverride('caja');
     if (currentModule === 'bonos') {
@@ -2677,6 +2698,17 @@ async function init() {
       togglePausaContador(e.target);
     }
   });
+  // Al expandir el panel de crítica en una fila ya guardada con override de admin:
+  // marcar como no-guardada para que la autorización / re-autorización fluya igual que en una entrada nueva.
+  document.getElementById('contadores-body').addEventListener('toggle', e => {
+    if (!e.target.matches('.contador-critica-detalle')) return;
+    if (!e.target.open) return;
+    const row = e.target.closest('tr');
+    if (row && row.dataset.guardado === '1' && adminOverride.contadores) {
+      row.dataset.guardado = '0';
+      recalcularFilaContador(row);
+    }
+  }, true);
   document.getElementById('contadores-body').addEventListener('input', e => {
     if (e.target.matches('.contador-campo, .contador-critica input, .contador-critica textarea')) {
       manejarEventoContadores(e.target);
@@ -2694,12 +2726,37 @@ async function init() {
     }
   }, true);
   document.getElementById('contadores-body').addEventListener('keydown', e => {
+    const ROLES_CRITICA = ['critica-entradas', 'critica-salidas', 'critica-jackpot', 'critica-pre-reset', 'critica-password'];
+
+    // Enter en contraseña: confirmar directamente
     if (e.key === 'Enter' && e.target.matches('[data-role="critica-password"]')) {
       e.preventDefault();
       confirmarReferenciaCritica(e.target.closest('tr'));
       return;
     }
-    if (e.key === 'Enter' && e.target.matches('.contador-campo')) {
+
+    // Tab / Enter dentro del sub-módulo de referencia crítica
+    if ((e.key === 'Tab' || e.key === 'Enter') && ROLES_CRITICA.includes(e.target.dataset.role)) {
+      e.preventDefault();
+      const row = e.target.closest('tr');
+      const critica = row?.querySelector('.contador-critica');
+      if (!critica) return;
+      const orden = ROLES_CRITICA
+        .map(r => critica.querySelector(`[data-role="${r}"]`))
+        .filter(Boolean);
+      const idx = orden.indexOf(e.target);
+      if (idx !== -1 && idx < orden.length - 1) {
+        orden[idx + 1].focus();
+        orden[idx + 1].select?.();
+      } else {
+        // Último campo (contraseña) + Tab → botón Confirmar
+        row.querySelector('.btn-confirmar-critica')?.focus();
+      }
+      return;
+    }
+
+    // Tab / Enter en campos principales (entradas, salidas, jackpot)
+    if ((e.key === 'Enter' || e.key === 'Tab') && e.target.matches('.contador-campo')) {
       e.preventDefault();
       moverSiguienteCampoContador(e.target);
       manejarEventoContadores(e.target);
@@ -2838,7 +2895,7 @@ async function cargarDatosCuadre(fecha) {
     }
 
     cuadreDatos = { ...datos, fecha };
-    renderCuadre(datos, estado.existe && adminOverride.cuadre);
+    renderCuadre(datos);
     contenido.classList.remove('oculto');
   } catch {
     document.getElementById('cuadre-bloqueado-msg').textContent = 'Error al cargar los datos del cuadre.';
@@ -2846,7 +2903,7 @@ async function cargarDatosCuadre(fecha) {
   }
 }
 
-function renderCuadre(datos, esOverride) {
+function renderCuadre(datos) {
   // Período
   const periodo = datos.periodo || [];
   const txtPeriodo = periodo.length > 1

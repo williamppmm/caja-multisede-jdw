@@ -74,6 +74,16 @@ def datos_fecha_plataformas(fecha: str):
     return datos
 
 
+@router.post("/cuadre/guardar", response_model=CuadreRespuesta)
+def guardar_cuadre_pre(entrada: CuadreEntrada):
+    preconds = cuadre_service.verificar_precondiciones(entrada.fecha)
+    if not preconds["ok"]:
+        return CuadreRespuesta(ok=False, mensaje=preconds["mensaje"], fecha=str(entrada.fecha))
+    base = preconds["base_anterior"] if preconds["tiene_base_anterior"] else entrada.base_anterior
+    resultado = cuadre_service.guardar_cuadre(entrada, base)
+    return CuadreRespuesta(**resultado)
+
+
 @router.post("/{modulo}/guardar", response_model=ModuloItemsRespuesta)
 def guardar_modulo_items(modulo: str, entrada: ModuloItemsEntrada):
     if modulo not in {"gastos"}:
@@ -140,16 +150,6 @@ def datos_fecha_cuadre(fecha: str):
     if datos is None:
         raise HTTPException(status_code=404, detail="No hay Cuadre guardado para esa fecha")
     return datos
-
-
-@router.post("/cuadre/guardar", response_model=CuadreRespuesta)
-def guardar_cuadre(entrada: CuadreEntrada):
-    preconds = cuadre_service.verificar_precondiciones(entrada.fecha)
-    if not preconds["ok"]:
-        return CuadreRespuesta(ok=False, mensaje=preconds["mensaje"], fecha=str(entrada.fecha))
-    base = preconds["base_anterior"] if preconds["tiene_base_anterior"] else entrada.base_anterior
-    resultado = cuadre_service.guardar_cuadre(entrada, base)
-    return CuadreRespuesta(**resultado)
 
 
 @router.get("/bonos/fecha/{fecha}/datos")
@@ -312,8 +312,7 @@ def ultima_modulo(modulo: str):
         if ultima_fecha is None:
             return {"fecha": None, "mensaje": "Sin cuadres registrados"}
         return {"fecha": str(ultima_fecha)}
-    year = date.today().year
-    ultima_fecha = excel_service.obtener_ultima_fecha_modulo(modulo, year)
+    ultima_fecha = excel_service.obtener_ultima_fecha_modulo_global(modulo)
     if ultima_fecha is None:
-        return {"fecha": None, "mensaje": "Sin registros este año"}
+        return {"fecha": None, "mensaje": "Sin registros"}
     return {"fecha": str(ultima_fecha)}

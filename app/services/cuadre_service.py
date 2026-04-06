@@ -16,7 +16,7 @@ def obtener_ultima_fecha_cuadre(antes_de: date | None = None) -> date | None:
         if candidata is None:
             continue
         if antes_de is not None and candidata >= antes_de:
-            path = excel_service.get_excel_path(year)
+            path = excel_service._path_modulo("cuadre", year)
             if not path.exists():
                 continue
             with excel_service._abrir_workbook_lectura(path) as wb:

@@ -29,6 +29,7 @@ class ContadorFilaEntrada(BaseModel):
     jackpot: int = 0
     usar_referencia_critica: bool = False
     referencia_critica: ReferenciaCriticaEntrada | None = None
+    produccion_pre_reset: int = 0
 
     @field_validator("item_id")
     @classmethod
@@ -38,7 +39,7 @@ class ContadorFilaEntrada(BaseModel):
             raise ValueError("El identificador del item es obligatorio")
         return texto
 
-    @field_validator("entradas", "salidas", "jackpot")
+    @field_validator("entradas", "salidas", "jackpot", "produccion_pre_reset")
     @classmethod
     def validar_contadores(cls, value: int) -> int:
         if value < 0:

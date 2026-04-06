@@ -6,7 +6,7 @@ from pathlib import Path
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
-from app.config import ENCABEZADOS, HOJA_REGISTROS, get_excel_filename, get_excel_path, normalizar_sede_archivo
+from app.config import ENCABEZADOS, HOJA_REGISTROS, get_consolidado_path, get_excel_path, normalizar_sede_archivo
 from app.services.settings_service import get_settings
 
 
@@ -95,10 +95,20 @@ CONTADORES_HEADERS = [
     "ref_salidas",
     "ref_jackpot",
     "yield_referencia",
+    "produccion_pre_reset",
     "observacion",
     "resultado_monetario",
     "fecha_hora_registro",
 ]
+
+
+def _path_modulo(modulo: str, year: int) -> Path:
+    """Devuelve la ruta del Excel según el módulo.
+    Cuadre va a Consolidado_{sede}_{año}.xlsx; el resto a Contadores_{sede}_{año}.xlsx.
+    """
+    if modulo == "cuadre":
+        return get_consolidado_path(year)
+    return get_excel_path(year)
 
 
 def _abrir_o_crear_workbook(path: Path):
@@ -256,7 +266,7 @@ def _escribir_encabezados(ws, modulo: str):
         widths = {
             "A": 14, "B": 20, "C": 26, "D": 14, "E": 12,
             "F": 12, "G": 12, "H": 14, "I": 12, "J": 12,
-            "K": 12, "L": 14, "M": 30, "N": 18, "O": 22,
+            "K": 12, "L": 14, "M": 18, "N": 30, "O": 18, "P": 22,
         }
     elif modulo == "cuadre":
         widths = {
@@ -411,12 +421,12 @@ def _formatear_filas_recientes_contadores(ws, cantidad_filas: int) -> None:
     start_row = last_row - cantidad_filas + 1
     for row_num in range(start_row, last_row + 1):
         ws.cell(row_num, 1).number_format = "YYYY-MM-DD"   # fecha
-        ws.cell(row_num, 14).number_format = "#,##0"        # resultado_monetario
-        ws.cell(row_num, 15).number_format = "YYYY-MM-DD HH:mm:SS"  # fecha_hora_registro
+        ws.cell(row_num, 15).number_format = "#,##0"        # resultado_monetario
+        ws.cell(row_num, 16).number_format = "YYYY-MM-DD HH:mm:SS"  # fecha_hora_registro
 
 
 def fecha_existe_modulo(modulo: str, fecha: date, year: int) -> bool:
-    path = get_excel_path(year)
+    path = _path_modulo(modulo, year)
     if not path.exists():
         return False
 
@@ -433,7 +443,7 @@ def fecha_existe_modulo(modulo: str, fecha: date, year: int) -> bool:
 
 
 def guardar_filas_modulo(modulo: str, filas: list, year: int, reemplazar_fecha: date | None = None) -> None:
-    path = get_excel_path(year)
+    path = _path_modulo(modulo, year)
     with _bloqueo_escritura(path):
         wb = _abrir_o_crear_workbook(path)
         if reemplazar_fecha is not None:
@@ -489,7 +499,7 @@ def _eliminar_fecha_modulo_en_workbook(wb, modulo: str, fecha: date) -> int:
 
 
 def eliminar_fecha_modulo(modulo: str, fecha: date, year: int) -> int:
-    path = get_excel_path(year)
+    path = _path_modulo(modulo, year)
     if not path.exists():
         return 0
 
@@ -514,7 +524,7 @@ def eliminar_fecha_modulo(modulo: str, fecha: date, year: int) -> int:
 
 
 def obtener_fechas_modulo_año(modulo: str, year: int) -> list[str]:
-    path = get_excel_path(year)
+    path = _path_modulo(modulo, year)
     if not path.exists():
         return []
 
@@ -646,7 +656,7 @@ def obtener_items_modulo_fecha(modulo: str, fecha: date, year: int) -> dict | No
 
 
 def obtener_ultima_fecha_modulo(modulo: str, year: int):
-    path = get_excel_path(year)
+    path = _path_modulo(modulo, year)
     if not path.exists():
         return None
 
@@ -673,6 +683,18 @@ def obtener_ultima_fecha_modulo(modulo: str, year: int):
     return ultima
 
 
+def obtener_ultima_fecha_modulo_global(modulo: str, years_back: int = 5):
+    hoy = date.today()
+    ultima = None
+    for year in range(hoy.year, hoy.year - years_back, -1):
+        candidata = obtener_ultima_fecha_modulo(modulo, year)
+        if candidata is None:
+            continue
+        if ultima is None or candidata > ultima:
+            ultima = candidata
+    return ultima
+
+
 def obtener_datos_contadores_fecha(fecha: date, year: int) -> dict:
     """Devuelve {item_id: {...}} con los valores guardados para la fecha dada."""
     path = get_excel_path(year)
@@ -694,6 +716,7 @@ def obtener_datos_contadores_fecha(fecha: date, year: int) -> dict:
                 "jackpot": data["jackpot"],
                 "yield_actual": data["yield_actual"],
                 "yield_referencia": data["yield_referencia"],
+                "produccion_pre_reset": data["produccion_pre_reset"],
                 "resultado_unidades": data["yield_actual"] - data["yield_referencia"],
                 "resultado_monetario": data["resultado_monetario"],
                 "observacion": data["observacion"],
@@ -775,8 +798,8 @@ def _obtener_paths_excel_sede() -> list[Path]:
 
 def _parsear_fila_contadores(row) -> dict:
     # fecha,item_id,nombre,denom,entradas,salidas,jackpot,yield_actual,
-    # ref_entradas,ref_salidas,ref_jackpot,yield_referencia,observacion,
-    # resultado_monetario,fecha_hora_registro
+    # ref_entradas,ref_salidas,ref_jackpot,yield_referencia,produccion_pre_reset,
+    # observacion,resultado_monetario,fecha_hora_registro
     return {
         "item_id": str(row[1] or "").strip(),
         "entradas": int(row[4] or 0),
@@ -784,12 +807,13 @@ def _parsear_fila_contadores(row) -> dict:
         "jackpot": int(row[6] or 0),
         "yield_actual": int(row[7] or 0),
         "yield_referencia": int(row[11] or 0),
-        "resultado_monetario": float(row[13] or 0),
-        "observacion": str(row[12] or ""),
+        "produccion_pre_reset": int(row[12] or 0),
+        "observacion": str(row[13] or ""),
+        "resultado_monetario": float(row[14] or 0),
         "ref_entradas": int(row[8]) if row[8] is not None else None,
         "ref_salidas": int(row[9]) if row[9] is not None else None,
         "ref_jackpot": int(row[10]) if row[10] is not None else None,
-        "fecha_hora_registro": row[14].isoformat() if isinstance(row[14], datetime) else str(row[14] or ""),
+        "fecha_hora_registro": row[15].isoformat() if isinstance(row[15], datetime) else str(row[15] or ""),
     }
 
 
@@ -1214,7 +1238,7 @@ def _parsear_fila_cuadre(row) -> dict:
 
 
 def obtener_datos_cuadre_fecha(fecha: date, year: int) -> dict | None:
-    path = get_excel_path(year)
+    path = _path_modulo("cuadre", year)
     if not path.exists():
         return None
     with _abrir_workbook_lectura(path) as wb:

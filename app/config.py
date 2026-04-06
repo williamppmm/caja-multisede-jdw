@@ -43,3 +43,15 @@ def get_excel_path(year: int) -> Path:
     settings = get_settings()
     data_dir = Path(settings.get("data_dir") or DATA_DIR)
     return data_dir / get_excel_filename(year, settings.get("sede"))
+
+
+def get_consolidado_filename(year: int, sede: str | None = None) -> str:
+    return f"Consolidado_{normalizar_sede_archivo(sede)}_{year}.xlsx"
+
+
+def get_consolidado_path(year: int) -> Path:
+    from app.services.settings_service import get_settings
+
+    settings = get_settings()
+    data_dir = Path(settings.get("data_dir") or DATA_DIR)
+    return data_dir / get_consolidado_filename(year, settings.get("sede"))
