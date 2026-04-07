@@ -113,20 +113,22 @@ Resultado esperado:
 - la configuración persiste en `settings.json`
 - al reiniciar, la app conserva la configuración guardada
 
-## PG-03 — Archivo anual por sede
+## PG-03 — Archivos anuales por sede
 
 Prioridad: Alta
 
 Pasos:
 
 1. Configurar una sede nueva.
-2. Guardar un registro simple.
-3. Revisar la carpeta configurada.
+2. Guardar un registro operativo (Caja, Contadores, etc.).
+3. Guardar un Cuadre.
+4. Revisar la carpeta configurada.
 
 Resultado esperado:
 
-- se crea el archivo `Contadores_<SEDE>_<AÑO>.xlsx`
-- el archivo corresponde a la sede configurada
+- se crea `Caja_<SEDE>_<AÑO>.xlsx` con los módulos operativos
+- se crea `Consolidado_<SEDE>_<AÑO>.xlsx` con el Cuadre
+- ambos archivos corresponden a la sede configurada
 
 ## PG-04 — Separación entre sedes
 
@@ -520,15 +522,17 @@ Prioridad: Alta
 Pasos:
 
 1. Reducir un valor respecto a la referencia.
-2. Abrir referencia crítica.
-3. Completar nueva referencia.
-4. Confirmar con admin.
-5. Guardar.
+2. Abrir referencia crítica (ícono ⚠ en la fila).
+3. Completar nueva referencia (campos E, S, J).
+4. Si aplica, ingresar producción acumulada antes del reset en campo Pre-reset.
+5. Confirmar con admin.
+6. Guardar.
 
 Resultado esperado:
 
 - la operación se permite
 - la referencia crítica queda embebida en el registro
+- el campo Pre-reset suma correctamente al resultado monetario del ítem
 
 ## CT-05 — Pausar un ítem
 
@@ -556,6 +560,21 @@ Resultado esperado:
 - vuelve a mostrarse como capturable
 
 ## Pruebas de Cuadre
+
+## CQ-00 — Archivo Consolidado
+
+Prioridad: Alta
+
+Pasos:
+
+1. Tener datos completos para una fecha.
+2. Guardar un Cuadre.
+3. Revisar la carpeta configurada.
+
+Resultado esperado:
+
+- existe `Consolidado_<SEDE>_<AÑO>.xlsx` con una hoja Cuadre
+- el archivo operativo `Caja_<SEDE>_<AÑO>.xlsx` no tiene hoja Cuadre
 
 ## CQ-01 — Cuadre sin base previa
 
@@ -674,19 +693,18 @@ Resultado esperado:
 
 ## Pruebas de concurrencia y Dropbox
 
-## DR-01 — Dos ventanas en el mismo equipo
+## DR-01 — Doble clic en el mismo equipo
 
 Prioridad: Alta
 
 Pasos:
 
-1. Abrir dos instancias de la app.
-2. Intentar guardar al mismo tiempo sobre el mismo archivo.
+1. Con la app ya corriendo, hacer doble clic en el `.exe` nuevamente.
 
 Resultado esperado:
 
-- una de las dos debe bloquearse o reintentar
-- no debe quedar corrupción visible
+- no se inicia un segundo servidor
+- el navegador se abre (o se reutiliza la pestaña existente) apuntando a la instancia ya activa
 
 ## DR-02 — Dos equipos de la misma sede
 
@@ -725,14 +743,17 @@ Después de tocar código, ejecutar al menos:
 
 1. PG-01
 2. PG-02
-3. CJ-01
-4. BN-03
-5. PR-04
-6. CT-03
-7. CT-04
-8. CQ-03
-9. CQ-05
-10. EX-01
+3. PG-03
+4. CJ-01
+5. BN-03
+6. PR-04
+7. CT-03
+8. CT-04
+9. CQ-00
+10. CQ-03
+11. CQ-05
+12. DR-01
+13. EX-01
 
 ## Registro de resultados
 

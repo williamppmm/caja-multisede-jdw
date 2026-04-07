@@ -1,5 +1,6 @@
 import os
 import threading
+import time
 
 from fastapi import APIRouter
 
@@ -7,6 +8,37 @@ from app.services import excel_service, settings_service, startup_state_service
 
 router = APIRouter()
 
+# ── Heartbeat ────────────────────────────────────────────────────────────────
+# El navegador envía POST /api/app/heartbeat cada ~30 s.
+# Si no llega ninguno en HEARTBEAT_TIMEOUT segundos, el servidor se apaga solo.
+# Esto cubre el caso en que el usuario cierra el navegador sin usar "Finalizar".
+
+HEARTBEAT_TIMEOUT = 75  # segundos sin heartbeat → apagar
+_last_heartbeat = time.monotonic()
+_heartbeat_started = False
+_heartbeat_lock = threading.Lock()
+
+
+def _watchdog():
+    while True:
+        time.sleep(10)
+        with _heartbeat_lock:
+            elapsed = time.monotonic() - _last_heartbeat
+        if elapsed > HEARTBEAT_TIMEOUT:
+            os._exit(0)
+
+
+def _iniciar_watchdog():
+    global _heartbeat_started
+    with _heartbeat_lock:
+        if _heartbeat_started:
+            return
+        _heartbeat_started = True
+    t = threading.Thread(target=_watchdog, daemon=True)
+    t.start()
+
+
+# ── Rutas ────────────────────────────────────────────────────────────────────
 
 @router.get("/api/settings")
 def get_settings():
@@ -40,6 +72,15 @@ def browse_directory():
     if not selected:
         return {"ok": False, "cancelled": True}
     return {"ok": True, "data_dir": selected}
+
+
+@router.post("/api/app/heartbeat")
+def heartbeat():
+    global _last_heartbeat
+    with _heartbeat_lock:
+        _last_heartbeat = time.monotonic()
+    _iniciar_watchdog()
+    return {"ok": True}
 
 
 @router.post("/api/app/shutdown")

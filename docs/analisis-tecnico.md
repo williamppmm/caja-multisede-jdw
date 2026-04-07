@@ -27,22 +27,23 @@ La aplicación funciona como un sistema local cliente-servidor:
 
 ### Arranque
 
-[launcher.py](C:\Users\User\Desktop\Proyectos\Caja\launcher.py)
+[launcher.py](../launcher.py)
 
 Responsabilidades:
 
-- detectar puerto libre entre 8000 y 8009
-- iniciar el servidor local
-- abrir el navegador automáticamente
+- verificar si ya hay una instancia corriendo en el puerto por defecto
+- si ya existe → abrir navegador y salir (instancia única)
+- si no existe → detectar puerto libre entre 8000 y 8009, iniciar servidor y abrir navegador
 
 Observaciones:
 
 - útil para operación no técnica
 - muy adecuado para distribución como `.exe`
+- el doble-clic accidental no duplica el proceso
 
 ### Aplicación FastAPI
 
-[app/main.py](C:\Users\User\Desktop\Proyectos\Caja\app\main.py)
+[app/main.py](../app/main.py)
 
 Responsabilidades:
 
@@ -53,8 +54,8 @@ Responsabilidades:
 
 ### Configuración y rutas
 
-[app/config.py](C:\Users\User\Desktop\Proyectos\Caja\app\config.py)
-[app/runtime_paths.py](C:\Users\User\Desktop\Proyectos\Caja\app\runtime_paths.py)
+[app/config.py](../app/config.py)
+[app/runtime_paths.py](../app/runtime_paths.py)
 
 Responsabilidades:
 
@@ -73,7 +74,7 @@ Observaciones:
 
 La persistencia principal está en:
 
-[app/services/excel_service.py](C:\Users\User\Desktop\Proyectos\Caja\app\services\excel_service.py)
+[app/services/excel_service.py](../app/services/excel_service.py)
 
 Este servicio:
 
@@ -85,14 +86,11 @@ Este servicio:
 - administra un lock local `.lock`
 - mantiene compatibilidad con algunos formatos legacy
 
-## Diseño del libro
+## Diseño de los libros
 
-Un libro por:
+Dos libros por sede y año:
 
-- sede
-- año
-
-Una hoja por:
+**`Caja_{sede}_{año}.xlsx`** — operativa diaria, una hoja por módulo:
 
 - Caja
 - Plataformas
@@ -101,6 +99,9 @@ Una hoja por:
 - Prestamos
 - Movimientos
 - Contadores
+
+**`Consolidado_{sede}_{año}.xlsx`** — cierre de período:
+
 - Cuadre
 
 Ventajas del diseño:
@@ -124,9 +125,9 @@ Conclusión:
 
 ## Modelos de datos
 
-[app/models/caja_models.py](C:\Users\User\Desktop\Proyectos\Caja\app\models\caja_models.py)
-[app/models/contadores_models.py](C:\Users\User\Desktop\Proyectos\Caja\app\models\contadores_models.py)
-[app/models/cuadre_models.py](C:\Users\User\Desktop\Proyectos\Caja\app\models\cuadre_models.py)
+[app/models/caja_models.py](../app/models/caja_models.py)
+[app/models/contadores_models.py](../app/models/contadores_models.py)
+[app/models/cuadre_models.py](../app/models/cuadre_models.py)
 
 La validación de entrada con Pydantic cubre bien:
 
@@ -142,7 +143,7 @@ Esto le da a la app una base bastante sana del lado backend.
 
 ## Router principal
 
-[app/routers/modules.py](C:\Users\User\Desktop\Proyectos\Caja\app\routers\modules.py)
+[app/routers/modules.py](../app/routers/modules.py)
 
 Agrupa endpoints para:
 
@@ -161,24 +162,26 @@ Observación:
 
 ## Router de settings
 
-[app/routers/settings.py](C:\Users\User\Desktop\Proyectos\Caja\app\routers\settings.py)
+[app/routers/settings.py](../app/routers/settings.py)
 
 Responsabilidades:
 
 - leer settings
 - guardar settings
 - abrir selector de carpeta
-- apagar la app
+- apagar la app (`/api/app/shutdown`)
+- recibir heartbeat del navegador (`/api/app/heartbeat`)
 
 Observación:
 
-- suficiente para una app local de escritorio
+- el heartbeat activa un watchdog: si no llega ninguno en 75 s el proceso termina solo
+- esto cubre el caso de cierre de navegador sin usar el botón Finalizar
 
 ## Servicios por módulo
 
 ## Caja y módulos simples
 
-[app/services/caja_service.py](C:\Users\User\Desktop\Proyectos\Caja\app\services\caja_service.py)
+[app/services/caja_service.py](../app/services/caja_service.py)
 
 Contiene la lógica para:
 
@@ -196,7 +199,7 @@ Fortalezas:
 
 ## Bonos
 
-[app/services/bonos_service.py](C:\Users\User\Desktop\Proyectos\Caja\app\services\bonos_service.py)
+[app/services/bonos_service.py](../app/services/bonos_service.py)
 
 Responsabilidades:
 
@@ -211,7 +214,7 @@ Punto importante:
 
 ## Préstamos
 
-[app/services/prestamos_service.py](C:\Users\User\Desktop\Proyectos\Caja\app\services\prestamos_service.py)
+[app/services/prestamos_service.py](../app/services/prestamos_service.py)
 
 Responsabilidades:
 
@@ -225,7 +228,7 @@ Punto importante:
 
 ## Movimientos
 
-[app/services/movimientos_service.py](C:\Users\User\Desktop\Proyectos\Caja\app\services\movimientos_service.py)
+[app/services/movimientos_service.py](../app/services/movimientos_service.py)
 
 Responsabilidades:
 
@@ -234,7 +237,7 @@ Responsabilidades:
 
 ## Contadores
 
-[app/services/contadores_service.py](C:\Users\User\Desktop\Proyectos\Caja\app\services\contadores_service.py)
+[app/services/contadores_service.py](../app/services/contadores_service.py)
 
 Es el módulo de mayor complejidad.
 
@@ -251,13 +254,14 @@ Lógica central:
 
 - cada ítem tiene una referencia vigente basada en eventos anteriores
 - si el valor actual baja respecto a esa referencia, se bloquea el guardado normal
-- si el usuario tiene admin, puede definir una nueva referencia crítica
+- si el usuario tiene admin, puede definir una nueva referencia crítica con valores de entradas, salidas y jackpot en el punto del reset
+- el campo `produccion_pre_reset` permite registrar la producción monetaria acumulada hasta ese reset técnico, que se suma al resultado del período
 
 Esto convierte el módulo en algo más cercano a control operativo que a mera captura.
 
 ## Cuadre
 
-[app/services/cuadre_service.py](C:\Users\User\Desktop\Proyectos\Caja\app\services\cuadre_service.py)
+[app/services/cuadre_service.py](../app/services/cuadre_service.py)
 
 Responsabilidades:
 
@@ -280,8 +284,8 @@ Riesgo:
 
 ## Frontend
 
-[web/index.html](C:\Users\User\Desktop\Proyectos\Caja\web\index.html)
-[web/app.js](C:\Users\User\Desktop\Proyectos\Caja\web\app.js)
+[web/index.html](../web/index.html)
+[web/app.js](../web/app.js)
 
 ## Estado actual
 

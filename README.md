@@ -2,7 +2,7 @@
 
 Aplicación local para capturar información diaria de caja por sede y guardarla en archivos Excel anuales, pensados tanto como respaldo operativo como fuente para análisis posterior en Excel o Power Query.
 
-La app corre localmente en cada equipo, abre una interfaz web en el navegador y escribe sobre un libro anual por sede dentro de una carpeta compartida, por ejemplo Dropbox.
+La app corre localmente en cada equipo, abre una interfaz web en el navegador y escribe sobre libros Excel anuales por sede dentro de una carpeta compartida, por ejemplo Dropbox.
 
 ## Qué hace
 
@@ -23,11 +23,10 @@ La app corre localmente en cada equipo, abre una interfaz web en el navegador y 
 - cada sede escribe en su propio archivo anual
 - el Excel sigue siendo útil como respaldo, consulta y fuente para Power Query
 
-Ejemplos de archivos:
+Archivos que genera por sede y año:
 
-- `Contadores_Barbacoas_2026.xlsx`
-- `Contadores_Satinga_2026.xlsx`
-- `Contadores_SanJose_2026.xlsx`
+- `Caja_{sede}_{año}.xlsx` — módulos operativos (Caja, Plataformas, Gastos, Bonos, Préstamos, Movimientos, Contadores)
+- `Consolidado_{sede}_{año}.xlsx` — cuadres del período
 
 ## Tecnologías
 
@@ -101,6 +100,8 @@ Características del EXE:
 - abre la interfaz en el navegador
 - no requiere consola visible
 - detecta un puerto libre entre 8000 y 8009
+- instancia única: si ya está corriendo, el segundo clic solo abre el navegador sin iniciar un servidor nuevo
+- se apaga automáticamente si el navegador se cierra (watchdog de 75 s sin heartbeat)
 
 ## Configuración inicial por equipo
 
@@ -152,11 +153,11 @@ Ventajas:
 
 Ejemplo:
 
-| Sede | Archivo |
-|---|---|
-| Barbacoas | `Contadores_Barbacoas_2026.xlsx` |
-| SanJose | `Contadores_SanJose_2026.xlsx` |
-| Satinga | `Contadores_Satinga_2026.xlsx` |
+| Sede | Operativo | Cuadres |
+|---|---|---|
+| Barbacoas | `Caja_Barbacoas_2026.xlsx` | `Consolidado_Barbacoas_2026.xlsx` |
+| SanJose | `Caja_SanJose_2026.xlsx` | `Consolidado_SanJose_2026.xlsx` |
+| Satinga | `Caja_Satinga_2026.xlsx` | `Consolidado_Satinga_2026.xlsx` |
 
 ## Límite importante con Dropbox
 
@@ -176,7 +177,7 @@ Eso significa:
 
 El análisis técnico completo del proyecto quedó separado aquí:
 
-[docs/analisis-tecnico.md](/c:/Users/User/Desktop/Caja/docs/analisis-tecnico.md)
+[docs/analisis-tecnico.md](docs/analisis-tecnico.md)
 
 Ese documento cubre:
 
@@ -197,7 +198,8 @@ prestamos_personas.json
 movimientos_conceptos.json
 contadores_items.json
 startup_state.json
-*.xlsx
+Caja_*.xlsx
+Consolidado_*.xlsx
 ~$*.xlsx
 *.lock
 ```
