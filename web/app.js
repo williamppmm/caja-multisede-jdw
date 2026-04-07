@@ -130,9 +130,28 @@ function mostrarMensaje(texto, tipo) {
 
 function formatFechaVisual(fechaIso) {
   if (!fechaIso) return '--';
-  const [year, month, day] = fechaIso.split('-');
-  if (!year || !month || !day) return fechaIso;
-  return `${day}-${month}`;
+  const match = String(fechaIso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const [, year, month, day] = match;
+    return `${day}-${month}-${year}`;
+  }
+  const matchSlash = String(fechaIso).match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (matchSlash) {
+    const [, day, month, year] = matchSlash;
+    return `${day}-${month}-${year}`;
+  }
+  return fechaIso;
+}
+
+function formatFechaHoraVisual(valor) {
+  if (!valor) return '';
+  const texto = String(valor);
+  const fechaMatch = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!fechaMatch) return texto;
+  const [, year, month, day] = fechaMatch;
+  const fecha = `${day}-${month}-${year}`;
+  const horaMatch = texto.match(/(\d{2}:\d{2}:\d{2})/);
+  return horaMatch ? `${fecha} ${horaMatch[1]}` : fecha;
 }
 
 function formatHoraVisual(dateObj = new Date()) {
@@ -202,7 +221,7 @@ function mostrarBannerAutorizacion({ titulo, descripcion, onSuccess, focusSelect
   pendingAuthContext = { titulo, descripcion };
   pendingAuthFocusSelector = focusSelector;
   pendingAuthAnchorSelector = focusSelector;
-  document.getElementById('auth-card-texto').textContent = `Estás en el día ${document.getElementById('fecha')?.value || ''}`;
+  document.getElementById('auth-card-texto').textContent = `Estás en el día ${formatFechaVisual(document.getElementById('fecha')?.value || '')}`;
   document.getElementById('auth-card-pass').value = '';
   document.getElementById('auth-card-error').classList.add('oculto');
   document.body.classList.add('auth-banner-open');
@@ -254,7 +273,7 @@ function obtenerMensajeAutorizacion(modulo, fecha) {
   const label = MODULE_META[modulo]?.label || modulo;
   return {
     titulo: `Editar ${label.toLowerCase()}`,
-    descripcion: `Estás en el día ${fecha}. Si de verdad requieres editar ${label.toLowerCase()}, ingresa la contraseña.`,
+    descripcion: `Estás en el día ${formatFechaVisual(fecha)}. Si de verdad requieres editar ${label.toLowerCase()}, ingresa la contraseña.`,
   };
 }
 
@@ -369,7 +388,7 @@ function bloquearIntentoEdicion(control, evento = null) {
     focusSelector: obtenerSelectorReanudacion(control),
     onSuccess: async () => {
       setOverride(currentModule, fecha);
-      mostrarBannerActivo(`${MODULE_META[currentModule].label} autorizada para ${fecha}.`);
+      mostrarBannerActivo(`${MODULE_META[currentModule].label} autorizada para ${formatFechaVisual(fecha)}.`);
       await cargarVistaModulo(currentModule, fecha);
       await verificarFechaActual();
       restaurarFocoDespuesAutorizacion();
@@ -568,15 +587,35 @@ function actualizarMovimientosVisuales() {
 }
 
 function renderBonusNames() {
+  const lista = document.getElementById('bonos-clientes-lista');
+  if (!lista) return;
+  lista.innerHTML = bonusNames
+    .map(nombre => `<option value="${String(nombre).replace(/"/g, '&quot;')}"></option>`)
+    .join('');
 }
 
 function renderExpenseConcepts() {
+  const lista = document.getElementById('gastos-conceptos-lista');
+  if (!lista) return;
+  lista.innerHTML = expenseConcepts
+    .map(concepto => `<option value="${String(concepto).replace(/"/g, '&quot;')}"></option>`)
+    .join('');
 }
 
 function renderMovementConcepts() {
+  const lista = document.getElementById('movimientos-conceptos-lista');
+  if (!lista) return;
+  lista.innerHTML = movementConcepts
+    .map(concepto => `<option value="${String(concepto).replace(/"/g, '&quot;')}"></option>`)
+    .join('');
 }
 
 function renderLoanNames() {
+  const lista = document.getElementById('prestamos-personas-lista');
+  if (!lista) return;
+  lista.innerHTML = loanNames
+    .map(nombre => `<option value="${String(nombre).replace(/"/g, '&quot;')}"></option>`)
+    .join('');
 }
 
 async function cargarBonusNames() {
@@ -1643,12 +1682,12 @@ async function verificarFechaActual() {
 
     if (currentModule === 'cuadre') {
       if (data.existe && !isOverrideActive('cuadre', fecha)) {
-        estado.textContent = `El Cuadre de ${fecha} ya existe. Al intentar editar se solicitará contraseña.`;
+        estado.textContent = `El Cuadre de ${formatFechaVisual(fecha)} ya existe. Al intentar editar se solicitará contraseña.`;
         estado.className = 'fecha-estado existe';
         return;
       }
       if (isOverrideActive('cuadre', fecha)) {
-        estado.textContent = `Corrección de Cuadre autorizada para ${fecha}.`;
+        estado.textContent = `Corrección de Cuadre autorizada para ${formatFechaVisual(fecha)}.`;
         estado.className = 'fecha-estado advertencia-fecha';
         return;
       }
@@ -1659,7 +1698,7 @@ async function verificarFechaActual() {
       }
       const dias = data.periodo?.length ?? 1;
       estado.textContent = dias > 1
-        ? `Período: ${data.periodo[0]} → ${fecha} (${dias} días del período)`
+        ? `Período: ${formatFechaVisual(data.periodo[0])} → ${formatFechaVisual(fecha)} (${dias} días del período)`
         : 'Fecha disponible para cuadre.';
       estado.className = 'fecha-estado libre';
       return;
@@ -1675,25 +1714,25 @@ async function verificarFechaActual() {
       }
 
       if (isOverrideActive('plataformas', fecha)) {
-        estado.textContent = `Corrección de plataformas autorizada para ${fecha}.`;
+        estado.textContent = `Corrección de plataformas autorizada para ${formatFechaVisual(fecha)}.`;
         estado.className = 'fecha-estado advertencia-fecha';
         return;
       }
 
-      estado.textContent = `Plataformas en ${fecha} requiere admin. Al intentar editar se solicitará contraseña.`;
+      estado.textContent = `Plataformas en ${formatFechaVisual(fecha)} requiere admin. Al intentar editar se solicitará contraseña.`;
       estado.className = 'fecha-estado existe';
       return;
     }
 
     if (currentModule === 'contadores') {
       if (data.existe && !isOverrideActive('contadores', fecha)) {
-        estado.textContent = `Contadores de ${fecha} ya existen. Al intentar editar se solicitará contraseña.`;
+        estado.textContent = `Contadores de ${formatFechaVisual(fecha)} ya existen. Al intentar editar se solicitará contraseña.`;
         estado.className = 'fecha-estado existe';
         return;
       }
 
       if (isOverrideActive('contadores', fecha)) {
-        estado.textContent = `Corrección de contadores autorizada para ${fecha}.`;
+        estado.textContent = `Corrección de contadores autorizada para ${formatFechaVisual(fecha)}.`;
         estado.className = 'fecha-estado advertencia-fecha';
         return;
       }
@@ -1705,20 +1744,20 @@ async function verificarFechaActual() {
 
     if (currentModule === 'caja') {
       if (data.existe && !isOverrideActive('caja', fecha)) {
-        estado.textContent = `La caja de ${fecha} ya existe. Al intentar editar se solicitará contraseña.`;
+        estado.textContent = `La caja de ${formatFechaVisual(fecha)} ya existe. Al intentar editar se solicitará contraseña.`;
         estado.className = 'fecha-estado existe';
         return;
       }
 
       if (isOverrideActive('caja', fecha)) {
-        estado.textContent = `Corrección de caja autorizada para ${fecha}.`;
+        estado.textContent = `Corrección de caja autorizada para ${formatFechaVisual(fecha)}.`;
         estado.className = 'fecha-estado advertencia-fecha';
         return;
       }
 
       estado.textContent = fecha === hoyStr() || fecha === ayerStr()
         ? 'Fecha disponible.'
-        : `Atención: ${fecha} no es hoy ni ayer. Verifique antes de guardar.`;
+        : `Atención: ${formatFechaVisual(fecha)} no es hoy ni ayer. Verifique antes de guardar.`;
       estado.className = fecha === hoyStr() || fecha === ayerStr() ? 'fecha-estado libre' : 'fecha-estado advertencia-fecha';
       return;
     }
@@ -1732,12 +1771,12 @@ async function verificarFechaActual() {
     }
 
     if (isOverrideActive(currentModule, fecha)) {
-      estado.textContent = `Corrección de ${MODULE_META[currentModule].label.toLowerCase()} autorizada para ${fecha}.`;
+      estado.textContent = `Corrección de ${MODULE_META[currentModule].label.toLowerCase()} autorizada para ${formatFechaVisual(fecha)}.`;
       estado.className = 'fecha-estado advertencia-fecha';
       return;
     }
 
-    estado.textContent = `${MODULE_META[currentModule].label} en ${fecha} requiere admin. Al intentar editar se solicitará contraseña.`;
+    estado.textContent = `${MODULE_META[currentModule].label} en ${formatFechaVisual(fecha)} requiere admin. Al intentar editar se solicitará contraseña.`;
     estado.className = 'fecha-estado existe';
   } catch {
     estado.textContent = '';
@@ -1772,17 +1811,17 @@ async function autorizarModulo() {
   const modulo = currentModule;
   const titulo = modulo === 'caja' ? 'Corrección de caja' : `Corrección de ${MODULE_META[modulo].label.toLowerCase()}`;
   const descripcion = modulo === 'caja'
-    ? `La caja del ${fecha} ya fue registrada. Ingrese la contraseña para corregirla.`
+    ? `La caja del ${formatFechaVisual(fecha)} ya fue registrada. Ingrese la contraseña para corregirla.`
     : modulo === 'contadores'
-      ? `Los contadores del ${fecha} ya fueron registrados. Ingrese la contraseña para corregirlos o aplicar referencias críticas.`
-      : `Ingrese la contraseña para corregir ${MODULE_META[modulo].label.toLowerCase()} del ${fecha}.`;
+      ? `Los contadores del ${formatFechaVisual(fecha)} ya fueron registrados. Ingrese la contraseña para corregirlos o aplicar referencias críticas.`
+      : `Ingrese la contraseña para corregir ${MODULE_META[modulo].label.toLowerCase()} del ${formatFechaVisual(fecha)}.`;
 
   abrirModalAdminAccion({
     titulo,
     descripcion,
     onSuccess: async () => {
       setOverride(modulo, fecha);
-      mostrarBannerActivo(`${titulo} autorizada: ${fecha}`);
+      mostrarBannerActivo(`${titulo} autorizada: ${formatFechaVisual(fecha)}`);
       await cargarVistaModulo(modulo, fecha);
       await verificarFechaActual();
     },
@@ -2470,19 +2509,19 @@ async function guardar() {
       eliminarDraftCaja(fecha);
       limpiarCaja();
       setCajaEditable(false);
-      mostrarMensaje(`✓ ${data.mensaje} — Total caja física: ${fmt(data.total_caja_fisica)} — ${data.fecha_hora_registro.slice(0, 10)} ${hora12}`, 'ok');
+      mostrarMensaje(`✓ ${data.mensaje} — Total caja física: ${fmt(data.total_caja_fisica)} — ${formatFechaHoraVisual(data.fecha_hora_registro) || `${formatFechaVisual(fecha)} ${hora12}`}`, 'ok');
     } else if (currentModule === 'plataformas') {
       setSharedModuleDate(fecha);
       document.getElementById('fecha').value = fecha;
       await cargarVistaModulo('plataformas', fecha);
-      mostrarMensaje(`✓ ${data.mensaje} — Total plataformas: ${fmt(data.total_plataformas)} — ${data.fecha_hora_registro.slice(0, 10)} ${hora12}`, 'ok');
+      mostrarMensaje(`✓ ${data.mensaje} — Total plataformas: ${fmt(data.total_plataformas)} — ${formatFechaHoraVisual(data.fecha_hora_registro) || `${formatFechaVisual(fecha)} ${hora12}`}`, 'ok');
     } else if (currentModule === 'bonos' || currentModule === 'prestamos') {
       return;
     } else {
       setSharedModuleDate(fecha);
       document.getElementById('fecha').value = fecha;
       await cargarVistaModulo(currentModule, fecha);
-      mostrarMensaje(`✓ ${data.mensaje} — Total ${MODULE_META[currentModule].label.toLowerCase()}: ${fmt(data.total)} — ${data.fecha_hora_registro.slice(0, 10)} ${hora12}`, 'ok');
+      mostrarMensaje(`✓ ${data.mensaje} — Total ${MODULE_META[currentModule].label.toLowerCase()}: ${fmt(data.total)} — ${formatFechaHoraVisual(data.fecha_hora_registro) || `${formatFechaVisual(fecha)} ${hora12}`}`, 'ok');
     }
 
     await verificarFechaActual();
@@ -2968,6 +3007,7 @@ async function init() {
   document.getElementById('gasto-concepto').addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
+      autocompletarConceptoGasto();
       document.getElementById('gasto-valor').focus();
       document.getElementById('gasto-valor').select();
     }
@@ -3009,6 +3049,7 @@ async function init() {
   document.getElementById('bono-cliente').addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
+      autocompletarClienteBono();
       document.getElementById('bono-valor').focus();
       document.getElementById('bono-valor').select();
     }
@@ -3016,6 +3057,7 @@ async function init() {
   document.getElementById('prestamo-persona').addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
+      autocompletarPersonaPrestamo();
       actualizarResumenPersonaPrestamo();
       document.getElementById('prestamo-valor').focus();
       document.getElementById('prestamo-valor').select();
@@ -3024,6 +3066,7 @@ async function init() {
   document.getElementById('movimiento-concepto').addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
+      autocompletarConceptoMovimiento();
       document.getElementById('movimiento-valor').focus();
       document.getElementById('movimiento-valor').select();
     }
@@ -3134,7 +3177,7 @@ function renderCuadre(datos) {
   // Período
   const periodo = datos.periodo || [];
   const txtPeriodo = periodo.length > 1
-    ? `Período: ${periodo[0]} → ${periodo[periodo.length - 1]} (${periodo.length} días del período)`
+    ? `Período: ${formatFechaVisual(periodo[0])} → ${formatFechaVisual(periodo[periodo.length - 1])} (${periodo.length} días del período)`
     : periodo.length === 1 ? `Fecha: ${periodo[0]}` : 'Sin días en el período';
   document.getElementById('cuadre-periodo-texto').textContent = txtPeriodo;
 
@@ -3263,7 +3306,7 @@ function renderCuadre(datos) {
 
 function renderCuadreGuardado(datos, fecha, calculado = null) {
   document.getElementById('cuadre-periodo-texto').textContent =
-    `Período: ${datos.fecha_inicio_periodo} → ${fecha} — Guardado: ${datos.fecha_hora_registro}`;
+    `Período: ${formatFechaVisual(datos.fecha_inicio_periodo)} → ${formatFechaVisual(fecha)} — Guardado: ${formatFechaHoraVisual(datos.fecha_hora_registro)}`;
 
   document.getElementById('cuadre-base-display').textContent = fmt(datos.base_anterior);
   document.getElementById('cuadre-base-display').classList.remove('oculto');

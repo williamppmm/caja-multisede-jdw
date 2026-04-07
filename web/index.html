@@ -143,7 +143,8 @@
         <div class="gastos-form">
           <div class="campo-manual gastos-descripcion">
             <label for="gasto-concepto">Descripción</label>
-            <input type="text" id="gasto-concepto" autocomplete="off" placeholder="Descripción del gasto" maxlength="80" />
+            <input type="text" id="gasto-concepto" list="gastos-conceptos-lista" autocomplete="off" placeholder="Descripción del gasto" maxlength="80" />
+            <datalist id="gastos-conceptos-lista"></datalist>
           </div>
           <div class="campo-manual gastos-valor">
             <label for="gasto-valor">Valor</label>
@@ -197,7 +198,8 @@
         <div class="bonos-form">
           <div class="campo-manual bonos-cliente">
             <label for="bono-cliente">Cliente</label>
-            <input type="text" id="bono-cliente" autocomplete="off" placeholder="Nombre del cliente" />
+            <input type="text" id="bono-cliente" list="bonos-clientes-lista" autocomplete="off" placeholder="Nombre del cliente" />
+            <datalist id="bonos-clientes-lista"></datalist>
             <p id="bono-acumulado-hint" class="modulo-ayuda bono-acumulado-hint">Sin bonos previos para este cliente en la fecha actual.</p>
           </div>
           <div class="campo-manual bonos-valor">
@@ -257,7 +259,8 @@
         <div class="bonos-form">
           <div class="campo-manual bonos-cliente">
             <label for="prestamo-persona">Persona</label>
-            <input type="text" id="prestamo-persona" autocomplete="off" placeholder="Nombre de la persona" />
+            <input type="text" id="prestamo-persona" list="prestamos-personas-lista" autocomplete="off" placeholder="Nombre de la persona" />
+            <datalist id="prestamos-personas-lista"></datalist>
             <p id="prestamo-resumen-hint" class="modulo-ayuda bono-acumulado-hint">Sin movimientos previos para esta persona.</p>
           </div>
           <div class="campo-manual bonos-valor">
@@ -326,7 +329,8 @@
         <div class="movimientos-form">
           <div class="campo-manual movimientos-concepto">
             <label for="movimiento-concepto">Concepto</label>
-            <input type="text" id="movimiento-concepto" autocomplete="off" placeholder="Ej: Giro, Consignación, Retiro dueño" maxlength="80" />
+            <input type="text" id="movimiento-concepto" list="movimientos-conceptos-lista" autocomplete="off" placeholder="Ej: Giro, Consignación, Retiro dueño" maxlength="80" />
+            <datalist id="movimientos-conceptos-lista"></datalist>
           </div>
           <div class="campo-manual movimientos-valor">
             <label for="movimiento-valor">Valor</label>

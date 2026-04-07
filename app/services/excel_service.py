@@ -361,8 +361,8 @@ def _formatear_filas_recientes(ws, cantidad_filas: int) -> None:
     start_row = last_row - cantidad_filas + 1
     for row_num in range(start_row, last_row + 1):
         ws.cell(row_num, 7).number_format = "#,##0"
-        ws.cell(row_num, 1).number_format = "YYYY-MM-DD"
-        ws.cell(row_num, 8).number_format = "YYYY-MM-DD HH:mm:SS"
+        ws.cell(row_num, 1).number_format = "DD-MM-YYYY"
+        ws.cell(row_num, 8).number_format = "DD-MM-YYYY HH:mm:SS"
 
 
 def _formatear_filas_recientes_bonos(ws, cantidad_filas: int) -> None:
@@ -371,10 +371,10 @@ def _formatear_filas_recientes_bonos(ws, cantidad_filas: int) -> None:
     last_row = ws.max_row
     start_row = last_row - cantidad_filas + 1
     for row_num in range(start_row, last_row + 1):
-        ws.cell(row_num, 1).number_format = "DD-MM"
+        ws.cell(row_num, 1).number_format = "DD-MM-YYYY"
         ws.cell(row_num, 2).number_format = "HH:mm AM/PM"
         ws.cell(row_num, 4).number_format = "#,##0"
-        ws.cell(row_num, 5).number_format = "YYYY-MM-DD HH:mm:SS"
+        ws.cell(row_num, 5).number_format = "DD-MM-YYYY HH:mm:SS"
 
 
 def _formatear_filas_recientes_prestamos(ws, cantidad_filas: int) -> None:
@@ -383,10 +383,10 @@ def _formatear_filas_recientes_prestamos(ws, cantidad_filas: int) -> None:
     last_row = ws.max_row
     start_row = last_row - cantidad_filas + 1
     for row_num in range(start_row, last_row + 1):
-        ws.cell(row_num, 1).number_format = "DD-MM"
+        ws.cell(row_num, 1).number_format = "DD-MM-YYYY"
         ws.cell(row_num, 2).number_format = "HH:mm AM/PM"
         ws.cell(row_num, 5).number_format = "#,##0"
-        ws.cell(row_num, 6).number_format = "YYYY-MM-DD HH:mm:SS"
+        ws.cell(row_num, 6).number_format = "DD-MM-YYYY HH:mm:SS"
 
 
 def _formatear_filas_recientes_movimientos(ws, cantidad_filas: int) -> None:
@@ -395,10 +395,10 @@ def _formatear_filas_recientes_movimientos(ws, cantidad_filas: int) -> None:
     last_row = ws.max_row
     start_row = last_row - cantidad_filas + 1
     for row_num in range(start_row, last_row + 1):
-        ws.cell(row_num, 1).number_format = "DD-MM"
+        ws.cell(row_num, 1).number_format = "DD-MM-YYYY"
         ws.cell(row_num, 2).number_format = "HH:mm AM/PM"
         ws.cell(row_num, 5).number_format = "#,##0"
-        ws.cell(row_num, 7).number_format = "YYYY-MM-DD HH:mm:SS"
+        ws.cell(row_num, 7).number_format = "DD-MM-YYYY HH:mm:SS"
 
 
 def _formatear_filas_recientes_cuadre(ws, cantidad_filas: int) -> None:
@@ -407,11 +407,11 @@ def _formatear_filas_recientes_cuadre(ws, cantidad_filas: int) -> None:
     last_row = ws.max_row
     start_row = last_row - cantidad_filas + 1
     for row_num in range(start_row, last_row + 1):
-        ws.cell(row_num, 1).number_format = "YYYY-MM-DD"   # fecha
-        ws.cell(row_num, 2).number_format = "YYYY-MM-DD"   # fecha_inicio_periodo
+        ws.cell(row_num, 1).number_format = "DD-MM-YYYY"   # fecha
+        ws.cell(row_num, 2).number_format = "DD-MM-YYYY"   # fecha_inicio_periodo
         for col in range(3, 19):                            # columnas numéricas
             ws.cell(row_num, col).number_format = "#,##0"
-        ws.cell(row_num, 19).number_format = "YYYY-MM-DD HH:mm:SS"  # fecha_hora_registro
+        ws.cell(row_num, 19).number_format = "DD-MM-YYYY HH:mm:SS"  # fecha_hora_registro
 
 
 def _formatear_filas_recientes_contadores(ws, cantidad_filas: int) -> None:
@@ -420,9 +420,9 @@ def _formatear_filas_recientes_contadores(ws, cantidad_filas: int) -> None:
     last_row = ws.max_row
     start_row = last_row - cantidad_filas + 1
     for row_num in range(start_row, last_row + 1):
-        ws.cell(row_num, 1).number_format = "YYYY-MM-DD"   # fecha
+        ws.cell(row_num, 1).number_format = "DD-MM-YYYY"   # fecha
         ws.cell(row_num, 15).number_format = "#,##0"        # resultado_monetario
-        ws.cell(row_num, 16).number_format = "YYYY-MM-DD HH:mm:SS"  # fecha_hora_registro
+        ws.cell(row_num, 16).number_format = "DD-MM-YYYY HH:mm:SS"  # fecha_hora_registro
 
 
 def fecha_existe_modulo(modulo: str, fecha: date, year: int) -> bool:
@@ -857,7 +857,7 @@ def _leer_movimientos_prestamos_desde_hoja(ws) -> list[dict]:
         registros.append({
             "sheet_row": idx,
             "fecha": cell_date.isoformat(),
-            "fecha_display": cell_date.strftime("%d-%m"),
+            "fecha_display": cell_date.strftime("%d-%m-%Y"),
             "hora_display": hora_texto,
             "persona": persona,
             "tipo_movimiento": "pago" if tipo == "pago" else "prestamo",
@@ -982,7 +982,7 @@ def obtener_bonos_fecha(fecha: date, year: int) -> list[dict]:
                 registros.append({
                     "sheet_row": idx,
                     "fecha": cell_date.isoformat(),
-                    "fecha_display": cell_date.strftime("%d-%m"),
+                    "fecha_display": cell_date.strftime("%d-%m-%Y"),
                     "hora_display": hora_texto,
                     "cliente": str(row[2] or ""),
                     "valor": valor,
@@ -1035,7 +1035,7 @@ def obtener_movimientos_fecha(fecha: date, year: int) -> list[dict]:
                 registros.append({
                     "sheet_row": idx,
                     "fecha": cell_date.isoformat(),
-                    "fecha_display": cell_date.strftime("%d-%m"),
+                    "fecha_display": cell_date.strftime("%d-%m-%Y"),
                     "hora_display": hora_texto,
                     "tipo_movimiento": str(row[2] or "").strip().lower() or "salida",
                     "concepto": str(row[3] or "").strip(),
