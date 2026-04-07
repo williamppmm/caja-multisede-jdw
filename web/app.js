@@ -901,10 +901,8 @@ function limpiarFormularioGastos() {
 function limpiarFormularioMovimientos() {
   const concepto = document.getElementById('movimiento-concepto');
   const valor = document.getElementById('movimiento-valor');
-  const observacion = document.getElementById('movimiento-observacion');
   if (concepto) concepto.value = '';
   if (valor) valor.value = '';
-  if (observacion) observacion.value = '';
 }
 
 function actualizarAccionesBonos() {
@@ -1052,6 +1050,15 @@ function obtenerTipoMovimientoSeleccionado() {
   return document.querySelector('input[name="movimiento-tipo"]:checked')?.value || 'salida';
 }
 
+function enfocarYSeleccionarPorId(id, seleccionar = false) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  requestAnimationFrame(() => {
+    el.focus();
+    if (seleccionar && typeof el.select === 'function') el.select();
+  });
+}
+
 function renderBonosRegistros(items = [], total = 0) {
   const tbody = document.getElementById('bonos-registros-body');
   bonusDayItems = Array.isArray(items) ? [...items] : [];
@@ -1120,7 +1127,7 @@ function renderMovimientosRegistros(items = [], resumen = {}) {
   if (!tbody) return;
   tbody.innerHTML = '';
   if (!movementItems.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
   } else {
     movementItems.forEach(item => {
       const tr = document.createElement('tr');
@@ -1130,7 +1137,6 @@ function renderMovimientosRegistros(items = [], resumen = {}) {
         <td>${item.tipo_movimiento === 'ingreso' ? 'Ingreso' : 'Salida'}</td>
         <td>${item.concepto || ''}</td>
         <td>${fmt(item.valor || 0)}</td>
-        <td>${item.observacion || ''}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -1208,11 +1214,9 @@ function validarPrestamo() {
 
 function validarMovimiento() {
   const concepto = document.getElementById('movimiento-concepto').value.trim();
-  const observacion = document.getElementById('movimiento-observacion').value.trim();
   const valor = parseNumeroInput('movimiento-valor');
   if (!concepto) return 'Debes ingresar el concepto del movimiento.';
   if (esTextoSoloNumeros(concepto)) return 'El concepto del movimiento no puede ser solo números.';
-  if (observacion && esTextoSoloNumeros(observacion)) return 'La observación no puede contener solo números.';
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de movimiento mayor que cero.';
   return null;
 }
@@ -1795,12 +1799,11 @@ async function registrarMovimiento() {
   const tipo_movimiento = obtenerTipoMovimientoSeleccionado();
   const concepto = document.getElementById('movimiento-concepto').value.trim();
   const valor = parseNumeroInput('movimiento-valor');
-  const observacion = document.getElementById('movimiento-observacion').value.trim();
 
   const res = await fetch('/api/modulos/movimientos/registrar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, tipo_movimiento, concepto, valor, observacion, forzar: isOverrideActive('movimientos', fecha) }),
+    body: JSON.stringify({ fecha, tipo_movimiento, concepto, valor, observacion: '', forzar: isOverrideActive('movimientos', fecha) }),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -2608,12 +2611,6 @@ async function init() {
     el.addEventListener('input', () => formatearInputNumerico(el, allowNegative));
     el.addEventListener('focus', () => limpiarFormatoInputNumerico(el, allowNegative));
     el.addEventListener('blur', () => formatearInputNumerico(el, allowNegative));
-    el.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        document.getElementById('btn-guardar').focus();
-      }
-    });
   });
 
   document.getElementById('fecha').addEventListener('change', e => {
@@ -2792,6 +2789,34 @@ async function init() {
       document.getElementById('gasto-valor').select();
     }
   });
+  document.getElementById('venta_practisistemas').addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+      const siguiente = document.getElementById('venta_deportivas');
+      if (siguiente) {
+        if (e.key === 'Enter') {
+          setTimeout(() => {
+            siguiente.focus();
+            if (typeof siguiente.select === 'function') siguiente.select();
+          }, 0);
+        } else {
+          siguiente.focus();
+          if (typeof siguiente.select === 'function') siguiente.select();
+        }
+      }
+    }
+  }, true);
+  document.getElementById('venta_deportivas').addEventListener('keydown', e => {
+    if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+      const guardarBtn = document.getElementById('btn-guardar');
+      if (guardarBtn) guardarBtn.focus();
+    }
+  }, true);
   document.getElementById('gasto-valor').addEventListener('keydown', e => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -2838,13 +2863,6 @@ async function init() {
       document.getElementById('btn-movimiento-registrar').focus();
     } else if (e.key === 'Tab' && !e.shiftKey) {
       e.preventDefault();
-      document.getElementById('movimiento-observacion').focus();
-      document.getElementById('movimiento-observacion').select();
-    }
-  });
-  document.getElementById('movimiento-observacion').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
       document.getElementById('btn-movimiento-registrar').focus();
     }
   });
@@ -2880,9 +2898,14 @@ async function cargarDatosCuadre(fecha) {
 
     // Ya guardado y sin override → vista de solo lectura
     if (estado.existe && !isOverrideActive('cuadre', fecha)) {
-      const datosRes = await fetch(`/api/modulos/cuadre/fecha/${fecha}/datos`);
+      const [datosRes, calcRes] = await Promise.all([
+        fetch(`/api/modulos/cuadre/fecha/${fecha}/datos`),
+        fetch(`/api/modulos/cuadre/calcular/${fecha}`),
+      ]);
       if (datosRes.ok) {
-        renderCuadreGuardado(await datosRes.json(), fecha);
+        const guardado = await datosRes.json();
+        const calculado = calcRes.ok ? await calcRes.json() : null;
+        renderCuadreGuardado(guardado, fecha, calculado);
         contenido.classList.remove('oculto');
         return;
       }
@@ -3044,7 +3067,7 @@ function renderCuadre(datos) {
   document.getElementById('cuadre-guardado-info').classList.add('oculto');
 }
 
-function renderCuadreGuardado(datos, fecha) {
+function renderCuadreGuardado(datos, fecha, calculado = null) {
   document.getElementById('cuadre-periodo-texto').textContent =
     `Período: ${datos.fecha_inicio_periodo} → ${fecha} — Guardado: ${datos.fecha_hora_registro}`;
 
@@ -3052,39 +3075,108 @@ function renderCuadreGuardado(datos, fecha) {
   document.getElementById('cuadre-base-display').classList.remove('oculto');
   document.getElementById('cuadre-base-input-wrap').classList.add('oculto');
 
-  // Secciones simplificadas con totales guardados
-  document.getElementById('cuadre-contadores-body').innerHTML =
-    `<tr><td colspan="4" class="bonos-vacio cuadre-resumen-guardado">Total: ${fmt(datos.total_contadores)}</td></tr>`;
+  // Contadores — detalle por ítem si hay datos calculados
+  const contBody = document.getElementById('cuadre-contadores-body');
+  const contItems = calculado?.contadores?.items || [];
+  if (contItems.length) {
+    contBody.innerHTML = '';
+    contItems.forEach((item, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${idx + 1}</td><td>${item.nombre}</td><td>${item.yield_actual}</td><td>${fmt(item.resultado)}</td>`;
+      contBody.appendChild(tr);
+    });
+  } else {
+    contBody.innerHTML = `<tr><td colspan="4" class="bonos-vacio cuadre-resumen-guardado">Total: ${fmt(datos.total_contadores)}</td></tr>`;
+  }
   document.getElementById('cuadre-contadores-total').textContent = fmt(datos.total_contadores);
 
-  document.getElementById('cuadre-bonos-body').innerHTML =
-    `<tr><td colspan="2" class="bonos-vacio cuadre-resumen-guardado">Total: ${fmt(datos.total_bonos)}</td></tr>`;
+  // Bonos — top 5 si hay datos calculados
+  const bonosBody = document.getElementById('cuadre-bonos-body');
+  const top5 = calculado?.bonos?.top5 || [];
+  if (top5.length) {
+    bonosBody.innerHTML = '';
+    top5.forEach(b => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${b.cliente}</td><td>${fmt(b.total)}</td>`;
+      bonosBody.appendChild(tr);
+    });
+  } else {
+    bonosBody.innerHTML = `<tr><td colspan="2" class="bonos-vacio cuadre-resumen-guardado">Total: ${fmt(datos.total_bonos)}</td></tr>`;
+  }
   document.getElementById('cuadre-bonos-total').textContent = fmt(datos.total_bonos);
 
+  // Plataformas — desde datos guardados (son totales simples)
   document.getElementById('cuadre-plataformas-practi').textContent = fmt(datos.total_practisistemas);
   const cuadrePlatDeport = document.getElementById('cuadre-plataformas-deport');
   cuadrePlatDeport.textContent = fmt(datos.total_deportivas);
   cuadrePlatDeport.className = 'resumen-valor' + (datos.total_deportivas < 0 ? ' cuadre-negativo' : '');
   document.getElementById('cuadre-plataformas-total').textContent = fmt((datos.total_practisistemas || 0) + (datos.total_deportivas || 0));
 
-  document.getElementById('cuadre-gastos-body').innerHTML =
-    `<tr><td colspan="2" class="bonos-vacio cuadre-resumen-guardado">Total: ${fmt(datos.total_gastos)}</td></tr>`;
+  // Gastos — detalle por concepto si hay datos calculados
+  const gastosBody = document.getElementById('cuadre-gastos-body');
+  const gastos = calculado?.gastos?.items || [];
+  if (gastos.length) {
+    gastosBody.innerHTML = '';
+    gastos.forEach(g => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${g.concepto}</td><td>${fmt(g.valor)}</td>`;
+      gastosBody.appendChild(tr);
+    });
+  } else {
+    gastosBody.innerHTML = `<tr><td colspan="2" class="bonos-vacio cuadre-resumen-guardado">Total: ${fmt(datos.total_gastos)}</td></tr>`;
+  }
   document.getElementById('cuadre-gastos-total').textContent = fmt(datos.total_gastos);
 
+  // Préstamos — totales desde guardados, detalle por persona si hay calculados
   document.getElementById('cuadre-prestamos-salida').textContent = fmt(datos.total_prestamos_salida);
   document.getElementById('cuadre-prestamos-entrada').textContent = fmt(datos.total_prestamos_entrada);
-  document.getElementById('cuadre-prestamos-neto').textContent = fmt(datos.neto_prestamos);
-  document.getElementById('cuadre-prestamos-detalle-wrap').classList.add('oculto');
+  const netoPrestEl = document.getElementById('cuadre-prestamos-neto');
+  netoPrestEl.textContent = fmt(datos.neto_prestamos);
+  netoPrestEl.className = 'resumen-valor ' + (datos.neto_prestamos >= 0 ? 'cuadre-positivo' : 'cuadre-negativo');
+  const resumenPrest = calculado?.prestamos?.resumen || [];
+  const prestBody = document.getElementById('cuadre-prestamos-body');
+  const prestDetWrap = document.getElementById('cuadre-prestamos-detalle-wrap');
+  prestBody.innerHTML = '';
+  if (resumenPrest.length) {
+    resumenPrest.forEach(p => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${p.persona}</td><td>${fmt(p.prestamos)}</td><td>${fmt(p.pagos)}</td><td>${fmt(p.neto)}</td>`;
+      prestBody.appendChild(tr);
+    });
+    prestDetWrap.classList.remove('oculto');
+  } else {
+    prestDetWrap.classList.add('oculto');
+  }
 
+  // Movimientos — desde datos guardados
   document.getElementById('cuadre-mov-ingresos').textContent = fmt(datos.total_mov_ingresos);
   document.getElementById('cuadre-mov-salidas').textContent = fmt(datos.total_mov_salidas);
-  document.getElementById('cuadre-mov-neto').textContent = fmt(datos.neto_movimientos ?? 0);
+  const netoMovEl = document.getElementById('cuadre-mov-neto');
+  netoMovEl.textContent = fmt(datos.neto_movimientos ?? 0);
+  netoMovEl.className = 'resumen-valor ' + ((datos.neto_movimientos ?? 0) >= 0 ? 'cuadre-positivo' : 'cuadre-negativo');
 
-  document.getElementById('cuadre-caja-body').innerHTML = '';
-  document.getElementById('cuadre-caja-monedas').textContent = '';
-  document.getElementById('cuadre-caja-viejos').textContent = '';
+  // Caja física — desglose de billetes si hay datos calculados
+  const cajaBody = document.getElementById('cuadre-caja-body');
+  cajaBody.innerHTML = '';
+  const desg = calculado?.caja_desglose || {};
+  if (desg.billetes) {
+    const billetes = desg.billetes;
+    [100000, 50000, 20000, 10000, 5000, 2000].forEach(d => {
+      const b = billetes[String(d)];
+      if (!b || b.subtotal === 0) return;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>$ ${d.toLocaleString('es-CO')}</td><td>${fmt(b.subtotal)}</td>`;
+      cajaBody.appendChild(tr);
+    });
+    document.getElementById('cuadre-caja-monedas').textContent = fmt(desg.total_monedas ?? 0);
+    document.getElementById('cuadre-caja-viejos').textContent = fmt(desg.billetes_viejos ?? 0);
+  } else {
+    document.getElementById('cuadre-caja-monedas').textContent = '';
+    document.getElementById('cuadre-caja-viejos').textContent = '';
+  }
   document.getElementById('cuadre-caja-total').textContent = fmt(datos.caja_fisica);
 
+  // Balance — siempre desde datos guardados (fuente de verdad del cuadre)
   document.getElementById('cuadre-balance-base').textContent = fmt(datos.base_anterior);
   document.getElementById('cuadre-teorica').textContent = fmt(datos.caja_teorica);
   document.getElementById('cuadre-fisica').textContent = fmt(datos.caja_fisica);

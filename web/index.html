@@ -33,7 +33,7 @@
       <div id="modulo-tabs" class="tabs-modulo"></div>
     </section>
 
-    <section id="panel-caja" class="modulo-panel">
+    <section id="panel-caja" class="modulo-panel modulo-panel-dos-columnas">
       <section class="card">
         <h2>Billetes</h2>
         <p class="modulo-ayuda">Registra el efectivo en caja al final del día, ingresa la cantidad de cada denominación.</p>
@@ -56,20 +56,22 @@
       </section>
 
       <section class="card">
-        <h2>Otros valores</h2>
-        <div class="grid-manuales">
-          <div class="campo-manual">
-            <label for="total_monedas">Total monedas</label>
-            <input type="text" inputmode="numeric" id="total_monedas" placeholder="0" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" />
+        <details open id="caja-otros-detalle">
+          <summary>Otros valores</summary>
+          <div class="grid-manuales" style="margin-top:12px">
+            <div class="campo-manual">
+              <label for="total_monedas">Total monedas</label>
+              <input type="text" inputmode="numeric" id="total_monedas" placeholder="0" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" />
+            </div>
+            <div class="campo-manual">
+              <label for="billetes_viejos">Billetes viejos</label>
+              <input type="text" inputmode="numeric" id="billetes_viejos" placeholder="0" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" />
+            </div>
           </div>
-          <div class="campo-manual">
-            <label for="billetes_viejos">Billetes viejos</label>
-            <input type="text" inputmode="numeric" id="billetes_viejos" placeholder="0" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" />
-          </div>
-        </div>
+        </details>
       </section>
 
-      <section class="card card-resumen">
+      <section class="card card-resumen modulo-span-2">
         <h2>Resumen Caja</h2>
         <div class="resumen-grid">
           <div class="resumen-item">
@@ -92,7 +94,7 @@
       </section>
     </section>
 
-    <section id="panel-plataformas" class="modulo-panel oculto">
+    <section id="panel-plataformas" class="modulo-panel modulo-panel-dos-columnas oculto">
       <section class="card">
         <h2>Ventas del día</h2>
         <p class="modulo-ayuda">Registra las ventas de Practisistemas y Deportivas al final del día.</p>
@@ -108,26 +110,28 @@
         </div>
       </section>
 
-      <section class="card card-resumen">
-        <h2>Resumen</h2>
-        <div class="resumen-grid resumen-grid-simple">
-          <div class="resumen-item">
-            <span class="resumen-label">Venta Practisistemas</span>
-            <span id="resumen-practisistemas" class="resumen-valor">$ 0</span>
+      <section class="card">
+        <details id="plataformas-detalle-dia" open>
+          <summary tabindex="-1">Resumen</summary>
+          <div class="resumen-grid resumen-grid-simple" style="margin-top:12px">
+            <div class="resumen-item">
+              <span class="resumen-label">Practisistemas</span>
+              <span id="resumen-practisistemas" class="resumen-valor">$ 0</span>
+            </div>
+            <div class="resumen-item" id="resumen-deportivas-item">
+              <span class="resumen-label">Deportivas</span>
+              <span id="resumen-deportivas" class="resumen-valor">$ 0</span>
+            </div>
+            <div class="resumen-item resumen-total">
+              <span class="resumen-label">TOTAL PLATAFORMAS</span>
+              <span id="resumen-plataformas-total" class="resumen-valor">$ 0</span>
+            </div>
           </div>
-          <div class="resumen-item">
-            <span class="resumen-label">Venta Deportivas</span>
-            <span id="resumen-deportivas" class="resumen-valor">$ 0</span>
-          </div>
-          <div class="resumen-item resumen-total">
-            <span class="resumen-label">TOTAL PLATAFORMAS</span>
-            <span id="resumen-plataformas-total" class="resumen-valor">$ 0</span>
-          </div>
-        </div>
+        </details>
       </section>
     </section>
 
-    <section id="panel-gastos" class="modulo-panel oculto">
+    <section id="panel-gastos" class="modulo-panel modulo-panel-dos-columnas oculto">
       <section class="card">
         <h2>Gastos del día</h2>
         <p class="modulo-ayuda">Registra los gastos del día. Para corregir otro día contacta al admin.</p>
@@ -150,7 +154,7 @@
         </div>
       </section>
       <section class="card">
-        <details id="gastos-detalle-dia" open>
+        <details id="gastos-detalle-dia">
           <summary>Registros del día</summary>
           <div class="bonos-listado-wrap">
             <table class="bonos-tabla">
@@ -171,7 +175,7 @@
       </section>
     </section>
 
-    <section id="panel-bonos" class="modulo-panel oculto">
+    <section id="panel-bonos" class="modulo-panel modulo-panel-dos-columnas oculto">
       <section class="card">
         <h2>Bonos del día</h2>
         <p class="modulo-ayuda">Cada bono se registra de inmediato. Si requiere corregir contacte al admin.</p>
@@ -207,7 +211,7 @@
         </div>
       </section>
       <section class="card">
-        <details id="bonos-detalle-dia" open>
+        <details id="bonos-detalle-dia">
           <summary>Registros del día</summary>
           <div class="bonos-listado-wrap">
             <table class="bonos-tabla">
@@ -231,7 +235,7 @@
       </section>
     </section>
 
-    <section id="panel-prestamos" class="modulo-panel oculto">
+    <section id="panel-prestamos" class="modulo-panel modulo-panel-dos-columnas oculto">
       <section class="card">
         <h2>Préstamos y pagos</h2>
         <p class="modulo-ayuda">Registra préstamos o pagos. Recuerda seleccionar si es préstamo o pago.</p>
@@ -262,20 +266,20 @@
         <div class="resumen-grid resumen-grid-simple">
           <div class="resumen-item">
             <span class="resumen-label">Total prestado</span>
-            <span id="total-prestado">$ 0</span>
+            <span id="total-prestado" class="resumen-valor">$ 0</span>
           </div>
           <div class="resumen-item">
             <span class="resumen-label">Total pagado</span>
-            <span id="total-pagado">$ 0</span>
+            <span id="total-pagado" class="resumen-valor">$ 0</span>
           </div>
           <div class="resumen-item resumen-total">
             <span class="resumen-label">Saldo pendiente</span>
-            <span id="saldo-prestamos">$ 0</span>
+            <span id="saldo-prestamos" class="resumen-valor">$ 0</span>
           </div>
         </div>
       </section>
       <section class="card">
-        <details id="prestamos-detalle-dia" open>
+        <details id="prestamos-detalle-dia">
           <summary>Historial de movimientos</summary>
           <div class="bonos-listado-wrap">
             <table class="bonos-tabla">
@@ -300,7 +304,7 @@
       </section>
     </section>
 
-    <section id="panel-movimientos" class="modulo-panel oculto">
+    <section id="panel-movimientos" class="modulo-panel modulo-panel-dos-columnas oculto">
       <section class="card">
         <h2>Movimientos</h2>
         <p class="modulo-ayuda">Registra ingresos y salidas de caja. Salidas en efectivo, consignaciones, giros o transferencias de Nequi.</p>
@@ -323,10 +327,6 @@
             <label for="movimiento-valor">Valor</label>
             <input type="text" inputmode="numeric" id="movimiento-valor" placeholder="0" />
           </div>
-          <div class="campo-manual movimientos-observacion">
-            <label for="movimiento-observacion">Observación</label>
-            <input type="text" id="movimiento-observacion" placeholder="Opcional" maxlength="120" />
-          </div>
         </div>
         <div class="bonos-acciones">
           <button id="btn-movimiento-registrar" class="btn btn-primary" type="button">Registrar</button>
@@ -334,20 +334,20 @@
         <div class="resumen-grid resumen-grid-simple resumen-movimientos">
           <div class="resumen-item">
             <span class="resumen-label">Total ingresos</span>
-            <span id="total-movimientos-ingresos">$ 0</span>
+            <span id="total-movimientos-ingresos" class="resumen-valor">$ 0</span>
           </div>
           <div class="resumen-item">
             <span class="resumen-label">Total salidas</span>
-            <span id="total-movimientos-salidas">$ 0</span>
+            <span id="total-movimientos-salidas" class="resumen-valor">$ 0</span>
           </div>
           <div class="resumen-item resumen-total">
             <span class="resumen-label">Neto del día</span>
-            <span id="total-movimientos-neto">$ 0</span>
+            <span id="total-movimientos-neto" class="resumen-valor">$ 0</span>
           </div>
         </div>
       </section>
       <section class="card">
-        <details id="movimientos-detalle-dia" open>
+        <details id="movimientos-detalle-dia">
           <summary>Registros del día</summary>
           <div class="bonos-listado-wrap">
             <table class="bonos-tabla">
@@ -358,12 +358,11 @@
                   <th>Tipo</th>
                   <th>Concepto</th>
                   <th>Valor</th>
-                  <th>Observación</th>
                 </tr>
               </thead>
               <tbody id="movimientos-registros-body">
                 <tr>
-                  <td colspan="6" class="bonos-vacio">Sin registros para esta fecha.</td>
+                  <td colspan="5" class="bonos-vacio">Sin registros para esta fecha.</td>
                 </tr>
               </tbody>
             </table>
@@ -413,12 +412,12 @@
         <p id="cuadre-bloqueado-msg" class="cuadre-msg-error"></p>
       </div>
 
-      <div id="cuadre-contenido" class="oculto">
-        <div class="card cuadre-periodo-card">
+      <div id="cuadre-contenido" class="oculto cuadre-grid">
+        <div class="card cuadre-periodo-card modulo-span-2">
           <span id="cuadre-periodo-texto" class="cuadre-periodo-texto"></span>
         </div>
 
-        <section class="card">
+        <section class="card modulo-span-2">
           <h2>Base anterior</h2>
           <div class="cuadre-base-row">
             <span id="cuadre-base-display" class="cuadre-base-valor"></span>
@@ -429,7 +428,7 @@
           </div>
         </section>
 
-        <section class="card">
+        <section class="card modulo-span-2">
           <div class="cuadre-seccion-header">
             <h2>Contadores</h2>
             <span id="cuadre-contadores-total" class="cuadre-total-badge"></span>
@@ -437,7 +436,7 @@
           <div class="bonos-listado-wrap">
             <table class="bonos-tabla">
               <thead>
-                <tr><th>#</th><th>Ítem</th><th>Yield actual</th><th>Resultado</th></tr>
+                <tr><th>#</th><th>Ítem</th><th>Yield</th><th>Resultado</th></tr>
               </thead>
               <tbody id="cuadre-contadores-body"></tbody>
             </table>
@@ -535,7 +534,7 @@
           </div>
         </section>
 
-        <section class="card">
+        <section class="card modulo-span-2">
           <h2>Caja física</h2>
           <div class="bonos-listado-wrap">
             <table class="bonos-tabla">
@@ -559,7 +558,7 @@
           </div>
         </section>
 
-        <section class="card card-resumen cuadre-balance-card">
+        <section class="card card-resumen cuadre-balance-card modulo-span-2">
           <h2>Balance del período</h2>
           <div class="resumen-grid">
             <div class="resumen-item">

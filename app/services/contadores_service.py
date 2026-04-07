@@ -114,7 +114,8 @@ def _construir_eventos_por_item(fecha_actual: date, catalogo: list[dict] | None 
 
 def obtener_referencia_vigente(item_id: str, fecha_actual: date, eventos_por_item: dict[str, list[dict]] | None = None) -> dict | None:
     eventos = eventos_por_item.get(item_id, []) if eventos_por_item is not None else _iter_referencias_previas(item_id, fecha_actual)
-    if not eventos:
+    registros = [evento for evento in eventos if evento.get("tipo") == "registro"]
+    if not registros:
         startup_date = startup_state_service.get_startup_date()
         startup_ref = startup_state_service.get_startup_reference(item_id)
         if startup_date is not None and startup_ref and startup_date <= fecha_actual:
@@ -132,7 +133,7 @@ def obtener_referencia_vigente(item_id: str, fecha_actual: date, eventos_por_ite
                 "observacion": "referencia inicial",
             }
         return None
-    return eventos[-1]
+    return registros[-1]
 
 
 def obtener_ultimo_registro_real(item_id: str, fecha_actual: date, eventos_por_item: dict[str, list[dict]] | None = None) -> dict | None:
@@ -152,9 +153,21 @@ def construir_base_fecha(fecha: date) -> dict:
     fecha_hora_registro = ""
 
     for item in catalogo:
-        ref = obtener_referencia_vigente(item["item_id"], fecha, eventos_por_item)
         ultimo_registro = obtener_ultimo_registro_real(item["item_id"], fecha, eventos_por_item)
         guardado = guardados.get(item["item_id"], {})
+        ref = obtener_referencia_vigente(item["item_id"], fecha, eventos_por_item)
+
+        if guardado.get("ref_entradas") is not None:
+            ref = {
+                "tipo": "referencia_critica",
+                "fecha": str(fecha),
+                "entradas": int(guardado.get("ref_entradas") or 0),
+                "salidas": int(guardado.get("ref_salidas") or 0),
+                "jackpot": int(guardado.get("ref_jackpot") or 0),
+                "yield": int(guardado.get("yield_referencia") or 0),
+                "observacion": guardado.get("observacion", ""),
+            }
+
         actual_entradas = int(guardado.get("entradas", 0))
         actual_salidas = int(guardado.get("salidas", 0))
         actual_jackpot = int(guardado.get(
