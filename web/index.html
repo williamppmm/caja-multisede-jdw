@@ -24,7 +24,7 @@
       </div>
     </div>
 
-    <section class="card">
+    <section class="card card-contexto card-fecha">
       <h2>Fecha</h2>
       <div class="fecha-row">
         <label for="fecha" id="fecha-label">Fecha del módulo</label>
@@ -33,13 +33,13 @@
       </div>
     </section>
 
-    <section class="card">
+    <section class="card card-contexto card-modulos">
       <h2>Módulos</h2>
       <div id="modulo-tabs" class="tabs-modulo"></div>
     </section>
 
     <section id="panel-caja" class="modulo-panel modulo-panel-dos-columnas">
-      <section class="card">
+      <section class="card modulo-captura-card">
         <h2>Billetes</h2>
         <p class="modulo-ayuda">Registra el efectivo en caja al final del día, ingresa la cantidad de cada denominación.</p>
         <table class="tabla-billetes">
@@ -60,7 +60,7 @@
         </table>
       </section>
 
-      <section class="card">
+      <section class="card modulo-secundario-card">
         <details open id="caja-otros-detalle">
           <summary>Otros valores</summary>
           <div class="grid-manuales" style="margin-top:12px">
@@ -76,7 +76,7 @@
         </details>
       </section>
 
-      <section class="card card-resumen modulo-span-2">
+      <section class="card card-resumen modulo-resumen-card modulo-span-2">
         <h2>Resumen Caja</h2>
         <div class="resumen-grid">
           <div class="resumen-item">
@@ -100,7 +100,7 @@
     </section>
 
     <section id="panel-plataformas" class="modulo-panel modulo-panel-dos-columnas oculto">
-      <section class="card">
+      <section class="card modulo-captura-card">
         <h2>Ventas del día</h2>
         <p class="modulo-ayuda">Registra las ventas de Practisistemas y Deportivas al final del día.</p>
         <div class="grid-manuales">
@@ -115,7 +115,7 @@
         </div>
       </section>
 
-      <section class="card">
+      <section class="card modulo-secundario-card modulo-detalle-card">
         <details id="plataformas-detalle-dia" open>
           <summary tabindex="-1">Resumen</summary>
           <div class="resumen-grid resumen-grid-simple" style="margin-top:12px">
@@ -137,7 +137,7 @@
     </section>
 
     <section id="panel-gastos" class="modulo-panel modulo-panel-dos-columnas oculto">
-      <section class="card">
+      <section class="card modulo-captura-card">
         <h2>Gastos del día</h2>
         <p class="modulo-ayuda">Registra los gastos del día. Para corregir otro día contacta al admin.</p>
         <div class="gastos-form">
@@ -159,7 +159,7 @@
           <span id="total-gastos">$ 0</span>
         </div>
       </section>
-      <section class="card">
+      <section class="card modulo-secundario-card modulo-detalle-card">
         <details id="gastos-detalle-dia">
           <summary>Registros del día</summary>
           <div class="bonos-listado-wrap">
@@ -182,7 +182,7 @@
     </section>
 
     <section id="panel-bonos" class="modulo-panel modulo-panel-dos-columnas oculto">
-      <section class="card">
+      <section class="card modulo-captura-card">
         <h2>Bonos del día</h2>
         <p class="modulo-ayuda">Cada bono se registra de inmediato. Si requiere corregir contacte al admin.</p>
         <div class="bonos-meta">
@@ -217,7 +217,7 @@
           <span id="total-bonos">$ 0</span>
         </div>
       </section>
-      <section class="card">
+      <section class="card modulo-secundario-card modulo-detalle-card">
         <details id="bonos-detalle-dia">
           <summary>Registros del día</summary>
           <div class="bonos-listado-wrap">
@@ -243,7 +243,7 @@
     </section>
 
     <section id="panel-prestamos" class="modulo-panel modulo-panel-dos-columnas oculto">
-      <section class="card">
+      <section class="card modulo-captura-card">
         <h2>Préstamos y pagos</h2>
         <p class="modulo-ayuda">Registra préstamos o pagos. Recuerda seleccionar si es préstamo o pago.</p>
         <div class="bonos-meta">
@@ -286,7 +286,7 @@
           </div>
         </div>
       </section>
-      <section class="card">
+      <section class="card modulo-secundario-card modulo-detalle-card">
         <details id="prestamos-detalle-dia">
           <summary>Historial de movimientos</summary>
           <div class="bonos-listado-wrap">
@@ -313,7 +313,7 @@
     </section>
 
     <section id="panel-movimientos" class="modulo-panel modulo-panel-dos-columnas oculto">
-      <section class="card">
+      <section class="card modulo-captura-card">
         <h2>Movimientos</h2>
         <p class="modulo-ayuda">Registra ingresos y salidas de caja. Salidas en efectivo, consignaciones, giros o transferencias de Nequi.</p>
         <div class="bonos-meta">
@@ -355,7 +355,7 @@
           </div>
         </div>
       </section>
-      <section class="card">
+      <section class="card modulo-secundario-card modulo-detalle-card">
         <details id="movimientos-detalle-dia">
           <summary>Registros del día</summary>
           <div class="bonos-listado-wrap">
