@@ -1741,6 +1741,72 @@ table.cuadre-tabla td.num {
   padding: 10px 0 4px;
 }
 
+/* ── Compactación segura de módulos operativos ─────────────── */
+
+.modulo-panel > .card {
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+
+.modulo-panel > .card h2 {
+  margin-bottom: 10px;
+}
+
+.modulo-panel .modulo-ayuda {
+  margin-bottom: 8px;
+}
+
+.modulo-panel .bonos-meta {
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.modulo-panel .bonos-meta-item {
+  padding: 8px 10px;
+}
+
+.modulo-panel .grid-manuales,
+.modulo-panel .gastos-form,
+.modulo-panel .bonos-form,
+.modulo-panel .movimientos-form,
+.modulo-panel .resumen-grid {
+  gap: 10px 16px;
+}
+
+.modulo-panel .bonos-acciones {
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.modulo-panel .gasto-total-row {
+  margin-top: 10px;
+  padding-top: 8px;
+}
+
+.modulo-panel .bonos-listado-wrap {
+  margin-top: 8px;
+}
+
+.modulo-panel .card details > summary {
+  padding: 0 0 6px;
+}
+
+.modulo-panel .bonos-tabla th,
+.modulo-panel .bonos-tabla td,
+.modulo-panel table.cuadre-tabla th,
+.modulo-panel table.cuadre-tabla td {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.modulo-panel .resumen-item {
+  padding: 6px 10px;
+}
+
+.modulo-panel .resumen-total {
+  padding: 10px 12px;
+}
+
 /* ── Armonización tipográfica global ───────────────────────── */
 
 h2,
