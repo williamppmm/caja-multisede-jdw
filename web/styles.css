@@ -1022,31 +1022,125 @@ input[type="number"]::-webkit-outer-spin-button {
 
 /* Banner edición */
 .banner-edicion {
-  display: flex;
+  position: sticky;
+  top: 10px;
+  z-index: 70;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
+  gap: 12px 16px;
   background: #fff8e1;
+  border: 1px solid #f2c46d;
   border-left: 4px solid #f59e0b;
   color: #78350f;
-  padding: 10px 16px;
-  border-radius: 6px;
+  padding: 12px 14px;
+  border-radius: 8px;
   margin-bottom: 14px;
+  box-shadow: 0 10px 24px rgba(47, 84, 150, 0.12);
   font-size: 0.93rem;
 }
 
-.banner-edicion button {
-  margin-left: auto;
-  background: none;
-  border: 1px solid #d97706;
-  color: #92400e;
-  border-radius: 5px;
-  padding: 4px 10px;
-  cursor: pointer;
-  font-size: 0.85rem;
+.banner-edicion-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.banner-edicion button:hover {
-  background: #fef3c7;
+.banner-edicion-titulo {
+  font-size: 0.95rem;
+  color: #8a4b08;
+}
+
+.banner-edicion-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.banner-edicion.banner-edicion-active {
+  background: #eef8f1;
+  border-color: #8bc79b;
+  border-left-color: #2e8b57;
+  color: #23553a;
+}
+
+.banner-edicion.banner-edicion-active .banner-edicion-titulo {
+  color: #1f6b43;
+}
+
+.banner-edicion.banner-edicion-active .btn-secondary {
+  border-color: #8bc79b;
+}
+
+body.auth-banner-open::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(1px);
+  z-index: 180;
+}
+
+.auth-card {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 220;
+  width: min(330px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  background: #fff4f1;
+  border: 1px solid #f1b3a6;
+  border-left: 4px solid #c2410c;
+  border-radius: 18px;
+  box-shadow: 0 24px 52px rgba(124, 45, 18, 0.22);
+}
+
+.auth-card input {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #d6a396;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  text-align: left;
+  background: #fff;
+}
+
+.auth-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.88rem;
+  color: #8f2d17;
+  line-height: 1.35;
+}
+
+.auth-card .error-text {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.auth-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 720px) {
+  .banner-edicion {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .banner-edicion-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
 }
 
 /* Calendario */

@@ -14,9 +14,14 @@
       <button id="btn-admin" class="btn-admin-trigger" title="Administración">⚙</button>
     </div>
 
-    <div id="banner-edicion" class="banner-edicion oculto">
-      <span id="banner-texto">Modo especial activo</span>
-      <button id="btn-cancelar-edicion">✕ Cancelar</button>
+    <div id="banner-edicion" class="banner-edicion oculto" aria-live="polite">
+      <div class="banner-edicion-copy">
+        <strong id="banner-titulo" class="banner-edicion-titulo">Edición protegida</strong>
+        <span id="banner-texto">Modo especial activo</span>
+      </div>
+      <div class="banner-edicion-actions">
+        <button id="btn-cancelar-edicion" class="btn btn-secondary" type="button">Cancelar edición</button>
+      </div>
     </div>
 
     <section class="card">
@@ -752,6 +757,18 @@
         <button id="btn-editar-ok" class="btn btn-primary">Continuar</button>
         <button id="btn-editar-cancelar" class="btn btn-secondary">Cancelar</button>
       </div>
+    </div>
+  </div>
+
+  <div id="auth-card" class="auth-card oculto" aria-live="polite">
+    <input type="password" id="auth-card-pass" placeholder="Contraseña" autocomplete="off" />
+    <div class="auth-card-meta">
+      <span id="auth-card-texto">Estás en el día 2026-04-05</span>
+      <span id="auth-card-error" class="error-text oculto">Contraseña incorrecta</span>
+    </div>
+    <div class="auth-card-actions">
+      <button id="btn-auth-card-ok" class="btn btn-primary" type="button">Autorizar</button>
+      <button id="btn-auth-card-cancel" class="btn btn-secondary" type="button">Cerrar</button>
     </div>
   </div>
 

@@ -24,6 +24,11 @@ let adminOverride = { caja: null, plataformas: null, gastos: null, bonos: null, 
 let cuadreDatos = null;
 let debounceTimer = null;
 let pendingAdminAction = null;
+let pendingAuthContext = null;
+let pendingAuthFocusSelector = null;
+let pendingAuthAnchorSelector = null;
+let pendingAuthPoint = null;
+let moduleStatusCache = {};
 let bonusNames = [];
 let loanNames = [];
 let expenseConcepts = [];
@@ -178,13 +183,199 @@ function actualizarEstadoDeportivas() {
   resumenItem.classList.toggle('negativo', esNegativo);
 }
 
-function mostrarBanner(texto) {
+function mostrarBannerActivo(texto, titulo = 'Edición autorizada') {
+  const banner = document.getElementById('banner-edicion');
+  document.body.classList.remove('auth-banner-open');
+  document.getElementById('auth-card').classList.add('oculto');
+  document.getElementById('banner-titulo').textContent = titulo;
   document.getElementById('banner-texto').textContent = texto;
-  document.getElementById('banner-edicion').classList.remove('oculto');
+  banner.classList.remove('oculto');
+  banner.classList.add('banner-edicion-active');
+  pendingAdminAction = null;
+  pendingAuthContext = null;
+}
+
+function mostrarBannerAutorizacion({ titulo, descripcion, onSuccess, focusSelector = null }) {
+  const card = document.getElementById('auth-card');
+  document.getElementById('banner-edicion').classList.add('oculto');
+  pendingAdminAction = onSuccess;
+  pendingAuthContext = { titulo, descripcion };
+  pendingAuthFocusSelector = focusSelector;
+  pendingAuthAnchorSelector = focusSelector;
+  document.getElementById('auth-card-texto').textContent = `Estás en el día ${document.getElementById('fecha')?.value || ''}`;
+  document.getElementById('auth-card-pass').value = '';
+  document.getElementById('auth-card-error').classList.add('oculto');
+  document.body.classList.add('auth-banner-open');
+  card.classList.remove('oculto');
+  card.dataset.titulo = titulo;
+  card.dataset.descripcion = descripcion;
+  posicionarTarjetaAuth();
+  setTimeout(() => {
+    posicionarTarjetaAuth();
+    document.getElementById('auth-card-pass')?.focus();
+  }, 30);
 }
 
 function ocultarBanner() {
+  pendingAuthContext = null;
+  pendingAuthFocusSelector = null;
+  pendingAuthAnchorSelector = null;
+  pendingAuthPoint = null;
+  document.body.classList.remove('auth-banner-open');
+  document.getElementById('auth-card').classList.add('oculto');
+  document.getElementById('auth-card').style.removeProperty('position');
+  document.getElementById('auth-card').style.removeProperty('top');
+  document.getElementById('auth-card').style.removeProperty('left');
+  document.getElementById('auth-card').style.removeProperty('transform');
+  document.getElementById('auth-card').style.removeProperty('z-index');
   document.getElementById('banner-edicion').classList.add('oculto');
+  document.getElementById('banner-edicion').classList.remove('banner-edicion-active');
+}
+
+function guardarEstadoModulo(modulo, fecha, data) {
+  moduleStatusCache[modulo] = { fecha, data };
+}
+
+function obtenerEstadoModulo(modulo, fecha) {
+  const guardado = moduleStatusCache[modulo];
+  if (!guardado || guardado.fecha !== fecha) return null;
+  return guardado.data || null;
+}
+
+function requiereAutorizacionParaFecha(modulo, fecha, data = null) {
+  if (!modulo || !fecha || fecha > hoyStr() || isOverrideActive(modulo, fecha)) return false;
+  if (modulo === 'caja' || modulo === 'contadores' || modulo === 'cuadre') {
+    return Boolean(data?.existe);
+  }
+  return fecha !== hoyStr();
+}
+
+function obtenerMensajeAutorizacion(modulo, fecha) {
+  const label = MODULE_META[modulo]?.label || modulo;
+  return {
+    titulo: `Editar ${label.toLowerCase()}`,
+    descripcion: `Estás en el día ${fecha}. Si de verdad requieres editar ${label.toLowerCase()}, ingresa la contraseña.`,
+  };
+}
+
+function obtenerSelectorReanudacion(control) {
+  if (!control) return null;
+  if (control.id) return `#${control.id}`;
+  if (control.matches('input[name][value]')) {
+    return `input[name="${control.name}"][value="${control.value}"]`;
+  }
+  if (control.matches('.contador-campo, .btn-confirmar-critica, .btn-toggle-pausa')) {
+    const row = control.closest('tr');
+    if (row?.dataset.itemId) {
+      if (control.matches('.btn-confirmar-critica')) return `tr[data-item-id="${row.dataset.itemId}"] .btn-confirmar-critica`;
+      if (control.matches('.btn-toggle-pausa')) return `tr[data-item-id="${row.dataset.itemId}"] .btn-toggle-pausa`;
+      const role = control.dataset.role || '';
+      return role
+        ? `tr[data-item-id="${row.dataset.itemId}"] [data-role="${role}"]`
+        : `tr[data-item-id="${row.dataset.itemId}"] .contador-campo`;
+    }
+  }
+  return null;
+}
+
+function restaurarFocoDespuesAutorizacion() {
+  if (!pendingAuthFocusSelector) return;
+  const selector = pendingAuthFocusSelector;
+  pendingAuthFocusSelector = null;
+  setTimeout(() => {
+    const target = document.querySelector(selector);
+    if (!target) return;
+    target.focus?.();
+    target.select?.();
+  }, 80);
+}
+
+function posicionarTarjetaAuth() {
+  const card = document.getElementById('auth-card');
+  if (!card || card.classList.contains('oculto')) return;
+
+  card.style.setProperty('position', 'fixed', 'important');
+  card.style.setProperty('z-index', '220', 'important');
+  card.style.setProperty('left', '50vw', 'important');
+  card.style.setProperty('top', '50vh', 'important');
+  card.style.setProperty('transform', 'translate(-50%, -50%)', 'important');
+}
+
+function esControlEdicionActual(control) {
+  if (!control || control.closest('#banner-edicion, #modal-admin, #modal-editar')) return false;
+  if (control.id === 'fecha' || control.id === 'btn-admin') return false;
+  if (control.closest('#modal-admin, #modal-editar')) return false;
+  const panel = document.getElementById(MODULE_META[currentModule]?.panelId);
+  if (currentModule === 'caja' || currentModule === 'plataformas') {
+    if (control.id === 'btn-guardar') return true;
+  }
+  if (!panel || !panel.contains(control)) return false;
+
+  if (currentModule === 'caja' || currentModule === 'plataformas') {
+    return control.matches('input, textarea, select');
+  }
+  if (currentModule === 'gastos') {
+    return control.matches('#gasto-concepto, #gasto-valor, #btn-gasto-registrar');
+  }
+  if (currentModule === 'bonos') {
+    return control.matches('#bono-cliente, #bono-valor, #btn-bono-registrar, #btn-bono-editar-ultimo, #btn-bono-eliminar-ultimo');
+  }
+  if (currentModule === 'prestamos') {
+    return control.matches('#prestamo-persona, #prestamo-valor, #btn-prestamo-registrar, input[name="prestamo-tipo"]');
+  }
+  if (currentModule === 'movimientos') {
+    return control.matches('#movimiento-concepto, #movimiento-valor, #btn-movimiento-registrar, input[name="movimiento-tipo"]');
+  }
+  if (currentModule === 'contadores') {
+    return control.matches('.contador-campo, .btn-confirmar-critica, .btn-toggle-pausa, summary, .contador-critica input, .contador-pausa input');
+  }
+  if (currentModule === 'cuadre') {
+    return control.matches('#cuadre-base-input, #btn-cuadre-guardar');
+  }
+  return false;
+}
+
+function bloquearIntentoEdicion(control, evento = null) {
+  const fecha = document.getElementById('fecha')?.value || '';
+  pendingAuthPoint = evento && typeof evento.clientX === 'number' && typeof evento.clientY === 'number'
+    ? { x: evento.clientX, y: evento.clientY }
+    : null;
+  if (!fecha) return false;
+  if (fecha > hoyStr()) {
+    if (evento?.type !== 'focusin') {
+      evento?.preventDefault?.();
+      evento?.stopPropagation?.();
+      evento?.stopImmediatePropagation?.();
+    }
+    control.blur?.();
+    mostrarMensaje('No es posible editar una fecha futura.', 'advertencia');
+    return true;
+  }
+
+  const estado = obtenerEstadoModulo(currentModule, fecha);
+  if (!requiereAutorizacionParaFecha(currentModule, fecha, estado)) return false;
+
+  if (evento?.type !== 'focusin') {
+    evento?.preventDefault?.();
+    evento?.stopPropagation?.();
+    evento?.stopImmediatePropagation?.();
+  }
+  control.blur?.();
+
+  const { titulo, descripcion } = obtenerMensajeAutorizacion(currentModule, fecha);
+  mostrarBannerAutorizacion({
+    titulo,
+    descripcion,
+    focusSelector: obtenerSelectorReanudacion(control),
+    onSuccess: async () => {
+      setOverride(currentModule, fecha);
+      mostrarBannerActivo(`${MODULE_META[currentModule].label} autorizada para ${fecha}.`);
+      await cargarVistaModulo(currentModule, fecha);
+      await verificarFechaActual();
+      restaurarFocoDespuesAutorizacion();
+    },
+  });
+  return true;
 }
 
 function buildTablaBilletes() {
@@ -1432,26 +1623,28 @@ async function verificarFechaActual() {
   if (!fecha) {
     estado.textContent = '';
     estado.className = 'fecha-estado';
+    guardarEstadoModulo(currentModule, '', null);
     return;
   }
 
   if (fecha > hoyStr()) {
-    estado.textContent = 'No es posible guardar una fecha futura.';
+    estado.textContent = 'No es posible editar una fecha futura.';
     estado.className = 'fecha-estado futura';
     btnGuardar.disabled = true;
+    guardarEstadoModulo(currentModule, fecha, { existe: false, futura: true });
     return;
   }
 
   try {
     const res = await fetch(`/api/modulos/${currentModule}/fecha/${fecha}/estado`);
     const data = await res.json();
+    guardarEstadoModulo(currentModule, fecha, data);
     btnGuardar.disabled = false;
 
     if (currentModule === 'cuadre') {
       if (data.existe && !isOverrideActive('cuadre', fecha)) {
-        estado.innerHTML = `El Cuadre de ${fecha} ya existe. <button class="btn-inline-editar" id="btn-inline-editar">Corregir (admin)</button>`;
+        estado.textContent = `El Cuadre de ${fecha} ya existe. Al intentar editar se solicitará contraseña.`;
         estado.className = 'fecha-estado existe';
-        document.getElementById('btn-inline-editar')?.addEventListener('click', () => autorizarModulo());
         return;
       }
       if (isOverrideActive('cuadre', fecha)) {
@@ -1487,19 +1680,15 @@ async function verificarFechaActual() {
         return;
       }
 
-      estado.innerHTML = `Para guardar plataformas en ${fecha} necesitas admin. <button class="btn-inline-editar" id="btn-inline-editar">Autorizar</button>`;
+      estado.textContent = `Plataformas en ${fecha} requiere admin. Al intentar editar se solicitará contraseña.`;
       estado.className = 'fecha-estado existe';
-      btnGuardar.disabled = true;
-      document.getElementById('btn-inline-editar')?.addEventListener('click', () => autorizarModulo());
       return;
     }
 
     if (currentModule === 'contadores') {
       if (data.existe && !isOverrideActive('contadores', fecha)) {
-        estado.innerHTML = `Contadores de ${fecha} ya existen. <button class="btn-inline-editar" id="btn-inline-editar">Corregir (admin)</button>`;
+        estado.textContent = `Contadores de ${fecha} ya existen. Al intentar editar se solicitará contraseña.`;
         estado.className = 'fecha-estado existe';
-        btnGuardar.disabled = true;
-        document.getElementById('btn-inline-editar')?.addEventListener('click', () => autorizarModulo());
         return;
       }
 
@@ -1516,10 +1705,8 @@ async function verificarFechaActual() {
 
     if (currentModule === 'caja') {
       if (data.existe && !isOverrideActive('caja', fecha)) {
-        estado.innerHTML = `La caja de ${fecha} ya existe. <button class="btn-inline-editar" id="btn-inline-editar">Corregir (admin)</button>`;
+        estado.textContent = `La caja de ${fecha} ya existe. Al intentar editar se solicitará contraseña.`;
         estado.className = 'fecha-estado existe';
-        btnGuardar.disabled = true;
-        document.getElementById('btn-inline-editar')?.addEventListener('click', () => autorizarModulo());
         return;
       }
 
@@ -1550,36 +1737,32 @@ async function verificarFechaActual() {
       return;
     }
 
-    estado.innerHTML = `Para guardar ${MODULE_META[currentModule].label.toLowerCase()} en ${fecha} necesitas admin. <button class="btn-inline-editar" id="btn-inline-editar">Autorizar</button>`;
+    estado.textContent = `${MODULE_META[currentModule].label} en ${fecha} requiere admin. Al intentar editar se solicitará contraseña.`;
     estado.className = 'fecha-estado existe';
-    btnGuardar.disabled = true;
-    document.getElementById('btn-inline-editar')?.addEventListener('click', () => autorizarModulo());
   } catch {
     estado.textContent = '';
+    guardarEstadoModulo(currentModule, fecha, null);
   }
 }
 
 function abrirModalAdminAccion({ titulo, descripcion, onSuccess }) {
-  pendingAdminAction = onSuccess;
-  document.getElementById('modal-editar-titulo').textContent = titulo;
-  document.getElementById('modal-editar-desc').textContent = descripcion;
-  document.getElementById('editar-pass').value = '';
-  document.getElementById('editar-pass-error').classList.add('oculto');
-  document.getElementById('modal-editar').classList.remove('oculto');
-  setTimeout(() => document.getElementById('editar-pass').focus(), 50);
+  mostrarBannerAutorizacion({ titulo, descripcion, onSuccess });
 }
 
 function cerrarModalEditar() {
   pendingAdminAction = null;
-  document.getElementById('modal-editar').classList.add('oculto');
+  ocultarBanner();
 }
 
 async function confirmarAccionAdmin() {
-  if (document.getElementById('editar-pass').value !== CONTRASENA) {
-    document.getElementById('editar-pass-error').classList.remove('oculto');
+  if (document.getElementById('auth-card-pass').value !== CONTRASENA) {
+    document.getElementById('auth-card-error').classList.remove('oculto');
+    document.getElementById('auth-card-pass').value = '';
+    document.getElementById('auth-card-pass').focus();
     return;
   }
   const accion = pendingAdminAction;
+  document.getElementById('auth-card-pass').value = '';
   cerrarModalEditar();
   if (accion) await accion();
 }
@@ -1599,7 +1782,7 @@ async function autorizarModulo() {
     descripcion,
     onSuccess: async () => {
       setOverride(modulo, fecha);
-      mostrarBanner(`${titulo} autorizada: ${fecha}`);
+      mostrarBannerActivo(`${titulo} autorizada: ${fecha}`);
       await cargarVistaModulo(modulo, fecha);
       await verificarFechaActual();
     },
@@ -2684,9 +2867,9 @@ async function init() {
     el.addEventListener('change', actualizarSelectModuloDefault);
   });
 
-  document.getElementById('btn-editar-ok').addEventListener('click', confirmarAccionAdmin);
-  document.getElementById('btn-editar-cancelar').addEventListener('click', cerrarModalEditar);
-  document.getElementById('editar-pass').addEventListener('keydown', e => {
+  document.getElementById('btn-auth-card-ok').addEventListener('click', confirmarAccionAdmin);
+  document.getElementById('btn-auth-card-cancel').addEventListener('click', cerrarModalEditar);
+  document.getElementById('auth-card-pass').addEventListener('keydown', e => {
     if (e.key === 'Enter') confirmarAccionAdmin();
   });
 
@@ -2881,6 +3064,17 @@ async function init() {
   document.getElementById('modal-editar').addEventListener('click', e => {
     if (e.target === e.currentTarget) cerrarModalEditar();
   });
+  window.addEventListener('resize', posicionarTarjetaAuth);
+  window.addEventListener('scroll', posicionarTarjetaAuth, true);
+  const interceptarIntentoEdicion = e => {
+    const control = e.target?.closest?.('input, textarea, select, button, summary');
+    if (!control || !esControlEdicionActual(control)) return;
+    if (e.type === 'focusin' && control.matches('button, summary')) return;
+    bloquearIntentoEdicion(control, e);
+  };
+  document.addEventListener('pointerdown', interceptarIntentoEdicion, true);
+  document.addEventListener('focusin', interceptarIntentoEdicion, true);
+  document.addEventListener('click', interceptarIntentoEdicion, true);
 }
 
 // ─── CUADRE ──────────────────────────────────────────────────────────────────
