@@ -175,9 +175,11 @@ Eso significa:
 
 ## Documentación técnica
 
-El análisis técnico completo del proyecto quedó separado aquí:
-
-[docs/analisis-tecnico.md](docs/analisis-tecnico.md)
+| Documento | Contenido |
+|---|---|
+| [docs/especificacion-funcional.md](docs/especificacion-funcional.md) | Descripción exhaustiva de cada módulo, regla de negocio, validación y comportamiento |
+| [docs/analisis-tecnico.md](docs/analisis-tecnico.md) | Arquitectura, capas del sistema, riesgos y escenarios de evolución |
+| [docs/plan-pruebas.md](docs/plan-pruebas.md) | Plan de pruebas funcionales y operativas |
 
 Ese documento cubre:
 
