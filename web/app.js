@@ -578,18 +578,6 @@ function moverSiguienteCampoContador(inputActual) {
   }
 }
 
-function formatRefTexto(fila) {
-  if (!fila.referencia || fila.referencia.tipo === 'sin_referencia') {
-    return 'Sin referencia previa';
-  }
-  const tipo = fila.referencia.tipo === 'referencia_critica'
-    ? 'Crítica'
-    : fila.referencia.tipo === 'referencia_inicial'
-      ? 'Inicial'
-      : 'Normal';
-  const fecha = fila.referencia.fecha || '--';
-  return `${tipo}: ${fecha}`;
-}
 
 function renderContadores(items = [], total = 0) {
   const tbody = document.getElementById('contadores-body');
@@ -619,19 +607,16 @@ function renderContadores(items = [], total = 0) {
     tr.dataset.pausado = fila.pausado ? '1' : '0';
     tr.className = fila.pausado ? 'contador-pausado' : '';
 
-    const refTexto = formatRefTexto(fila);
-    const refVisible = fila.referencia && fila.referencia.tipo !== 'sin_referencia';
-
     if (fila.pausado) {
       tr.innerHTML = `
         <td>
-          <span class="contador-item-nombre"><span class="contador-item-id-inline">${fila.item_id}</span> ${fila.nombre}</span>
-          <div class="contador-controles-inline">
+          <div class="contador-fila-nombre">
+            <span class="contador-item-nombre"><span class="contador-item-id-inline">${fila.item_id}</span> ${fila.nombre}</span>
             <details class="contador-pausa-detalle">
               <summary title="Reactivar máquina">▶</summary>
               <div class="contador-pausa-accion">
-                <input type="password" data-role="pausa-password" placeholder="Contraseña admin" autocomplete="off" tabindex="-1" />
-                <button type="button" class="btn-toggle-pausa" data-pausado="1" tabindex="-1">Confirmar reactivación</button>
+                <input type="password" data-role="pausa-password" placeholder="Clave" autocomplete="off" tabindex="-1" />
+                <button type="button" class="btn-toggle-pausa" data-pausado="1" tabindex="-1">OK</button>
                 <span class="pausa-pass-error oculto"></span>
               </div>
             </details>
@@ -641,26 +626,26 @@ function renderContadores(items = [], total = 0) {
         <td colspan="7" class="contador-pausa-celdas">— en pausa —</td>
       `;
     } else {
+      const refFechaTitle = fila.referencia?.fecha || 'Base 0';
       tr.innerHTML = `
         <td>
-          <span class="contador-item-nombre"><span class="contador-item-id-inline">${fila.item_id}</span> ${fila.nombre}</span>
-          <div class="contador-controles-inline">
-            ${refVisible ? `<span class="contador-ref-texto">${refTexto}</span>` : ''}
+          <div class="contador-fila-nombre">
+            <span class="contador-item-nombre"><span class="contador-item-id-inline">${fila.item_id}</span> ${fila.nombre}</span>
             <details class="contador-critica-detalle oculto" ${fila.usar_referencia_critica ? 'open' : ''}>
-              <summary class="${fila.usar_referencia_critica ? 'autorizado' : ''}">${fila.usar_referencia_critica ? 'Autorizado' : 'Referencia crítica'}</summary>
+              <summary class="critica-summary ${fila.usar_referencia_critica ? 'autorizado' : ''}" title="${fila.usar_referencia_critica ? 'Autorizado' : 'Ref. crítica'}">${fila.usar_referencia_critica ? '✓' : '⚠'}</summary>
               <div class="contador-critica">
                 <div class="contador-critica-grid">
-                  <input type="text" inputmode="numeric" data-role="critica-entradas" placeholder="Ref. Entradas" value="${limpiarNumeroTexto((fila.ref_entradas_guardada ?? fila.referencia?.entradas) || 0)}" />
-                  <input type="text" inputmode="numeric" data-role="critica-salidas" placeholder="Ref. Salidas" value="${limpiarNumeroTexto((fila.ref_salidas_guardada ?? fila.referencia?.salidas) || 0)}" />
-                  <input type="text" inputmode="numeric" data-role="critica-jackpot" placeholder="Ref. Jackpot" value="${limpiarNumeroTexto((fila.ref_jackpot_guardada ?? fila.referencia?.jackpot) || 0)}" />
+                  <input type="text" inputmode="numeric" data-role="critica-entradas" placeholder="E" value="${limpiarNumeroTexto((fila.ref_entradas_guardada ?? fila.referencia?.entradas) || 0)}" />
+                  <input type="text" inputmode="numeric" data-role="critica-salidas" placeholder="S" value="${limpiarNumeroTexto((fila.ref_salidas_guardada ?? fila.referencia?.salidas) || 0)}" />
+                  <input type="text" inputmode="numeric" data-role="critica-jackpot" placeholder="J" value="${limpiarNumeroTexto((fila.ref_jackpot_guardada ?? fila.referencia?.jackpot) || 0)}" />
                 </div>
                 <div class="contador-critica-pre-reset">
-                  <label class="critica-pre-reset-label">Prod. antes del reset</label>
+                  <label class="critica-pre-reset-label">Pre-reset</label>
                   <input type="text" inputmode="numeric" data-role="critica-pre-reset" placeholder="0" value="${limpiarNumeroTexto(fila.produccion_pre_reset_guardada || 0)}" />
                 </div>
                 <div class="contador-critica-confirm">
-                  <input type="password" data-role="critica-password" placeholder="Contraseña admin" autocomplete="off" />
-                  <button type="button" class="btn-confirmar-critica">Confirmar</button>
+                  <input type="password" data-role="critica-password" placeholder="Clave" autocomplete="off" />
+                  <button type="button" class="btn-confirmar-critica">OK</button>
                 </div>
                 <span class="critica-pass-error oculto"></span>
               </div>
@@ -668,8 +653,8 @@ function renderContadores(items = [], total = 0) {
             <details class="contador-pausa-detalle">
               <summary title="Pausar máquina">⏸</summary>
               <div class="contador-pausa-accion">
-                <input type="password" data-role="pausa-password" placeholder="Contraseña admin" autocomplete="off" tabindex="-1" />
-                <button type="button" class="btn-toggle-pausa" data-pausado="0" tabindex="-1">Confirmar pausa</button>
+                <input type="password" data-role="pausa-password" placeholder="Clave" autocomplete="off" tabindex="-1" />
+                <button type="button" class="btn-toggle-pausa" data-pausado="0" tabindex="-1">OK</button>
                 <span class="pausa-pass-error oculto"></span>
               </div>
             </details>
@@ -680,7 +665,7 @@ function renderContadores(items = [], total = 0) {
         <td>${crearInputContador('salidas', fila.salidas)}</td>
         <td>${crearInputContador('jackpot', fila.jackpot)}</td>
         <td class="contador-yield" data-role="yield-actual">${limpiarNumeroTexto(fila.yield_actual || 0, true)}</td>
-        <td data-role="yield-ref">${limpiarNumeroTexto(fila.referencia?.yield || 0, true)}<span class="contador-ref-texto">${fila.referencia?.fecha || 'Base 0'}</span></td>
+        <td data-role="yield-ref">${limpiarNumeroTexto(fila.referencia?.yield || 0, true)}<span class="yield-ref-fecha" title="${refFechaTitle}">·</span></td>
         <td class="contador-resultado ${fila.resultado_monetario < 0 ? 'negativo' : ''}" data-role="resultado">${fmt(fila.resultado_monetario || 0)}</td>
       `;
     }
@@ -725,7 +710,7 @@ function recalcularFilaContador(row) {
 
   if (!tieneCaptura && !usaCritica) {
     row.querySelector('[data-role="yield-actual"]').textContent = '';
-    row.querySelector('[data-role="yield-ref"]').innerHTML = `${limpiarNumeroTexto(fila.refYield, true)}<span class="contador-ref-texto">${fila.refFecha || 'Base 0'}</span>`;
+    row.querySelector('[data-role="yield-ref"]').innerHTML = `${limpiarNumeroTexto(fila.refYield, true)}<span class="yield-ref-fecha" title="${fila.refFecha || 'Base 0'}">·</span>`;
     row.querySelector('[data-role="resultado"]').textContent = '';
     row.querySelector('[data-role="resultado"]').classList.remove('negativo');
     return;
@@ -733,7 +718,7 @@ function recalcularFilaContador(row) {
 
   if (!completa && !usaCritica) {
     row.querySelector('[data-role="yield-actual"]').textContent = '';
-    row.querySelector('[data-role="yield-ref"]').innerHTML = `${limpiarNumeroTexto(fila.refYield, true)}<span class="contador-ref-texto">${fila.refFecha || 'Base 0'}</span>`;
+    row.querySelector('[data-role="yield-ref"]').innerHTML = `${limpiarNumeroTexto(fila.refYield, true)}<span class="yield-ref-fecha" title="${fila.refFecha || 'Base 0'}">·</span>`;
     row.querySelector('[data-role="resultado"]').textContent = '';
     row.querySelector('[data-role="resultado"]').classList.remove('negativo');
     return;
@@ -751,7 +736,7 @@ function recalcularFilaContador(row) {
   const preReset = usaCritica ? (valorContadorRow(row, 'critica-pre-reset') || 0) : 0;
   const resultado = (yieldActual - refYield) * fila.denominacion + preReset;
   row.querySelector('[data-role="yield-actual"]').textContent = limpiarNumeroTexto(yieldActual, true);
-  row.querySelector('[data-role="yield-ref"]').innerHTML = `${limpiarNumeroTexto(refYield, true)}<span class="contador-ref-texto">${usaCritica ? 'Autorizado' : (fila.refFecha || 'Base 0')}</span>`;
+  row.querySelector('[data-role="yield-ref"]').innerHTML = `${limpiarNumeroTexto(refYield, true)}<span class="yield-ref-fecha" title="${usaCritica ? 'Autorizado' : (fila.refFecha || 'Base 0')}">·</span>`;
   const resultadoEl = row.querySelector('[data-role="resultado"]');
   resultadoEl.textContent = fmt(resultado);
   resultadoEl.classList.toggle('negativo', resultado < 0);
