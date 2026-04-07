@@ -1,10 +1,10 @@
 import json
 from datetime import date
 
-from app.config import BASE_DIR
+from app.services.local_data_service import get_local_data_path
 
 
-STARTUP_STATE_PATH = BASE_DIR / "startup_state.json"
+STARTUP_STATE_PATH = get_local_data_path("startup_state.json")
 
 
 def _default_state() -> dict:

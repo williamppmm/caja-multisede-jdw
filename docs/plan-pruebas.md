@@ -110,7 +110,7 @@ Pasos:
 
 Resultado esperado:
 
-- la configuración persiste en `settings.json`
+- la configuración persiste en `data/settings.json`
 - al reiniciar, la app conserva la configuración guardada
 
 ## PG-03 — Archivos anuales por sede
@@ -690,6 +690,7 @@ Pasos:
 Resultado esperado:
 
 - los catálogos siguen disponibles
+- los JSON locales viven dentro de `data/`
 
 ## Pruebas de concurrencia y Dropbox
 

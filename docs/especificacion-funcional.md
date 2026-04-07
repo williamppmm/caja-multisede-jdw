@@ -43,7 +43,7 @@ Accesible con el botón ⚙ en la esquina superior derecha. Protegida por contra
 
 ### 2.2 Persistencia de configuración
 
-Se guarda en `settings.json` junto al ejecutable. Al iniciar la app, se carga este archivo. Si no existe, la app funciona con valores en blanco hasta que el usuario configure.
+Se guarda en `data/settings.json`. Al iniciar la app, se carga este archivo. Si no existe, la app funciona con valores en blanco hasta que el usuario configure.
 
 ### 2.3 Estado de inicio (Startup State)
 
@@ -56,13 +56,13 @@ Sección especial dentro de Administración. Permite definir valores de partida 
 | **Caja inicial** | Monto en caja al arrancar (usado como `base_anterior` del primer Cuadre). |
 | **Contadores iniciales** | Por cada ítem del catálogo: Entradas, Salidas y Jackpot en la fecha de inicio. Sirven como referencia vigente antes del primer registro real. |
 
-Se guarda en `startup_state.json`. El efecto:
+Se guarda en `data/startup_state.json`. El efecto:
 - Si un ítem de Contadores no tiene ningún registro previo, el sistema busca en `startup_state` una referencia para ese `item_id`. Si la encuentra y la fecha de inicio ≤ fecha actual, la usa como referencia de tipo `referencia_inicial`.
 - Si Cuadre no tiene ningún cuadre previo, busca en `startup_state` la `caja_inicial` como base anterior.
 
 ### 2.4 Gestión del catálogo de Contadores
 
-Desde Administración se mantiene el catálogo de ítems de Contadores (`contadores_items.json`). Cada ítem tiene:
+Desde Administración se mantiene el catálogo de ítems de Contadores (`data/contadores_items.json`). Cada ítem tiene:
 
 | Campo | Regla |
 |---|---|
@@ -223,7 +223,7 @@ Hoja `Plataformas` del libro `Caja_{sede}_{año}.xlsx`. Una fila por día:
 
 - Se pueden registrar múltiples gastos el mismo día. Cada registro agrega una fila, no sobrescribe.
 - El total diario se acumula con cada nuevo registro.
-- Los conceptos nuevos se agregan automáticamente al catálogo local (`gastos_conceptos.json`) para autocompletado en registros futuros.
+- Los conceptos nuevos se agregan automáticamente al catálogo local (`data/gastos_conceptos.json`) para autocompletado en registros futuros.
 
 ### 6.3 Reglas de edición
 
@@ -258,7 +258,7 @@ Hoja `Gastos` del libro `Caja_{sede}_{año}.xlsx`. Una fila por concepto registr
 - Cada bono es una entrada independiente. Se pueden registrar múltiples bonos para el mismo cliente en el mismo día.
 - El total diario se muestra acumulado por todos los bonos del día.
 - Se muestra el **acumulado por cliente** dentro del día para facilitar el control.
-- El cliente se agrega al catálogo local (`bonos_clientes.json`) para autocompletado.
+- El cliente se agrega al catálogo local (`data/bonos_clientes.json`) para autocompletado.
 
 ### 7.3 Editar el último bono
 
@@ -353,7 +353,7 @@ Hoja `Prestamos` del libro `Caja_{sede}_{año}.xlsx`. Una fila por movimiento:
 ### 9.2 Comportamiento
 
 - Múltiples movimientos por día.
-- Los conceptos se agregan al catálogo local (`movimientos_conceptos.json`) para autocompletado.
+- Los conceptos se agregan al catálogo local (`data/movimientos_conceptos.json`) para autocompletado.
 - El resumen del día muestra: Total ingresos, Total salidas, Neto (ingresos − salidas).
 
 ### 9.3 Reglas de edición
@@ -407,7 +407,7 @@ La referencia es el último registro guardado para ese ítem en fechas anteriore
 | Tipo | Origen |
 |---|---|
 | `sin_referencia` | No hay historial ni startup state. El cálculo no es posible hasta tener datos previos. |
-| `referencia_inicial` | Proviene de `startup_state.json`. Usado cuando no hay ningún registro real previo pero el sistema tiene una base configurada. |
+| `referencia_inicial` | Proviene de `data/startup_state.json`. Usado cuando no hay ningún registro real previo pero el sistema tiene una base configurada. |
 | `registro` (Normal) | Último registro guardado de fechas anteriores. Es el caso habitual después del primer día. |
 | `referencia_critica` | Referencia definida manualmente por admin durante el guardado del día. Aplica cuando hubo un reset técnico. |
 
@@ -469,7 +469,7 @@ Desde el micro-control ⏸ de cada fila (requiere contraseña admin):
 - **Pausar:** el ítem queda marcado como `pausado: true` en el catálogo. Aparece visualmente atenuado. No se captura ni guarda en el período. No contribuye al total.
 - **Reactivar:** con el ícono ▶ en la fila pausada. El ítem vuelve a estado normal.
 
-La pausa/reactivación es persistente en `contadores_items.json`. No afecta el historial de registros pasados.
+La pausa/reactivación es persistente en `data/contadores_items.json`. No afecta el historial de registros pasados.
 
 ### 10.9 Guardado
 
@@ -606,17 +606,17 @@ Cuando se guarda sobre una fecha existente (con admin), el sistema elimina todas
 
 ### 12.5 Catálogos locales
 
-Archivos JSON que viven junto al ejecutable y no se sincronizan por Dropbox:
+Archivos JSON que viven en `data/` junto al ejecutable y no se sincronizan por Dropbox:
 
 | Archivo | Contenido |
 |---|---|
-| `settings.json` | Sede, carpeta de datos, módulos habilitados, módulo por defecto |
-| `startup_state.json` | Base inicial: fecha, caja, referencias de contadores |
-| `contadores_items.json` | Catálogo de ítems de Contadores (id, nombre, denominación, pausa) |
-| `bonos_clientes.json` | Catálogo de clientes para autocompletado en Bonos |
-| `gastos_conceptos.json` | Catálogo de conceptos para autocompletado en Gastos |
-| `prestamos_personas.json` | Catálogo de personas para autocompletado en Préstamos |
-| `movimientos_conceptos.json` | Catálogo de conceptos para autocompletado en Movimientos |
+| `data/settings.json` | Sede, carpeta de datos, módulos habilitados, módulo por defecto |
+| `data/startup_state.json` | Base inicial: fecha, caja, referencias de contadores |
+| `data/contadores_items.json` | Catálogo de ítems de Contadores (id, nombre, denominación, pausa) |
+| `data/bonos_clientes.json` | Catálogo de clientes para autocompletado en Bonos |
+| `data/gastos_conceptos.json` | Catálogo de conceptos para autocompletado en Gastos |
+| `data/prestamos_personas.json` | Catálogo de personas para autocompletado en Préstamos |
+| `data/movimientos_conceptos.json` | Catálogo de conceptos para autocompletado en Movimientos |
 
 ---
 

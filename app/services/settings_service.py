@@ -4,8 +4,9 @@ import subprocess
 from pathlib import Path
 
 from app.config import BASE_DIR
+from app.services.local_data_service import get_local_data_path
 
-SETTINGS_PATH = BASE_DIR / "settings.json"
+SETTINGS_PATH = get_local_data_path("settings.json")
 
 
 def _default_sede() -> str:

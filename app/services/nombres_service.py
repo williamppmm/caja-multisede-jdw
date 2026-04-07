@@ -1,12 +1,12 @@
 import json
 from pathlib import Path
 
-from app.config import BASE_DIR
+from app.services.local_data_service import get_local_data_path
 
-NOMBRES_PATH = BASE_DIR / "bonos_clientes.json"
-GASTOS_PATH = BASE_DIR / "gastos_conceptos.json"
-PRESTAMOS_PATH = BASE_DIR / "prestamos_personas.json"
-MOVIMIENTOS_PATH = BASE_DIR / "movimientos_conceptos.json"
+NOMBRES_PATH = get_local_data_path("bonos_clientes.json")
+GASTOS_PATH = get_local_data_path("gastos_conceptos.json")
+PRESTAMOS_PATH = get_local_data_path("prestamos_personas.json")
+MOVIMIENTOS_PATH = get_local_data_path("movimientos_conceptos.json")
 
 CATALOG_PATHS = {
     "bonos": NOMBRES_PATH,

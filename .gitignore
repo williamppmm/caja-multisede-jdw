@@ -16,6 +16,7 @@ dist/
 *.spec
 
 # Local data and settings
+data/
 settings.json
 bonos_clientes.json
 gastos_conceptos.json

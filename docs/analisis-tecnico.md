@@ -62,11 +62,12 @@ Responsabilidades:
 - definir denominaciones
 - resolver nombres de archivo Excel
 - resolver rutas en desarrollo o en modo `.exe`
+- concentrar JSON locales en `data/`
 
 Observaciones:
 
 - la lógica de nombre por sede y año está bien encapsulada
-- la ruta final del libro depende de `settings.json`
+- la ruta final del libro depende de `data/settings.json`
 
 ## Persistencia
 

@@ -56,6 +56,7 @@ scripts/
 launcher.py
 CajaJDW.spec
 README.md
+data/
 docs/
   analisis-tecnico.md
 ```
@@ -113,7 +114,7 @@ Después de abrir la app:
 4. Seleccionar los módulos habilitados.
 5. Elegir el módulo por defecto si aplica.
 
-La configuración se guarda en `settings.json`.
+La configuración se guarda en `data/settings.json`.
 
 ## Módulos disponibles
 
@@ -130,14 +131,14 @@ La configuración se guarda en `settings.json`.
 
 ## Catálogos locales
 
-La app mantiene catálogos JSON por equipo:
+La app mantiene JSON locales por equipo dentro de `data/`:
 
-- `bonos_clientes.json`
-- `gastos_conceptos.json`
-- `prestamos_personas.json`
-- `movimientos_conceptos.json`
-- `contadores_items.json`
-- `settings.json`
+- `data/bonos_clientes.json`
+- `data/gastos_conceptos.json`
+- `data/prestamos_personas.json`
+- `data/movimientos_conceptos.json`
+- `data/contadores_items.json`
+- `data/settings.json`
 
 Estos archivos son locales y no se comparten por Dropbox.
 
@@ -193,13 +194,13 @@ Ese documento cubre:
 ## Archivos que normalmente no deben versionarse
 
 ```text
-settings.json
-bonos_clientes.json
-gastos_conceptos.json
-prestamos_personas.json
-movimientos_conceptos.json
-contadores_items.json
-startup_state.json
+data/settings.json
+data/bonos_clientes.json
+data/gastos_conceptos.json
+data/prestamos_personas.json
+data/movimientos_conceptos.json
+data/contadores_items.json
+data/startup_state.json
 Caja_*.xlsx
 Consolidado_*.xlsx
 ~$*.xlsx

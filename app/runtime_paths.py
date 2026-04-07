@@ -12,6 +12,12 @@ def get_base_dir() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def get_app_data_dir() -> Path:
+    data_dir = get_base_dir() / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
+
+
 def get_resource_root() -> Path:
     if is_frozen():
         return Path(getattr(sys, "_MEIPASS", get_base_dir()))

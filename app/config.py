@@ -1,9 +1,10 @@
 import re
 from pathlib import Path
-from app.runtime_paths import get_base_dir
+from app.runtime_paths import get_app_data_dir, get_base_dir
 
 # Base directory: parent of app/
 BASE_DIR = get_base_dir()
+APP_DATA_DIR = get_app_data_dir()
 
 # Data directory: where Excel files live
 # For development, the Excel is in the same folder as the project.

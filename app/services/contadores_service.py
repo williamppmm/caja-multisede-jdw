@@ -2,12 +2,12 @@ import json
 from datetime import date, datetime
 from pathlib import Path
 
-from app.config import BASE_DIR
 from app.models.contadores_models import ContadorCatalogoItem, ContadoresEntrada
 from app.services import excel_service, startup_state_service
+from app.services.local_data_service import get_local_data_path
 
 
-CATALOGO_PATH = BASE_DIR / "contadores_items.json"
+CATALOGO_PATH = get_local_data_path("contadores_items.json")
 
 
 def _leer_json(path: Path, default):
