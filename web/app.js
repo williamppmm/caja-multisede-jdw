@@ -1682,7 +1682,7 @@ async function verificarFechaActual() {
 
     if (currentModule === 'cuadre') {
       if (data.existe && !isOverrideActive('cuadre', fecha)) {
-        estado.textContent = `El Cuadre de ${formatFechaVisual(fecha)} ya existe. Al intentar editar se solicitará contraseña.`;
+        estado.textContent = `El Cuadre de ${formatFechaVisual(fecha)} ya existe.`;
         estado.className = 'fecha-estado existe';
         return;
       }
@@ -1719,14 +1719,14 @@ async function verificarFechaActual() {
         return;
       }
 
-      estado.textContent = `Plataformas en ${formatFechaVisual(fecha)} requiere admin. Al intentar editar se solicitará contraseña.`;
+      estado.textContent = `Plataformas en ${formatFechaVisual(fecha)} requiere admin.`;
       estado.className = 'fecha-estado existe';
       return;
     }
 
     if (currentModule === 'contadores') {
       if (data.existe && !isOverrideActive('contadores', fecha)) {
-        estado.textContent = `Contadores de ${formatFechaVisual(fecha)} ya existen. Al intentar editar se solicitará contraseña.`;
+        estado.textContent = `Contadores de ${formatFechaVisual(fecha)} ya existen.`;
         estado.className = 'fecha-estado existe';
         return;
       }
@@ -1744,7 +1744,7 @@ async function verificarFechaActual() {
 
     if (currentModule === 'caja') {
       if (data.existe && !isOverrideActive('caja', fecha)) {
-        estado.textContent = `La caja de ${formatFechaVisual(fecha)} ya existe. Al intentar editar se solicitará contraseña.`;
+        estado.textContent = `La caja de ${formatFechaVisual(fecha)} ya existe.`;
         estado.className = 'fecha-estado existe';
         return;
       }
@@ -1776,7 +1776,7 @@ async function verificarFechaActual() {
       return;
     }
 
-    estado.textContent = `${MODULE_META[currentModule].label} en ${formatFechaVisual(fecha)} requiere admin. Al intentar editar se solicitará contraseña.`;
+    estado.textContent = `${MODULE_META[currentModule].label} en ${formatFechaVisual(fecha)} requiere admin.`;
     estado.className = 'fecha-estado existe';
   } catch {
     estado.textContent = '';
@@ -3245,9 +3245,9 @@ function renderCuadre(datos) {
   document.getElementById('cuadre-prestamos-salida').textContent = fmt(datos.prestamos?.total_salida ?? 0);
   document.getElementById('cuadre-prestamos-entrada').textContent = fmt(datos.prestamos?.total_entrada ?? 0);
   const netoPrest = datos.prestamos?.neto ?? 0;
-  const netoPrestEl = document.getElementById('cuadre-prestamos-neto');
-  netoPrestEl.textContent = fmt(netoPrest);
-  netoPrestEl.className = 'resumen-valor ' + (netoPrest >= 0 ? 'cuadre-positivo' : 'cuadre-negativo');
+  const netoPrestBadge = document.getElementById('cuadre-prestamos-total');
+  netoPrestBadge.textContent = fmt(netoPrest);
+  netoPrestBadge.className = 'cuadre-total-badge' + (netoPrest < 0 ? ' cuadre-badge-negativo' : '');
   const resumenPrest = datos.prestamos?.resumen || [];
   const prestBody = document.getElementById('cuadre-prestamos-body');
   const prestDetWrap = document.getElementById('cuadre-prestamos-detalle-wrap');
@@ -3267,9 +3267,9 @@ function renderCuadre(datos) {
   document.getElementById('cuadre-mov-ingresos').textContent = fmt(datos.movimientos?.total_ingresos ?? 0);
   document.getElementById('cuadre-mov-salidas').textContent = fmt(datos.movimientos?.total_salidas ?? 0);
   const netoMov = (datos.movimientos?.neto ?? 0);
-  const netoMovEl = document.getElementById('cuadre-mov-neto');
-  netoMovEl.textContent = fmt(netoMov);
-  netoMovEl.className = 'resumen-valor ' + (netoMov >= 0 ? 'cuadre-positivo' : 'cuadre-negativo');
+  const netoMovBadge = document.getElementById('cuadre-mov-total');
+  netoMovBadge.textContent = fmt(netoMov);
+  netoMovBadge.className = 'cuadre-total-badge' + (netoMov < 0 ? ' cuadre-badge-negativo' : '');
 
   // Caja física
   const desg = datos.caja_desglose || {};
@@ -3285,7 +3285,7 @@ function renderCuadre(datos) {
   });
   document.getElementById('cuadre-caja-monedas').textContent = fmt(desg.total_monedas ?? 0);
   document.getElementById('cuadre-caja-viejos').textContent = fmt(desg.billetes_viejos ?? 0);
-  document.getElementById('cuadre-caja-total').textContent = fmt(datos.caja_fisica ?? 0);
+  document.getElementById('cuadre-caja-total-badge').textContent = fmt(datos.caja_fisica ?? 0);
 
   // Balance
   document.getElementById('cuadre-balance-base').textContent = fmt(datos.base_anterior ?? 0);
@@ -3367,9 +3367,9 @@ function renderCuadreGuardado(datos, fecha, calculado = null) {
   // Préstamos — totales desde guardados, detalle por persona si hay calculados
   document.getElementById('cuadre-prestamos-salida').textContent = fmt(datos.total_prestamos_salida);
   document.getElementById('cuadre-prestamos-entrada').textContent = fmt(datos.total_prestamos_entrada);
-  const netoPrestEl = document.getElementById('cuadre-prestamos-neto');
-  netoPrestEl.textContent = fmt(datos.neto_prestamos);
-  netoPrestEl.className = 'resumen-valor ' + (datos.neto_prestamos >= 0 ? 'cuadre-positivo' : 'cuadre-negativo');
+  const netoPrestBadge = document.getElementById('cuadre-prestamos-total');
+  netoPrestBadge.textContent = fmt(datos.neto_prestamos);
+  netoPrestBadge.className = 'cuadre-total-badge' + (datos.neto_prestamos < 0 ? ' cuadre-badge-negativo' : '');
   const resumenPrest = calculado?.prestamos?.resumen || [];
   const prestBody = document.getElementById('cuadre-prestamos-body');
   const prestDetWrap = document.getElementById('cuadre-prestamos-detalle-wrap');
@@ -3388,9 +3388,9 @@ function renderCuadreGuardado(datos, fecha, calculado = null) {
   // Movimientos — desde datos guardados
   document.getElementById('cuadre-mov-ingresos').textContent = fmt(datos.total_mov_ingresos);
   document.getElementById('cuadre-mov-salidas').textContent = fmt(datos.total_mov_salidas);
-  const netoMovEl = document.getElementById('cuadre-mov-neto');
-  netoMovEl.textContent = fmt(datos.neto_movimientos ?? 0);
-  netoMovEl.className = 'resumen-valor ' + ((datos.neto_movimientos ?? 0) >= 0 ? 'cuadre-positivo' : 'cuadre-negativo');
+  const netoMovBadge = document.getElementById('cuadre-mov-total');
+  netoMovBadge.textContent = fmt(datos.neto_movimientos ?? 0);
+  netoMovBadge.className = 'cuadre-total-badge' + ((datos.neto_movimientos ?? 0) < 0 ? ' cuadre-badge-negativo' : '');
 
   // Caja física — desglose de billetes si hay datos calculados
   const cajaBody = document.getElementById('cuadre-caja-body');
@@ -3411,7 +3411,7 @@ function renderCuadreGuardado(datos, fecha, calculado = null) {
     document.getElementById('cuadre-caja-monedas').textContent = '';
     document.getElementById('cuadre-caja-viejos').textContent = '';
   }
-  document.getElementById('cuadre-caja-total').textContent = fmt(datos.caja_fisica);
+  document.getElementById('cuadre-caja-total-badge').textContent = fmt(datos.caja_fisica);
 
   // Balance — siempre desde datos guardados (fuente de verdad del cuadre)
   document.getElementById('cuadre-balance-base').textContent = fmt(datos.base_anterior);

@@ -498,6 +498,7 @@
         <section class="card">
           <div class="cuadre-seccion-header">
             <h2>Préstamos</h2>
+            <span id="cuadre-prestamos-total" class="cuadre-total-badge"></span>
           </div>
           <div class="resumen-grid resumen-grid-simple">
             <div class="resumen-item">
@@ -507,10 +508,6 @@
             <div class="resumen-item">
               <span class="resumen-label">Entradas (pagos recibidos)</span>
               <span id="cuadre-prestamos-entrada" class="resumen-valor"></span>
-            </div>
-            <div class="resumen-item resumen-total">
-              <span class="resumen-label">Neto en caja</span>
-              <span id="cuadre-prestamos-neto" class="resumen-valor"></span>
             </div>
           </div>
           <div id="cuadre-prestamos-detalle-wrap" class="oculto">
@@ -526,6 +523,7 @@
         <section class="card">
           <div class="cuadre-seccion-header">
             <h2>Movimientos</h2>
+            <span id="cuadre-mov-total" class="cuadre-total-badge"></span>
           </div>
           <div class="resumen-grid resumen-grid-simple">
             <div class="resumen-item">
@@ -536,15 +534,14 @@
               <span class="resumen-label">Total salidas</span>
               <span id="cuadre-mov-salidas" class="resumen-valor"></span>
             </div>
-            <div class="resumen-item resumen-total">
-              <span class="resumen-label">Neto en caja</span>
-              <span id="cuadre-mov-neto" class="resumen-valor"></span>
-            </div>
           </div>
         </section>
 
         <section class="card modulo-span-2">
-          <h2>Caja física</h2>
+          <div class="cuadre-seccion-header">
+            <h2>Caja física</h2>
+            <span id="cuadre-caja-total-badge" class="cuadre-total-badge"></span>
+          </div>
           <div class="bonos-listado-wrap">
             <table class="bonos-tabla">
               <thead><tr><th>Denominación</th><th>Subtotal</th></tr></thead>
@@ -559,10 +556,6 @@
             <div class="resumen-item">
               <span class="resumen-label">Billetes viejos</span>
               <span id="cuadre-caja-viejos" class="resumen-valor"></span>
-            </div>
-            <div class="resumen-item resumen-total">
-              <span class="resumen-label">TOTAL EFECTIVO</span>
-              <span id="cuadre-caja-total" class="resumen-valor"></span>
             </div>
           </div>
         </section>
