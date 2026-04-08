@@ -3156,24 +3156,20 @@ async function cargarDatosCuadre(fecha) {
       }
     }
 
-    // Precondiciones no cumplidas → bloquear
-    if (!estado.ok) {
-      document.getElementById('cuadre-bloqueado-msg').textContent = estado.mensaje;
-      bloqueado.classList.remove('oculto');
-      return;
-    }
-
-    // Calcular
     const calcRes = await fetch(`/api/modulos/cuadre/calcular/${fecha}`);
     const datos = await calcRes.json();
-    if (!datos.ok) {
+    if (!calcRes.ok || !datos.ok) {
       document.getElementById('cuadre-bloqueado-msg').textContent = datos.mensaje;
       bloqueado.classList.remove('oculto');
       return;
     }
 
-    cuadreDatos = { ...datos, fecha };
+    cuadreDatos = datos.puede_guardar ? { ...datos, fecha } : null;
     renderCuadre(datos);
+    if (!datos.puede_guardar && datos.mensaje) {
+      document.getElementById('cuadre-bloqueado-msg').textContent = datos.mensaje;
+      bloqueado.classList.remove('oculto');
+    }
     contenido.classList.remove('oculto');
   } catch {
     document.getElementById('cuadre-bloqueado-msg').textContent = 'Error al cargar los datos del cuadre.';
@@ -3307,9 +3303,16 @@ function renderCuadre(datos) {
   document.getElementById('cuadre-diferencia-label').textContent =
     dif === 0 ? 'CUADRE EXACTO' : dif > 0 ? 'SOBRANTE' : 'FALTANTE';
 
-  // Botones
-  document.getElementById('cuadre-acciones').classList.remove('oculto');
-  document.getElementById('cuadre-guardado-info').classList.add('oculto');
+  const acciones = document.getElementById('cuadre-acciones');
+  const info = document.getElementById('cuadre-guardado-info');
+  if (datos.puede_guardar) {
+    acciones.classList.remove('oculto');
+    info.classList.add('oculto');
+  } else {
+    acciones.classList.add('oculto');
+    info.textContent = datos.mensaje || 'Resumen parcial disponible. El guardado del cuadre se habilita cuando existan Caja y Contadores del día.';
+    info.classList.remove('oculto');
+  }
 }
 
 function renderCuadreGuardado(datos, fecha, calculado = null) {

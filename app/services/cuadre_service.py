@@ -76,27 +76,34 @@ def calcular_periodo(fecha_cuadre: date) -> list[date]:
 def verificar_precondiciones(fecha_cuadre: date) -> dict:
     base = {
         "ok": False,
+        "puede_guardar": False,
         "periodo": [],
         "fechas_sin_caja": [],
         "tiene_base_anterior": False,
         "base_anterior": 0.0,
+        "tiene_caja_dia": False,
+        "tiene_contadores_dia": False,
         "mensaje": "",
     }
 
-    if not excel_service.fecha_existe_modulo("contadores", fecha_cuadre, fecha_cuadre.year):
-        base["mensaje"] = (
-            f"No hay Contadores registrados para {fecha_cuadre}. "
-            "El Cuadre requiere Contadores y Caja del día del cuadre."
-        )
-        return base
+    tiene_contadores = excel_service.fecha_existe_modulo("contadores", fecha_cuadre, fecha_cuadre.year)
+    tiene_caja = excel_service.fecha_existe_modulo("caja", fecha_cuadre, fecha_cuadre.year)
+    base["tiene_contadores_dia"] = tiene_contadores
+    base["tiene_caja_dia"] = tiene_caja
 
-    if not excel_service.fecha_existe_modulo("caja", fecha_cuadre, fecha_cuadre.year):
+    if not tiene_contadores or not tiene_caja:
         periodo = calcular_periodo(fecha_cuadre)
         base["periodo"] = [str(d) for d in periodo]
-        base["fechas_sin_caja"] = [str(fecha_cuadre)]
+        if not tiene_caja:
+            base["fechas_sin_caja"] = [str(fecha_cuadre)]
+        faltantes = []
+        if not tiene_contadores:
+            faltantes.append("Contadores")
+        if not tiene_caja:
+            faltantes.append("Caja")
         base["mensaje"] = (
-            f"Falta Caja para {fecha_cuadre}. "
-            "Completa Caja del día del cuadre antes de cuadrar."
+            f"Vista previa parcial disponible. Falta {' y '.join(faltantes)} para {fecha_cuadre}. "
+            "Podrás guardar el Cuadre cuando existan Caja y Contadores del día."
         )
         return base
 
@@ -105,11 +112,14 @@ def verificar_precondiciones(fecha_cuadre: date) -> dict:
     tiene_base = valor_base is not None
     return {
         "ok": True,
+        "puede_guardar": True,
         "mensaje": "OK",
         "periodo": [str(d) for d in periodo],
         "fechas_sin_caja": [],
         "tiene_base_anterior": tiene_base,
         "base_anterior": valor_base if tiene_base else 0.0,
+        "tiene_caja_dia": True,
+        "tiene_contadores_dia": True,
     }
 
 

@@ -133,8 +133,6 @@ def calcular_cuadre_fecha(fecha: str):
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
     preconds = cuadre_service.verificar_precondiciones(d)
-    if not preconds["ok"]:
-        return {"ok": False, **preconds}
     base = preconds["base_anterior"] if preconds["tiene_base_anterior"] else 0.0
     datos = cuadre_service.calcular_cuadre(d, base)
     return {"ok": True, **preconds, **datos}
