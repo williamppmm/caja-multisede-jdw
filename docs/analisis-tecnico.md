@@ -91,7 +91,7 @@ Este servicio:
 
 Dos libros por sede y año:
 
-**`Caja_{sede}_{año}.xlsx`** — operativa diaria, una hoja por módulo:
+**`Contadores_{sede}_{año}.xlsx`** — operativa diaria, una hoja por módulo:
 
 - Caja
 - Plataformas

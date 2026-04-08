@@ -294,7 +294,6 @@ input[type="number"]::-webkit-outer-spin-button {
 
 /* Resumen */
 .card-resumen {
-  border-left: 4px solid var(--brand);
 }
 
 .resumen-grid {
@@ -329,22 +328,23 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .resumen-total {
   grid-column: 1 / -1;
-  background: linear-gradient(180deg, #365da7 0%, var(--brand) 100%);
+  background: var(--bg-soft);
   padding: 12px 14px;
   border-radius: 12px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+  border-top: 2px solid var(--brand);
 }
 
 .resumen-total .resumen-label {
-  color: #dde4f5;
+  color: var(--brand);
   font-weight: 700;
   font-size: 1rem;
   text-transform: uppercase;
 }
 
 .resumen-total .resumen-valor {
-  color: #fff;
+  color: var(--brand);
   font-size: 1.3rem;
+  font-weight: 700;
 }
 
 .resumen-informativo {
@@ -571,10 +571,19 @@ input[type="number"]::-webkit-outer-spin-button {
   text-align: center !important;
 }
 
-.contadores-tabla th,
+table.contadores-tabla th {
+  background: linear-gradient(180deg, #365da7 0%, var(--brand) 100%);
+  color: #fff;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  vertical-align: middle;
+  border-bottom: none;
+}
+
 .contadores-tabla td {
   white-space: nowrap;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .contadores-tabla {
@@ -1991,6 +2000,11 @@ table.cuadre-tabla td.num {
   padding-bottom: 6px;
 }
 
+.modulo-panel table.contadores-tabla th {
+  padding: 8px 12px;
+  font-size: 0.9rem;
+}
+
 .modulo-panel .resumen-item {
   padding: 6px 10px;
 }
@@ -2140,7 +2154,6 @@ table.cuadre-tabla th,
 
 /* ── Contadores: compactación fina final ───────────────────── */
 
-#panel-contadores .contadores-tabla th,
 #panel-contadores .contadores-tabla td {
   padding-top: 2px;
   padding-bottom: 2px;

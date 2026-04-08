@@ -164,7 +164,7 @@ Con admin activo, guardar sobre una fecha existente **reemplaza** completamente 
 
 ### 4.4 Persistencia en Excel
 
-Hoja `Caja` del libro `Caja_{sede}_{año}.xlsx`. Columnas:
+Hoja `Caja` del libro `Contadores_{sede}_{año}.xlsx`. Columnas:
 
 | Fecha | Tipo | Concepto | Denominación | Cantidad | Valor unitario | Subtotal | Timestamp |
 |---|---|---|---|---|---|---|---|
@@ -201,7 +201,7 @@ Total plataformas = Practisistemas + Deportivas
 
 ### 5.4 Persistencia en Excel
 
-Hoja `Plataformas` del libro `Caja_{sede}_{año}.xlsx`. Una fila por día:
+Hoja `Plataformas` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por día:
 
 | Fecha | Practisistemas | Deportivas | Total | Timestamp |
 |---|---|---|---|---|
@@ -235,7 +235,7 @@ Hoja `Plataformas` del libro `Caja_{sede}_{año}.xlsx`. Una fila por día:
 
 ### 6.4 Persistencia en Excel
 
-Hoja `Gastos` del libro `Caja_{sede}_{año}.xlsx`. Una fila por concepto registrado:
+Hoja `Gastos` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por concepto registrado:
 
 | Fecha | Tipo | Concepto | (vacíos) | Valor | Timestamp |
 |---|---|---|---|---|---|
@@ -278,7 +278,7 @@ Elimina el **bono con timestamp más reciente** de la fecha activa. El total se 
 
 ### 7.6 Persistencia en Excel
 
-Hoja `Bonos` del libro `Caja_{sede}_{año}.xlsx`. Una fila por bono:
+Hoja `Bonos` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por bono:
 
 | Fecha | Tipo | Cliente | (vacíos) | Valor | Timestamp |
 |---|---|---|---|---|---|
@@ -330,7 +330,7 @@ No existe función de editar o eliminar un préstamo individual (a diferencia de
 
 ### 8.6 Persistencia en Excel
 
-Hoja `Prestamos` del libro `Caja_{sede}_{año}.xlsx`. Una fila por movimiento:
+Hoja `Prestamos` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por movimiento:
 
 | Fecha | Tipo | Persona | (vacíos) | Valor | Timestamp |
 |---|---|---|---|---|---|
@@ -366,7 +366,7 @@ Hoja `Prestamos` del libro `Caja_{sede}_{año}.xlsx`. Una fila por movimiento:
 
 ### 9.4 Persistencia en Excel
 
-Hoja `Movimientos` del libro `Caja_{sede}_{año}.xlsx`. Una fila por movimiento:
+Hoja `Movimientos` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por movimiento:
 
 | Fecha | Tipo | Concepto | (vacíos) | Valor | Timestamp |
 |---|---|---|---|---|---|
@@ -489,7 +489,7 @@ El guardado envía todos los ítems activos (no pausados). Las reglas:
 
 ### 10.11 Persistencia en Excel
 
-Hoja `Contadores` del libro `Caja_{sede}_{año}.xlsx`. Una fila por ítem por día:
+Hoja `Contadores` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por ítem por día:
 
 | Fecha | item_id | nombre | denominacion | entradas | salidas | jackpot | yield_actual | ref_entradas | ref_salidas | ref_jackpot | yield_referencia | produccion_pre_reset | observacion | resultado_monetario | Timestamp |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -587,7 +587,7 @@ La interfaz muestra:
 
 | Archivo | Contenido |
 |---|---|
-| `Caja_{sede}_{año}.xlsx` | Módulos operativos: Caja, Plataformas, Gastos, Bonos, Prestamos, Movimientos, Contadores |
+| `Contadores_{sede}_{año}.xlsx` | Módulos operativos: Caja, Plataformas, Gastos, Bonos, Prestamos, Movimientos, Contadores |
 | `Consolidado_{sede}_{año}.xlsx` | Cuadre |
 
 Un par de archivos por sede y por año. La normalización del nombre de sede elimina tildes, espacios y caracteres especiales.

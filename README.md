@@ -25,7 +25,7 @@ La app corre localmente en cada equipo, abre una interfaz web en el navegador y 
 
 Archivos que genera por sede y año:
 
-- `Caja_{sede}_{año}.xlsx` — módulos operativos (Caja, Plataformas, Gastos, Bonos, Préstamos, Movimientos, Contadores)
+- `Contadores_{sede}_{año}.xlsx` — módulos operativos (Caja, Plataformas, Gastos, Bonos, Préstamos, Movimientos, Contadores)
 - `Consolidado_{sede}_{año}.xlsx` — cuadres del período
 
 ## Tecnologías
@@ -83,6 +83,8 @@ uvicorn app.main:app --reload
 1. Descargar o clonar el proyecto.
 2. Ejecutar `Instalar Caja.bat`.
 
+El instalador crea `.venv`, instala dependencias y deja un acceso directo `Iniciar Caja.lnk` en el escritorio.
+
 También puedes usar:
 
 ```powershell
@@ -104,6 +106,8 @@ Características del EXE:
 - instancia única: si ya está corriendo, el segundo clic solo abre el navegador sin iniciar un servidor nuevo
 - se apaga automáticamente si el navegador se cierra (watchdog de 75 s sin heartbeat)
 
+`Iniciar Caja.bat` usa el mismo `launcher.py`, así que en desarrollo conserva ese comportamiento de arranque.
+
 ## Configuración inicial por equipo
 
 Después de abrir la app:
@@ -113,8 +117,15 @@ Después de abrir la app:
 3. Elegir la carpeta donde se guardarán los libros.
 4. Seleccionar los módulos habilitados.
 5. Elegir el módulo por defecto si aplica.
+6. Opcionalmente definir un estado inicial del sistema:
+   - fecha de inicio
+   - caja inicial
+   - referencias iniciales por ítem para Contadores
 
-La configuración se guarda en `data/settings.json`.
+La configuración local se reparte entre:
+
+- `data/settings.json`
+- `data/startup_state.json`
 
 ## Módulos disponibles
 
@@ -139,8 +150,15 @@ La app mantiene JSON locales por equipo dentro de `data/`:
 - `data/movimientos_conceptos.json`
 - `data/contadores_items.json`
 - `data/settings.json`
+- `data/startup_state.json`
 
 Estos archivos son locales y no se comparten por Dropbox.
+
+También se pueden administrar desde la interfaz:
+
+- importar nombres de bonos desde `.txt`
+- editar catálogos de gastos, préstamos, movimientos y contadores
+- pausar ítems de Contadores sin eliminar su historial
 
 ## Uso con varias sedes
 
@@ -156,9 +174,9 @@ Ejemplo:
 
 | Sede | Operativo | Cuadres |
 |---|---|---|
-| Barbacoas | `Caja_Barbacoas_2026.xlsx` | `Consolidado_Barbacoas_2026.xlsx` |
-| SanJose | `Caja_SanJose_2026.xlsx` | `Consolidado_SanJose_2026.xlsx` |
-| Satinga | `Caja_Satinga_2026.xlsx` | `Consolidado_Satinga_2026.xlsx` |
+| Barbacoas | `Contadores_Barbacoas_2026.xlsx` | `Consolidado_Barbacoas_2026.xlsx` |
+| SanJose | `Contadores_SanJose_2026.xlsx` | `Consolidado_SanJose_2026.xlsx` |
+| Satinga | `Contadores_Satinga_2026.xlsx` | `Consolidado_Satinga_2026.xlsx` |
 
 ## Límite importante con Dropbox
 
@@ -201,7 +219,7 @@ data/prestamos_personas.json
 data/movimientos_conceptos.json
 data/contadores_items.json
 data/startup_state.json
-Caja_*.xlsx
+Contadores_*.xlsx
 Consolidado_*.xlsx
 ~$*.xlsx
 *.lock
@@ -221,5 +239,12 @@ Consolidado_*.xlsx
 ## Estado actual
 
 El proyecto ya es usable como herramienta operativa diaria si se trabaja por sede y se acepta que el Excel sigue siendo la fuente principal.
+
+Puntos auditados en esta versión:
+
+- flujo local estable con launcher, instancia única y cierre automático por heartbeat
+- configuración administrativa más completa, incluyendo estado inicial del sistema
+- persistencia operativa en `Contadores_{sede}_{año}.xlsx` y cuadre en `Consolidado_{sede}_{año}.xlsx`
+- catálogos locales editables desde la propia app
 
 Su siguiente límite natural, si crece la concurrencia o la exigencia de seguridad, será migrar la operación central a una base de datos y dejar Excel como respaldo o salida analítica.

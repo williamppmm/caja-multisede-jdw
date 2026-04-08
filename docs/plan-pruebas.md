@@ -126,7 +126,7 @@ Pasos:
 
 Resultado esperado:
 
-- se crea `Caja_<SEDE>_<AÑO>.xlsx` con los módulos operativos
+- se crea `Contadores_<SEDE>_<AÑO>.xlsx` con los módulos operativos
 - se crea `Consolidado_<SEDE>_<AÑO>.xlsx` con el Cuadre
 - ambos archivos corresponden a la sede configurada
 
@@ -574,7 +574,7 @@ Pasos:
 Resultado esperado:
 
 - existe `Consolidado_<SEDE>_<AÑO>.xlsx` con una hoja Cuadre
-- el archivo operativo `Caja_<SEDE>_<AÑO>.xlsx` no tiene hoja Cuadre
+- el archivo operativo `Contadores_<SEDE>_<AÑO>.xlsx` no tiene hoja Cuadre
 
 ## CQ-01 — Cuadre sin base previa
 
