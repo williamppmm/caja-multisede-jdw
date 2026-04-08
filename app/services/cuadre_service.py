@@ -69,23 +69,8 @@ def _obtener_primera_fecha_operativa_desde(fecha_inicio: date, fecha_cuadre: dat
 
 
 def calcular_periodo(fecha_cuadre: date) -> list[date]:
-    """Días calendario entre el último cuadre previo y la fecha actual, inclusive."""
-    ultima_cuadre = obtener_ultima_fecha_cuadre(fecha_cuadre)
-    if ultima_cuadre:
-        start = ultima_cuadre + timedelta(days=1)
-    else:
-        startup_date = startup_state_service.get_startup_date()
-        if startup_date is not None and startup_date <= fecha_cuadre:
-            start = _obtener_primera_fecha_operativa_desde(startup_date, fecha_cuadre) or fecha_cuadre
-        else:
-            start = fecha_cuadre
-
-    periodo = []
-    current = start
-    while current <= fecha_cuadre:
-        periodo.append(current)
-        current += timedelta(days=1)
-    return periodo
+    """El cuadre operativo actual consolida solo la fecha seleccionada."""
+    return [fecha_cuadre]
 
 
 def verificar_precondiciones(fecha_cuadre: date) -> dict:
