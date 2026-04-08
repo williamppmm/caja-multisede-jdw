@@ -23,7 +23,6 @@ def guardar_movimiento(entrada: MovimientoEntrada) -> dict:
             entrada.observacion,
             timestamp,
         )
-        nombres_service.agregar_item_catalogo("movimientos", entrada.concepto)
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 

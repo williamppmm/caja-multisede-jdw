@@ -148,9 +148,6 @@ def guardar_items_modulo(modulo: str, entrada: ModuloItemsEntrada) -> dict:
         timestamp = datetime.now().replace(microsecond=0)
         filas, total, cantidad = construir_filas_items(modulo, entrada, timestamp)
         excel_service.guardar_filas_modulo(modulo, filas, year)
-        if modulo in {"gastos", "movimientos"}:
-            for item in entrada.items:
-                nombres_service.agregar_item_catalogo(modulo, item.concepto)
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
