@@ -76,9 +76,16 @@ def guardar_caja(entrada: CajaEntrada) -> dict:
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
+    from app.services import cuadre_service
+
+    sync_result = cuadre_service.autoguardar_cuadre_si_listo(entrada.fecha)
+    mensaje = "Caja guardada correctamente"
+    if sync_result and sync_result.get("ok"):
+        mensaje += " y Cuadre sincronizado automaticamente"
+
     return {
         "ok": True,
-        "mensaje": "Caja guardada correctamente",
+        "mensaje": mensaje,
         "fecha": str(entrada.fecha),
         "total_billetes": total_billetes,
         "total_caja_fisica": total_caja_fisica,

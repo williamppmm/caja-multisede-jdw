@@ -361,9 +361,15 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
         return {"ok": False, "mensaje": str(exc), "fecha": fecha_str}
 
     total = sum(float(item["resultado_monetario"]) for item in filas_guardadas)
+    from app.services import cuadre_service
+
+    sync_result = cuadre_service.autoguardar_cuadre_si_listo(entrada.fecha)
+    mensaje = "Contadores guardados correctamente"
+    if sync_result and sync_result.get("ok"):
+        mensaje += " y Cuadre sincronizado automaticamente"
     return {
         "ok": True,
-        "mensaje": "Contadores guardados correctamente",
+        "mensaje": mensaje,
         "fecha": fecha_str,
         "total_resultado": total,
         "cantidad_items": len(filas_guardadas),
