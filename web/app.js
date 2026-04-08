@@ -564,6 +564,8 @@ function renderGastosRegistros(items = [], total = 0) {
     });
   }
   document.getElementById('total-gastos').textContent = fmt(total);
+  const detGastos = document.getElementById('gastos-detalle-dia');
+  if (detGastos) detGastos.open = items.length > 0;
 }
 
 function actualizarBonosVisuales() {
@@ -1314,6 +1316,8 @@ function renderBonosRegistros(items = [], total = 0) {
   document.getElementById('total-bonos').textContent = fmt(total);
   actualizarAccionesBonos();
   actualizarAcumuladoBonoCliente();
+  const detBonos = document.getElementById('bonos-detalle-dia');
+  if (detBonos) detBonos.open = bonusDayItems.length > 0;
 }
 
 function renderPrestamosRegistros(items = [], resumen = {}) {
@@ -1340,6 +1344,8 @@ function renderPrestamosRegistros(items = [], resumen = {}) {
   document.getElementById('total-pagado').textContent = fmt(resumen.total_pagado || 0);
   document.getElementById('saldo-prestamos').textContent = fmt(resumen.saldo_pendiente || 0);
   actualizarResumenPersonaPrestamo();
+  const detPrestamos = document.getElementById('prestamos-detalle-dia');
+  if (detPrestamos) detPrestamos.open = loanItems.length > 0;
 }
 
 function renderMovimientosRegistros(items = [], resumen = {}) {
@@ -1365,6 +1371,8 @@ function renderMovimientosRegistros(items = [], resumen = {}) {
   document.getElementById('total-movimientos-ingresos').textContent = fmt(resumen.total_ingresos || 0);
   document.getElementById('total-movimientos-salidas').textContent = fmt(resumen.total_salidas || 0);
   document.getElementById('total-movimientos-neto').textContent = fmt(resumen.neto || 0);
+  const detMovimientos = document.getElementById('movimientos-detalle-dia');
+  if (detMovimientos) detMovimientos.open = movementItems.length > 0;
 }
 
 async function cargarBonosDelDia(fecha) {
