@@ -3152,25 +3152,24 @@ async function cargarDatosCuadre(fecha) {
         const calculado = calcRes.ok ? await calcRes.json() : null;
         renderCuadreGuardado(guardado, fecha, calculado);
         contenido.classList.remove('oculto');
+        document.getElementById('btn-cuadre-guardar').disabled = true;
         return;
       }
     }
 
     const calcRes = await fetch(`/api/modulos/cuadre/calcular/${fecha}`);
-    const datos = await calcRes.json();
-    if (!calcRes.ok || !datos.ok) {
-      document.getElementById('cuadre-bloqueado-msg').textContent = datos.mensaje;
+    if (!calcRes.ok) {
+      document.getElementById('cuadre-bloqueado-msg').textContent = 'Error al calcular el cuadre.';
       bloqueado.classList.remove('oculto');
       return;
     }
+    const datos = await calcRes.json();
 
+    // Siempre renderizar lo que haya — puede ser vista parcial sin caja/contadores.
     cuadreDatos = datos.puede_guardar ? { ...datos, fecha } : null;
     renderCuadre(datos);
-    if (!datos.puede_guardar && datos.mensaje) {
-      document.getElementById('cuadre-bloqueado-msg').textContent = datos.mensaje;
-      bloqueado.classList.remove('oculto');
-    }
     contenido.classList.remove('oculto');
+    document.getElementById('btn-cuadre-guardar').disabled = !datos.puede_guardar;
   } catch {
     document.getElementById('cuadre-bloqueado-msg').textContent = 'Error al cargar los datos del cuadre.';
     bloqueado.classList.remove('oculto');
