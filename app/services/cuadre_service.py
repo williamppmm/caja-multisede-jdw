@@ -74,13 +74,15 @@ def calcular_periodo(fecha_cuadre: date) -> list[date]:
 
 
 def verificar_precondiciones(fecha_cuadre: date) -> dict:
+    valor_base = obtener_base_anterior_valor(fecha_cuadre)
+    tiene_base = valor_base is not None
     base = {
         "ok": False,
         "puede_guardar": False,
         "periodo": [],
         "fechas_sin_caja": [],
-        "tiene_base_anterior": False,
-        "base_anterior": 0.0,
+        "tiene_base_anterior": tiene_base,
+        "base_anterior": valor_base if tiene_base else 0.0,
         "tiene_caja_dia": False,
         "tiene_contadores_dia": False,
         "mensaje": "",
@@ -108,8 +110,6 @@ def verificar_precondiciones(fecha_cuadre: date) -> dict:
         return base
 
     periodo = calcular_periodo(fecha_cuadre)
-    valor_base = obtener_base_anterior_valor(fecha_cuadre)
-    tiene_base = valor_base is not None
     return {
         "ok": True,
         "puede_guardar": True,

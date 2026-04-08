@@ -1280,15 +1280,6 @@ function obtenerTipoMovimientoSeleccionado() {
   return document.querySelector('input[name="movimiento-tipo"]:checked')?.value || 'salida';
 }
 
-function enfocarYSeleccionarPorId(id, seleccionar = false) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  requestAnimationFrame(() => {
-    el.focus();
-    if (seleccionar && typeof el.select === 'function') el.select();
-  });
-}
-
 function renderBonosRegistros(items = [], total = 0) {
   const tbody = document.getElementById('bonos-registros-body');
   bonusDayItems = Array.isArray(items) ? [...items] : [];
@@ -1804,28 +1795,6 @@ async function confirmarAccionAdmin() {
   document.getElementById('auth-card-pass').value = '';
   cerrarModalEditar();
   if (accion) await accion();
-}
-
-async function autorizarModulo() {
-  const fecha = document.getElementById('fecha').value;
-  const modulo = currentModule;
-  const titulo = modulo === 'caja' ? 'Corrección de caja' : `Corrección de ${MODULE_META[modulo].label.toLowerCase()}`;
-  const descripcion = modulo === 'caja'
-    ? `La caja del ${formatFechaVisual(fecha)} ya fue registrada. Ingrese la contraseña para corregirla.`
-    : modulo === 'contadores'
-      ? `Los contadores del ${formatFechaVisual(fecha)} ya fueron registrados. Ingrese la contraseña para corregirlos o aplicar referencias críticas.`
-      : `Ingrese la contraseña para corregir ${MODULE_META[modulo].label.toLowerCase()} del ${formatFechaVisual(fecha)}.`;
-
-  abrirModalAdminAccion({
-    titulo,
-    descripcion,
-    onSuccess: async () => {
-      setOverride(modulo, fecha);
-      mostrarBannerActivo(`${titulo} autorizada: ${formatFechaVisual(fecha)}`);
-      await cargarVistaModulo(modulo, fecha);
-      await verificarFechaActual();
-    },
-  });
 }
 
 async function cargarDatosCaja(fecha) {
