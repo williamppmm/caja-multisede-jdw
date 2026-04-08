@@ -39,16 +39,31 @@ def obtener_ultima_fecha_cuadre(antes_de: date | None = None) -> date | None:
 
 def obtener_base_anterior_valor(fecha_cuadre: date) -> float | None:
     ultima = obtener_ultima_fecha_cuadre(fecha_cuadre)
-    if ultima is None:
-        startup_date = startup_state_service.get_startup_date()
-        startup_cash = startup_state_service.get_startup_cash()
-        if startup_date is not None and startup_cash is not None and startup_date <= fecha_cuadre:
-            return float(startup_cash)
-        return None
-    datos = excel_service.obtener_datos_cuadre_fecha(ultima, ultima.year)
-    if datos is None:
-        return None
-    return float(datos.get("base_nueva", 0))
+    fecha_cursor = fecha_cuadre - timedelta(days=1)
+    while ultima is None or fecha_cursor > ultima:
+        if (
+            excel_service.fecha_existe_modulo("caja", fecha_cursor, fecha_cursor.year)
+            and excel_service.fecha_existe_modulo("contadores", fecha_cursor, fecha_cursor.year)
+        ):
+            datos_caja = excel_service.obtener_datos_caja_fecha(fecha_cursor, fecha_cursor.year)
+            if datos_caja:
+                total_billetes = sum(
+                    int(denominacion) * int(cantidad or 0)
+                    for denominacion, cantidad in (datos_caja.get("billetes") or {}).items()
+                )
+                return float(total_billetes + float(datos_caja.get("total_monedas", 0)) + float(datos_caja.get("billetes_viejos", 0)))
+        fecha_cursor -= timedelta(days=1)
+
+    if ultima is not None:
+        datos = excel_service.obtener_datos_cuadre_fecha(ultima, ultima.year)
+        if datos is not None:
+            return float(datos.get("base_nueva", 0))
+
+    startup_date = startup_state_service.get_startup_date()
+    startup_cash = startup_state_service.get_startup_cash()
+    if startup_date is not None and startup_cash is not None and startup_date <= fecha_cuadre:
+        return float(startup_cash)
+    return None
 
 
 def _obtener_primera_fecha_operativa_desde(fecha_inicio: date, fecha_cuadre: date) -> date | None:
