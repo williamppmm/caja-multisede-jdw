@@ -263,7 +263,11 @@ function obtenerEstadoModulo(modulo, fecha) {
 
 function requiereAutorizacionParaFecha(modulo, fecha, data = null) {
   if (!modulo || !fecha || fecha > hoyStr() || isOverrideActive(modulo, fecha)) return false;
-  if (modulo === 'caja' || modulo === 'contadores' || modulo === 'cuadre') {
+  if (modulo === 'caja') {
+    if (fecha === hoyStr() || fecha === ayerStr()) return false;
+    return Boolean(data?.existe);
+  }
+  if (modulo === 'contadores' || modulo === 'cuadre') {
     return Boolean(data?.existe);
   }
   return fecha !== hoyStr();
@@ -1582,7 +1586,7 @@ function actualizarPaneles() {
 }
 
 function sugerirFechaModulo(modulo) {
-  return hoyStr();
+  return ayerStr();
 }
 
 function _persistirFechasModulo() {
@@ -1819,9 +1823,10 @@ async function cargarDatosCaja(fecha) {
     // La caja existe: siempre cargar y mostrar los datos guardados.
     // Si hay override de admin se habilita edición; si no, solo lectura.
     const res = await fetch(`/api/modulos/caja/fecha/${fecha}/datos`);
+    const cajaLibre = fecha === hoyStr() || fecha === ayerStr();
     if (!res.ok) {
       limpiarCaja();
-      setCajaEditable(isOverrideActive('caja', fecha));
+      setCajaEditable(cajaLibre || isOverrideActive('caja', fecha));
       return;
     }
     const data = await res.json();
@@ -1834,7 +1839,7 @@ async function cargarDatosCaja(fecha) {
     setNumeroInputValue('billetes_viejos', data.billetes_viejos || '');
     calcularCaja();
     eliminarDraftCaja(fecha);
-    setCajaEditable(isOverrideActive('caja', fecha));
+    setCajaEditable(cajaLibre || isOverrideActive('caja', fecha));
   } catch {
     if (!aplicarDraftCaja(fecha)) limpiarCaja();
     setCajaEditable(true);
