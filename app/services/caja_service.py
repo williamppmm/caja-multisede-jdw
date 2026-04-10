@@ -170,12 +170,19 @@ def guardar_items_modulo(modulo: str, entrada: ModuloItemsEntrada) -> dict:
 def consultar_estado_modulo(modulo: str, fecha_str: str) -> dict:
     fecha = date.fromisoformat(fecha_str)
     existe = excel_service.fecha_existe_modulo(modulo, fecha, fecha.year)
-    requiere_admin = modulo == "caja" and existe
+    today = date.today()
+    ayer = date.fromordinal(today.toordinal() - 1)
+    requiere_admin = modulo == "caja" and (existe or fecha not in {today, ayer})
     if modulo in ROW_TYPES or modulo == "plataformas":
-        requiere_admin = fecha != date.today()
+        requiere_admin = fecha != today
+    elif modulo == "caja":
+        requiere_admin = existe or fecha not in {today, ayer}
     return {
         "fecha": fecha_str,
         "existe": existe,
         "requiere_admin": requiere_admin,
-        "editable_libre": (modulo in ROW_TYPES or modulo == "plataformas") and fecha == date.today(),
+        "editable_libre": (
+            ((modulo in ROW_TYPES or modulo == "plataformas") and fecha == date.today())
+            or (modulo == "caja" and not requiere_admin)
+        ),
     }
