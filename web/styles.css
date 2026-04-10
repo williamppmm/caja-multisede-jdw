@@ -2028,6 +2028,10 @@ table.cuadre-tabla th,
 
 /* ── Super Admin ─────────────────────────────────────────────────────────── */
 
+body.super-admin-active {
+  border-top: 4px solid #4f7ef8;
+}
+
 .super-admin-sede-banner {
   display: flex;
   align-items: center;
@@ -2039,6 +2043,17 @@ table.cuadre-tabla th,
   margin-bottom: 14px;
   font-size: 0.9rem;
   border-left: 4px solid #4f7ef8;
+}
+
+.super-admin-badge {
+  background: #4f7ef8;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
 }
 
 .super-admin-sede-label {

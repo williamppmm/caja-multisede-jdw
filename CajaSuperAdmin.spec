@@ -33,7 +33,7 @@ excludes = [
 ]
 
 a = Analysis(
-    ['launcher.py'],
+    ['launcher_super_admin.py'],
     pathex=[],
     binaries=[],
     datas=[('web', 'web')],

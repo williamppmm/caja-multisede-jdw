@@ -15,7 +15,8 @@
     </div>
 
     <div id="super-admin-sede-banner" class="super-admin-sede-banner oculto" aria-live="polite">
-      <span class="super-admin-sede-label">Trabajando sobre:</span>
+      <span class="super-admin-badge">SUPER ADMIN</span>
+      <span class="super-admin-sede-label">Sede:</span>
       <select id="super-admin-sede-select" class="super-admin-sede-select"></select>
       <span id="super-admin-sede-path" class="super-admin-sede-path"></span>
     </div>
@@ -655,7 +656,7 @@
             <select id="admin-default-module"></select>
           </div>
         </section>
-        <section class="admin-section">
+        <section class="admin-section" id="admin-section-archivo-anual">
           <h4 class="admin-section-title">Archivo Anual</h4>
           <div class="campo-config">
             <span class="campo-config-label">Sede</span>
@@ -672,7 +673,7 @@
             <p class="modal-desc">La app creará en esa carpeta un archivo anual por sede, por ejemplo <strong id="admin-excel-preview">Contadores_Principal_2026.xlsx</strong>.</p>
           </div>
         </section>
-        <section class="admin-section">
+        <section class="admin-section" id="admin-section-startup">
           <h4 class="admin-section-title">Día 0</h4>
           <div class="campo-config">
             <label><input type="checkbox" id="admin-startup-enabled" /> Activar estado inicial del sistema</label>
@@ -740,8 +741,8 @@
           </details>
         </section>
         <section class="admin-section admin-section-super-admin" id="admin-section-sedes">
-          <h4 class="admin-section-title admin-section-title-super">Modo Super Admin — Sedes remotas</h4>
-          <div class="campo-config">
+          <h4 class="admin-section-title admin-section-title-super">Sedes remotas</h4>
+          <div class="campo-config" id="admin-super-admin-toggle">
             <label><input type="checkbox" id="admin-super-admin-mode" /> Activar modo super admin</label>
             <p class="modal-desc">Permite trabajar sobre múltiples sedes remotas sin contraseña. Solo para uso administrativo desde un equipo de supervisión.</p>
           </div>
@@ -763,11 +764,6 @@
                   <input type="text" id="admin-sede-form-label" placeholder="Ej: Barbacoas Centro" maxlength="40" />
                 </div>
                 <div class="campo-config">
-                  <span class="campo-config-label">Sede (nombre técnico)</span>
-                  <input type="text" id="admin-sede-form-sede" placeholder="Ej: Barbacoas" maxlength="31" />
-                  <p class="modal-desc">Se usa para nombrar los archivos Excel: <strong id="admin-sede-form-preview">Contadores_Barbacoas_2026.xlsx</strong></p>
-                </div>
-                <div class="campo-config">
                   <span class="campo-config-label">Carpeta Dropbox</span>
                   <input type="text" id="admin-sede-form-dir" placeholder="Ej: C:\Dropbox\Barbacoas" />
                   <div class="acciones-modal acciones-modal-config">
@@ -775,6 +771,11 @@
                     <button type="button" id="btn-admin-sede-form-validate" class="btn btn-secondary">Verificar acceso</button>
                   </div>
                   <p id="admin-sede-form-validate-msg" class="modal-desc oculto"></p>
+                </div>
+                <div class="campo-config">
+                  <span class="campo-config-label">Sede</span>
+                  <input type="text" id="admin-sede-form-sede" placeholder="Detectado automáticamente" maxlength="31" />
+                  <p class="modal-desc">Se detecta del nombre del Excel (<strong id="admin-sede-form-preview">Contadores_Barbacoas_2026.xlsx</strong>). Solo editar si es necesario.</p>
                 </div>
               </div>
               <div class="acciones-modal acciones-modal-config">

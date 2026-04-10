@@ -18,6 +18,7 @@ let configDataDir = '';
 let enabledModules = ['caja', 'gastos'];
 let defaultModule = 'caja';
 let configSuperAdminMode = false;
+let configSuperAdminBuild = false;   // true cuando el proceso es CajaSuperAdmin.exe
 let configRemoteSites = [];
 let configActiveSite = null;
 let currentModule = 'caja';
@@ -2614,12 +2615,20 @@ async function ingresarAdmin() {
     toggleSedesPanel(!!settings.super_admin_mode);
   } catch { /* defaults */ }
 
+  // En el build dedicado: ocultar secciones irrelevantes y el toggle de activación
+  const esBuildSA = configSuperAdminBuild;
+  document.getElementById('admin-section-archivo-anual').classList.toggle('oculto', configSuperAdminMode);
+  document.getElementById('admin-section-startup').classList.toggle('oculto', configSuperAdminMode);
+  document.getElementById('admin-super-admin-toggle').classList.toggle('oculto', esBuildSA);
+
   try {
     await cargarCatalogosAdmin();
   } catch { /* ignore */ }
-  try {
-    await cargarStartupAdmin();
-  } catch { /* ignore */ }
+  if (!configSuperAdminMode) {
+    try {
+      await cargarStartupAdmin();
+    } catch { /* ignore */ }
+  }
   try {
     await cargarSedesAdmin();
   } catch { /* ignore */ }
@@ -2674,16 +2683,18 @@ async function guardarAdmin() {
       body: JSON.stringify({ items: parseContadoresCatalogoGrid() }),
     });
     const itemsAgregados = sincronizarReferenciasCatalogo();
-    await fetch('/api/settings/startup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        enabled: document.getElementById('admin-startup-enabled')?.checked || false,
-        fecha_inicio: document.getElementById('admin-startup-date')?.value || '',
-        caja_inicial: parseNumeroTexto(document.getElementById('admin-startup-cash')?.value || '') || 0,
-        contadores: parseStartupContadoresGrid(),
-      }),
-    });
+    if (!body.super_admin_mode) {
+      await fetch('/api/settings/startup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: document.getElementById('admin-startup-enabled')?.checked || false,
+          fecha_inicio: document.getElementById('admin-startup-date')?.value || '',
+          caja_inicial: parseNumeroTexto(document.getElementById('admin-startup-cash')?.value || '') || 0,
+          contadores: parseStartupContadoresGrid(),
+        }),
+      });
+    }
     configModoEntrada = body.modo_entrada;
     enabledModules = body.enabled_modules;
     defaultModule = body.default_module;
@@ -2743,9 +2754,13 @@ function renderSuperAdminSedeBanner() {
   if (!banner) return;
   if (!configSuperAdminMode) {
     banner.classList.add('oculto');
+    document.body.classList.remove('super-admin-active');
+    document.title = 'ContabilidadJDW';
     return;
   }
   banner.classList.remove('oculto');
+  document.body.classList.add('super-admin-active');
+  document.title = '⚙ SUPER ADMIN — ContabilidadJDW';
   const sel = document.getElementById('super-admin-sede-select');
   const pathEl = document.getElementById('super-admin-sede-path');
   sel.innerHTML = '';
@@ -2909,7 +2924,16 @@ async function validarRutaSedeForm() {
     });
     const data = await res.json();
     if (data.ok) {
-      msgEl.textContent = `✓ Carpeta accesible. ${data.archivos_encontrados} archivo(s) Excel encontrado(s)${data.muestra?.length ? ': ' + data.muestra.join(', ') : ''}.`;
+      // Auto-rellenar sede y etiqueta desde el nombre del xlsx detectado
+      if (data.sede_detectada) {
+        const sedeField = document.getElementById('admin-sede-form-sede');
+        const labelField = document.getElementById('admin-sede-form-label');
+        if (!sedeField.value.trim()) sedeField.value = data.sede_detectada;
+        if (!labelField.value.trim()) labelField.value = data.sede_detectada;
+        actualizarPreviewSedeForm();
+      }
+      const sedeMsg = data.sede_detectada ? ` Sede detectada: "${data.sede_detectada}".` : ' No se detectó sede en los archivos.';
+      msgEl.textContent = `✓ Carpeta accesible.${sedeMsg} ${data.archivos_encontrados} archivo(s) Excel encontrado(s).`;
       msgEl.className = 'modal-desc ok-text';
     } else {
       msgEl.textContent = `✗ ${data.mensaje}`;
@@ -2930,6 +2954,8 @@ async function browseCarpetaSedeForm() {
     if (!data.ok) return;
     document.getElementById('admin-sede-form-dir').value = data.data_dir || '';
     actualizarPreviewSedeForm();
+    // Auto-detectar sede desde los xlsx de la carpeta seleccionada
+    await validarRutaSedeForm();
   } catch { /* ignore */ }
 }
 
@@ -2974,6 +3000,7 @@ async function init() {
     enabledModules = settings.enabled_modules || ['caja', 'gastos'];
     defaultModule = settings.default_module || enabledModules[0];
     configSuperAdminMode = !!settings.super_admin_mode;
+    configSuperAdminBuild = !!settings.is_super_admin_build;
     configRemoteSites = settings.remote_sites || [];
     configActiveSite = settings.active_site || null;
   } catch { /* defaults */ }

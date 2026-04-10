@@ -74,23 +74,39 @@ def _normalizar_remote_sites(value) -> list[dict]:
     return result
 
 
+def is_super_admin_build() -> bool:
+    """True cuando el proceso arrancó desde launcher_super_admin.py."""
+    return os.getenv("CAJA_SUPER_ADMIN") == "1"
+
+
 def _resolver_settings() -> dict:
     if not SETTINGS_PATH.exists():
-        return _DEFAULTS.copy()
-
-    with open(SETTINGS_PATH, encoding="utf-8") as f:
-        data = {**_DEFAULTS, **json.load(f)}
-        if "enabled_modules" not in data:
-            data["enabled_modules"] = ["caja", "gastos"] if data.get("mostrar_gastos") else ["caja"]
-        data["enabled_modules"] = _normalizar_modulos(data.get("enabled_modules"))
-        data["default_module"] = _normalizar_modulo_default(
-            data.get("default_module"),
-            data["enabled_modules"],
+        data = _DEFAULTS.copy()
+    else:
+        with open(SETTINGS_PATH, encoding="utf-8") as f:
+            data = {**_DEFAULTS, **json.load(f)}
+    if "enabled_modules" not in data:
+        data["enabled_modules"] = ["caja", "gastos"] if data.get("mostrar_gastos") else ["caja"]
+    data["enabled_modules"] = _normalizar_modulos(data.get("enabled_modules"))
+    data["default_module"] = _normalizar_modulo_default(
+        data.get("default_module"),
+        data["enabled_modules"],
+    )
+    data["super_admin_mode"] = bool(data.get("super_admin_mode", False))
+    data["remote_sites"] = _normalizar_remote_sites(data.get("remote_sites", []))
+    data["active_site_id"] = str(data.get("active_site_id") or "").strip()
+    # El build dedicado siempre opera en super admin, independiente de lo que diga settings.json
+    if is_super_admin_build():
+        data["super_admin_mode"] = True
+        # Todos los módulos disponibles para poder completar cualquier sede
+        data["enabled_modules"] = _normalizar_modulos(
+            data["enabled_modules"] or _normalizar_modulos(list(_DEFAULTS["enabled_modules"]))
         )
-        data["super_admin_mode"] = bool(data.get("super_admin_mode", False))
-        data["remote_sites"] = _normalizar_remote_sites(data.get("remote_sites", []))
-        data["active_site_id"] = str(data.get("active_site_id") or "").strip()
-        return data
+        all_modules = ["caja", "plataformas", "gastos", "bonos", "prestamos", "movimientos", "contadores", "cuadre"]
+        for m in all_modules:
+            if m not in data["enabled_modules"]:
+                data["enabled_modules"].append(m)
+    return data
 
 
 def get_settings() -> dict:
@@ -207,15 +223,27 @@ def save_remote_sites(sites: list[dict]) -> list[dict]:
 
 
 def validate_remote_site(data_dir: str) -> dict:
-    """Verifica que la carpeta existe, tiene xlsx y admite escritura."""
+    """Verifica que la carpeta existe, tiene xlsx, admite escritura y detecta el nombre de sede."""
+    import re
     import tempfile
     path = Path(str(data_dir or "").strip())
     if not path.exists():
         return {"ok": False, "mensaje": "La carpeta no existe."}
     if not path.is_dir():
         return {"ok": False, "mensaje": "La ruta no es una carpeta."}
-    xlsx_files = list(path.glob("Contadores_*.xlsx")) + list(path.glob("Consolidado_*.xlsx"))
-    # Prueba de escritura: crear y eliminar un archivo temporal
+    contadores_files = sorted(path.glob("Contadores_*.xlsx"))
+    xlsx_files = list(contadores_files) + list(path.glob("Consolidado_*.xlsx"))
+    # Extraer nombres de sede desde Contadores_{sede}_{año}.xlsx
+    sedes_encontradas: list[str] = []
+    seen: set[str] = set()
+    for f in contadores_files:
+        m = re.match(r"Contadores_(.+)_\d{4}\.xlsx$", f.name)
+        if m:
+            sede = m.group(1)
+            if sede not in seen:
+                seen.add(sede)
+                sedes_encontradas.append(sede)
+    # Prueba de escritura
     try:
         fd, tmp_path = tempfile.mkstemp(dir=path, suffix=".tmp")
         os.close(fd)
@@ -229,6 +257,8 @@ def validate_remote_site(data_dir: str) -> dict:
         "ok": True,
         "archivos_encontrados": len(xlsx_files),
         "muestra": [f.name for f in xlsx_files[:5]],
+        "sede_detectada": sedes_encontradas[0] if sedes_encontradas else None,
+        "sedes_encontradas": sedes_encontradas,
     }
 
 

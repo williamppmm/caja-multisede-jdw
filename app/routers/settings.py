@@ -47,6 +47,7 @@ def get_settings():
         **s,
         "hojas_activas": excel_service.obtener_hojas_activas(),
         "active_site": settings_service.get_active_site(),
+        "is_super_admin_build": settings_service.is_super_admin_build(),
     }
 
 
