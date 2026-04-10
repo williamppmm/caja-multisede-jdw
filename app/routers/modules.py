@@ -18,26 +18,47 @@ from app.models.caja_models import (
 )
 from app.models.contadores_models import ContadoresEntrada, ContadoresRespuesta
 from app.models.cuadre_models import CuadreEntrada, CuadreRespuesta
-from app.services import bonos_service, caja_service, contadores_service, cuadre_service, excel_service, movimientos_service, nombres_service, prestamos_service, settings_service
+from app.services import bonos_service, caja_service, contadores_service, cuadre_service, excel_service, movimientos_service, nombres_service, prestamos_service, settings_service, super_admin_audit_service
 
 router = APIRouter(prefix="/api/modulos")
+
+
+def _audit(accion: str, modulo: str, fecha: str) -> None:
+    """Registra en el log de auditoría solo cuando super_admin_mode está activo."""
+    s = settings_service.get_settings()
+    if not s.get("super_admin_mode"):
+        return
+    site = settings_service.get_active_site()
+    super_admin_audit_service.registrar(
+        accion=accion,
+        modulo=modulo,
+        fecha_afectada=fecha,
+        sede_id=site["id"] if site else "",
+        sede_label=site["label"] if site else "",
+    )
 
 
 @router.post("/caja/guardar", response_model=CajaRespuesta)
 def guardar_caja(entrada: CajaEntrada):
     resultado = caja_service.guardar_caja(entrada)
+    if resultado.get("ok"):
+        _audit("guardar", "caja", str(entrada.fecha))
     return CajaRespuesta(**resultado)
 
 
 @router.post("/plataformas/guardar", response_model=PlataformasRespuesta)
 def guardar_plataformas(entrada: PlataformasEntrada):
     resultado = caja_service.guardar_plataformas(entrada)
+    if resultado.get("ok"):
+        _audit("guardar", "plataformas", str(entrada.fecha))
     return PlataformasRespuesta(**resultado)
 
 
 @router.post("/contadores/guardar", response_model=ContadoresRespuesta)
 def guardar_contadores(entrada: ContadoresEntrada):
     resultado = contadores_service.guardar_contadores(entrada)
+    if resultado.get("ok"):
+        _audit("guardar", "contadores", str(entrada.fecha))
     return ContadoresRespuesta(**resultado)
 
 
@@ -81,6 +102,8 @@ def guardar_cuadre_pre(entrada: CuadreEntrada):
         return CuadreRespuesta(ok=False, mensaje=preconds["mensaje"], fecha=str(entrada.fecha))
     base = preconds["base_anterior"] if preconds["tiene_base_anterior"] else entrada.base_anterior
     resultado = cuadre_service.guardar_cuadre(entrada, base)
+    if resultado.get("ok"):
+        _audit("guardar", "cuadre", str(entrada.fecha))
     return CuadreRespuesta(**resultado)
 
 
@@ -89,24 +112,32 @@ def guardar_modulo_items(modulo: str, entrada: ModuloItemsEntrada):
     if modulo not in {"gastos"}:
         raise HTTPException(status_code=404, detail="Modulo no soportado")
     resultado = caja_service.guardar_items_modulo(modulo, entrada)
+    if resultado.get("ok"):
+        _audit("guardar", modulo, str(entrada.fecha))
     return ModuloItemsRespuesta(**resultado)
 
 
 @router.post("/bonos/registrar", response_model=BonoRespuesta)
 def registrar_bono(entrada: BonoEntrada):
     resultado = bonos_service.guardar_bono(entrada)
+    if resultado.get("ok"):
+        _audit("registrar", "bonos", str(entrada.fecha))
     return BonoRespuesta(**resultado)
 
 
 @router.post("/prestamos/registrar", response_model=PrestamoRespuesta)
 def registrar_prestamo(entrada: PrestamoEntrada):
     resultado = prestamos_service.guardar_prestamo(entrada)
+    if resultado.get("ok"):
+        _audit("registrar", "prestamos", str(entrada.fecha))
     return PrestamoRespuesta(**resultado)
 
 
 @router.post("/movimientos/registrar", response_model=MovimientoRespuesta)
 def registrar_movimiento(entrada: MovimientoEntrada):
     resultado = movimientos_service.guardar_movimiento(entrada)
+    if resultado.get("ok"):
+        _audit("registrar", "movimientos", str(entrada.fecha))
     return MovimientoRespuesta(**resultado)
 
 

@@ -14,6 +14,12 @@
       <button id="btn-admin" class="btn-admin-trigger" title="Administración">⚙</button>
     </div>
 
+    <div id="super-admin-sede-banner" class="super-admin-sede-banner oculto" aria-live="polite">
+      <span class="super-admin-sede-label">Trabajando sobre:</span>
+      <select id="super-admin-sede-select" class="super-admin-sede-select"></select>
+      <span id="super-admin-sede-path" class="super-admin-sede-path"></span>
+    </div>
+
     <div id="banner-edicion" class="banner-edicion oculto" aria-live="polite">
       <div class="banner-edicion-copy">
         <strong id="banner-titulo" class="banner-edicion-titulo">Edición protegida</strong>
@@ -732,6 +738,51 @@
               <p class="modal-desc" style="margin-top:8px">ID corto (ej. <strong>M01</strong>), nombre visible y denominación en pesos.</p>
             </div>
           </details>
+        </section>
+        <section class="admin-section admin-section-super-admin" id="admin-section-sedes">
+          <h4 class="admin-section-title admin-section-title-super">Modo Super Admin — Sedes remotas</h4>
+          <div class="campo-config">
+            <label><input type="checkbox" id="admin-super-admin-mode" /> Activar modo super admin</label>
+            <p class="modal-desc">Permite trabajar sobre múltiples sedes remotas sin contraseña. Solo para uso administrativo desde un equipo de supervisión.</p>
+          </div>
+          <div id="admin-sedes-panel" class="oculto">
+            <div class="campo-config">
+              <span class="campo-config-label">Sedes configuradas</span>
+              <table class="admin-grid-tabla" id="admin-sedes-tabla">
+                <thead><tr><th>Nombre</th><th>Sede</th><th>Carpeta</th><th></th></tr></thead>
+                <tbody id="admin-sedes-body"></tbody>
+              </table>
+              <button type="button" id="btn-admin-sedes-add" class="btn btn-secondary admin-grid-add-row">+ Agregar sede</button>
+            </div>
+            <div id="admin-sede-form" class="admin-sede-form oculto">
+              <h5 class="admin-sede-form-titulo">Nueva sede</h5>
+              <div class="admin-sede-form-campos">
+                <input type="hidden" id="admin-sede-form-id" />
+                <div class="campo-config">
+                  <span class="campo-config-label">Nombre visible</span>
+                  <input type="text" id="admin-sede-form-label" placeholder="Ej: Barbacoas Centro" maxlength="40" />
+                </div>
+                <div class="campo-config">
+                  <span class="campo-config-label">Sede (nombre técnico)</span>
+                  <input type="text" id="admin-sede-form-sede" placeholder="Ej: Barbacoas" maxlength="31" />
+                  <p class="modal-desc">Se usa para nombrar los archivos Excel: <strong id="admin-sede-form-preview">Contadores_Barbacoas_2026.xlsx</strong></p>
+                </div>
+                <div class="campo-config">
+                  <span class="campo-config-label">Carpeta Dropbox</span>
+                  <input type="text" id="admin-sede-form-dir" placeholder="Ej: C:\Dropbox\Barbacoas" />
+                  <div class="acciones-modal acciones-modal-config">
+                    <button type="button" id="btn-admin-sede-form-browse" class="btn btn-secondary">Elegir carpeta</button>
+                    <button type="button" id="btn-admin-sede-form-validate" class="btn btn-secondary">Verificar acceso</button>
+                  </div>
+                  <p id="admin-sede-form-validate-msg" class="modal-desc oculto"></p>
+                </div>
+              </div>
+              <div class="acciones-modal acciones-modal-config">
+                <button type="button" id="btn-admin-sede-form-save" class="btn btn-primary">Guardar sede</button>
+                <button type="button" id="btn-admin-sede-form-cancel" class="btn btn-secondary">Cancelar</button>
+              </div>
+            </div>
+          </div>
         </section>
         <p id="admin-config-msg" class="config-msg oculto"></p>
         <div class="acciones-modal">

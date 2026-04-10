@@ -42,16 +42,51 @@ def _iniciar_watchdog():
 
 @router.get("/api/settings")
 def get_settings():
+    s = settings_service.get_settings()
     return {
-        **settings_service.get_settings(),
+        **s,
         "hojas_activas": excel_service.obtener_hojas_activas(),
+        "active_site": settings_service.get_active_site(),
     }
 
 
 @router.post("/api/settings")
 def post_settings(body: dict):
     settings_service.save_settings(body)
-    return {"ok": True}
+    return {"ok": True, "active_site": settings_service.get_active_site()}
+
+
+# ── Sedes remotas (super admin) ───────────────────────────────────────────────
+
+@router.get("/api/settings/remote-sites")
+def get_remote_sites():
+    return {"sites": settings_service.get_remote_sites()}
+
+
+@router.post("/api/settings/remote-sites")
+def post_remote_sites(body: dict):
+    sites = settings_service.save_remote_sites(body.get("sites", []))
+    return {"ok": True, "sites": sites, "active_site": settings_service.get_active_site()}
+
+
+@router.post("/api/settings/active-site")
+def post_active_site(body: dict):
+    result = settings_service.set_active_site(str(body.get("site_id", "")))
+    return result
+
+
+@router.post("/api/settings/remote-sites/validate")
+def validate_remote_site(body: dict):
+    return settings_service.validate_remote_site(str(body.get("data_dir", "")))
+
+
+@router.post("/api/settings/remote-sites/browse")
+def browse_remote_site():
+    settings = settings_service.get_settings()
+    selected = settings_service.select_directory_dialog(settings.get("data_dir"))
+    if not selected:
+        return {"ok": False, "cancelled": True}
+    return {"ok": True, "data_dir": selected}
 
 
 @router.get("/api/settings/startup")

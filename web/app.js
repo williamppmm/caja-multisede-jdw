@@ -17,6 +17,9 @@ let configSede = 'Principal';
 let configDataDir = '';
 let enabledModules = ['caja', 'gastos'];
 let defaultModule = 'caja';
+let configSuperAdminMode = false;
+let configRemoteSites = [];
+let configActiveSite = null;
 let currentModule = 'caja';
 const cajaInputSessionToken = `caja_${Date.now().toString(36)}`;
 let moduleDates = {};
@@ -262,6 +265,7 @@ function obtenerEstadoModulo(modulo, fecha) {
 }
 
 function requiereAutorizacionParaFecha(modulo, fecha, data = null) {
+  if (configSuperAdminMode && configActiveSite) return false;
   if (!modulo || !fecha || fecha > hoyStr() || isOverrideActive(modulo, fecha)) return false;
   if (modulo === 'caja') {
     const fechaLibre = fecha === hoyStr() || fecha === ayerStr();
@@ -1056,7 +1060,7 @@ function confirmarReferenciaCritica(row) {
   const passField = row.querySelector('[data-role="critica-password"]');
   const passError = row.querySelector('.critica-pass-error');
   const pass = (passField?.value || '').trim();
-  const ok = isOverrideActive('contadores') || pass === CONTRASENA;
+  const ok = (configSuperAdminMode && !!configActiveSite) || isOverrideActive('contadores') || pass === CONTRASENA;
   if (!ok) {
     if (passError) { passError.textContent = 'Contraseña incorrecta.'; passError.classList.remove('oculto'); }
     if (passField) { passField.value = ''; passField.focus(); }
@@ -1089,7 +1093,7 @@ async function togglePausaContador(btn) {
   const passField = detalle?.querySelector('[data-role="pausa-password"]');
   const passError = detalle?.querySelector('.pausa-pass-error');
   const pass = (passField?.value || '').trim();
-  const ok = isOverrideActive('contadores') || pass === CONTRASENA;
+  const ok = (configSuperAdminMode && !!configActiveSite) || isOverrideActive('contadores') || pass === CONTRASENA;
   if (!ok) {
     if (passError) { passError.textContent = 'Contraseña incorrecta.'; passError.classList.remove('oculto'); }
     if (passField) { passField.value = ''; passField.focus(); }
@@ -1812,7 +1816,7 @@ async function confirmarAccionAdmin() {
 }
 
 async function cargarDatosCaja(fecha) {
-  const cajaLibre = fecha === hoyStr() || fecha === ayerStr();
+  const cajaLibre = (configSuperAdminMode && !!configActiveSite) || fecha === hoyStr() || fecha === ayerStr();
   try {
     const estadoRes = await fetch(`/api/modulos/caja/fecha/${fecha}/estado`);
     const estado = estadoRes.ok ? await estadoRes.json() : { existe: false };
@@ -1824,11 +1828,10 @@ async function cargarDatosCaja(fecha) {
     }
 
     // La caja existe: siempre cargar y mostrar los datos guardados.
-    // Si hay override de admin se habilita edición; si no, solo lectura.
     const res = await fetch(`/api/modulos/caja/fecha/${fecha}/datos`);
     if (!res.ok) {
       limpiarCaja();
-      setCajaEditable(Boolean(isOverrideActive('caja', fecha)));
+      setCajaEditable(cajaLibre || isOverrideActive('caja', fecha));
       return;
     }
     const data = await res.json();
@@ -1841,7 +1844,7 @@ async function cargarDatosCaja(fecha) {
     setNumeroInputValue('billetes_viejos', data.billetes_viejos || '');
     calcularCaja();
     eliminarDraftCaja(fecha);
-    setCajaEditable(Boolean(isOverrideActive('caja', fecha)));
+    setCajaEditable(cajaLibre || isOverrideActive('caja', fecha));
   } catch {
     if (!aplicarDraftCaja(fecha)) limpiarCaja();
     setCajaEditable(cajaLibre || isOverrideActive('caja', fecha));
@@ -2404,6 +2407,25 @@ async function guardar() {
     return;
   }
 
+  // Super admin: confirmación mínima antes de sobrescribir
+  if (configSuperAdminMode && !configActiveSite) {
+    mostrarMensaje('Selecciona una sede remota activa antes de guardar.', 'error');
+    return;
+  }
+  if (configSuperAdminMode) {
+    const estado = obtenerEstadoModulo(currentModule, fecha);
+    const sede = configActiveSite ? configActiveSite.label : configSede;
+    if (estado?.existe) {
+      const label = MODULE_META[currentModule]?.label || currentModule;
+      const ok = confirm(`⚠ Vas a sobrescribir ${label} del ${formatFechaVisual(fecha)} en "${sede}".\n¿Confirmar corrección?`);
+      if (!ok) return;
+    } else if (fecha !== hoyStr() && fecha !== ayerStr()) {
+      const label = MODULE_META[currentModule]?.label || currentModule;
+      const ok = confirm(`Estás guardando ${label} en una fecha anterior (${formatFechaVisual(fecha)}) en "${sede}".\n¿Continuar?`);
+      if (!ok) return;
+    }
+  }
+
   const error = currentModule === 'caja'
     ? validarCaja()
     : currentModule === 'plataformas'
@@ -2552,6 +2574,11 @@ function actualizarSelectModuloDefault() {
 }
 
 function abrirAdmin() {
+  if (configSuperAdminMode) {
+    document.getElementById('modal-admin').classList.remove('oculto');
+    ingresarAdmin();
+    return;
+  }
   document.getElementById('admin-pass').value = '';
   document.getElementById('admin-pass-error').classList.add('oculto');
   document.getElementById('admin-login-section').classList.remove('oculto');
@@ -2565,7 +2592,7 @@ function cerrarAdmin() {
 }
 
 async function ingresarAdmin() {
-  if (document.getElementById('admin-pass').value !== CONTRASENA) {
+  if (!configSuperAdminMode && document.getElementById('admin-pass').value !== CONTRASENA) {
     document.getElementById('admin-pass-error').classList.remove('oculto');
     return;
   }
@@ -2583,6 +2610,8 @@ async function ingresarAdmin() {
     document.getElementById('admin-data-dir').value = settings.data_dir || '';
     actualizarPreviewRutaAdmin();
     actualizarPreviewHojasAdmin();
+    document.getElementById('admin-super-admin-mode').checked = !!settings.super_admin_mode;
+    toggleSedesPanel(!!settings.super_admin_mode);
   } catch { /* defaults */ }
 
   try {
@@ -2590,6 +2619,9 @@ async function ingresarAdmin() {
   } catch { /* ignore */ }
   try {
     await cargarStartupAdmin();
+  } catch { /* ignore */ }
+  try {
+    await cargarSedesAdmin();
   } catch { /* ignore */ }
 
   document.getElementById('admin-login-section').classList.add('oculto');
@@ -2605,14 +2637,17 @@ async function guardarAdmin() {
     default_module: document.getElementById('admin-default-module').value || enabled[0],
     sede: document.getElementById('admin-sede').value.trim(),
     data_dir: document.getElementById('admin-data-dir').value.trim(),
+    super_admin_mode: document.getElementById('admin-super-admin-mode')?.checked || false,
   };
 
   try {
-    await fetch('/api/settings', {
+    const settingsRes = await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    const settingsData = await settingsRes.json();
+    configActiveSite = settingsData.active_site || null;
     await fetch('/api/modulos/catalogos/bonos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2654,6 +2689,8 @@ async function guardarAdmin() {
     defaultModule = body.default_module;
     configSede = body.sede || 'Principal';
     configDataDir = body.data_dir;
+    configSuperAdminMode = !!body.super_admin_mode;
+    renderSuperAdminSedeBanner();
     await cargarBonusNames();
     await cargarLoanNames();
     await cargarExpenseConcepts();
@@ -2699,6 +2736,211 @@ async function buscarCarpetaDatos() {
   }
 }
 
+// ── Super Admin — Sedes remotas ───────────────────────────────────────────────
+
+function renderSuperAdminSedeBanner() {
+  const banner = document.getElementById('super-admin-sede-banner');
+  if (!banner) return;
+  if (!configSuperAdminMode) {
+    banner.classList.add('oculto');
+    return;
+  }
+  banner.classList.remove('oculto');
+  const sel = document.getElementById('super-admin-sede-select');
+  const pathEl = document.getElementById('super-admin-sede-path');
+  sel.innerHTML = '';
+  if (!configRemoteSites.length) {
+    sel.innerHTML = '<option value="">Sin sedes configuradas</option>';
+    pathEl.textContent = '';
+    return;
+  }
+  configRemoteSites.forEach(site => {
+    const opt = document.createElement('option');
+    opt.value = site.id;
+    opt.textContent = site.label;
+    if (configActiveSite && site.id === configActiveSite.id) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  pathEl.textContent = configActiveSite ? configActiveSite.data_dir : '';
+}
+
+async function cambiarSedeActiva(siteId) {
+  try {
+    const res = await fetch('/api/settings/active-site', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ site_id: siteId }),
+    });
+    const data = await res.json();
+    if (!data.ok) { mostrarMensaje(data.mensaje || 'No se pudo cambiar la sede.', 'error'); return; }
+    configActiveSite = data.active_site;
+    const pathEl = document.getElementById('super-admin-sede-path');
+    if (pathEl) pathEl.textContent = configActiveSite ? configActiveSite.data_dir : '';
+    // Limpiar borradores para que no se inyecten datos de la sede anterior
+    cajaDrafts = {};
+    contadoresDrafts = {};
+    try { sessionStorage.removeItem('cajaDrafts'); } catch {}
+    try { sessionStorage.removeItem('contadoresDrafts'); } catch {}
+    await cargarVistaModulo(currentModule, moduleDates[currentModule]);
+    await verificarFechaActual();
+    mostrarMensaje(`Sede activa: ${configActiveSite?.label || siteId}`, 'ok');
+  } catch {
+    mostrarMensaje('Error al cambiar de sede.', 'error');
+  }
+}
+
+function toggleSedesPanel(visible) {
+  const panel = document.getElementById('admin-sedes-panel');
+  if (panel) panel.classList.toggle('oculto', !visible);
+}
+
+async function cargarSedesAdmin() {
+  const res = await fetch('/api/settings/remote-sites');
+  const data = await res.json();
+  configRemoteSites = data.sites || [];
+  renderSedesAdminTable();
+}
+
+function renderSedesAdminTable() {
+  const tbody = document.getElementById('admin-sedes-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  if (!configRemoteSites.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="bonos-vacio">Sin sedes configuradas.</td></tr>';
+    return;
+  }
+  configRemoteSites.forEach(site => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${site.label}</td>
+      <td>${site.sede}</td>
+      <td class="admin-sede-dir-cell" title="${site.data_dir}">${site.data_dir}</td>
+      <td class="admin-grid-acciones">
+        <button class="btn btn-secondary btn-xs" data-action="edit-site" data-id="${site.id}">Editar</button>
+        <button class="btn btn-secondary btn-xs btn-danger-subtle" data-action="delete-site" data-id="${site.id}">Eliminar</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function abrirFormularioSede(site = null) {
+  const form = document.getElementById('admin-sede-form');
+  form.classList.remove('oculto');
+  document.getElementById('admin-sede-form-titulo').textContent = site ? 'Editar sede' : 'Nueva sede';
+  document.getElementById('admin-sede-form-id').value = site?.id || '';
+  document.getElementById('admin-sede-form-label').value = site?.label || '';
+  document.getElementById('admin-sede-form-sede').value = site?.sede || '';
+  document.getElementById('admin-sede-form-dir').value = site?.data_dir || '';
+  actualizarPreviewSedeForm();
+  document.getElementById('admin-sede-form-validate-msg').classList.add('oculto');
+  document.getElementById('admin-sede-form-label').focus();
+}
+
+function cerrarFormularioSede() {
+  document.getElementById('admin-sede-form').classList.add('oculto');
+}
+
+function actualizarPreviewSedeForm() {
+  const sede = document.getElementById('admin-sede-form-sede').value.trim() || 'Sede';
+  const year = new Date().getFullYear();
+  const preview = document.getElementById('admin-sede-form-preview');
+  if (preview) preview.textContent = `Contadores_${sede}_${year}.xlsx`;
+}
+
+async function guardarSedeForm() {
+  const id = document.getElementById('admin-sede-form-id').value.trim();
+  const label = document.getElementById('admin-sede-form-label').value.trim();
+  const sede = document.getElementById('admin-sede-form-sede').value.trim();
+  const data_dir = document.getElementById('admin-sede-form-dir').value.trim();
+  if (!label || !data_dir) {
+    mostrarMensajeAdmin('El nombre y la carpeta son obligatorios.', 'error');
+    return;
+  }
+  const siteActual = id ? configRemoteSites.find(s => s.id === id) : null;
+  const sitesActualizados = configRemoteSites.filter(s => s.id !== id);
+  sitesActualizados.push({ id: id || undefined, label, sede: sede || label, data_dir });
+  try {
+    const res = await fetch('/api/settings/remote-sites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sites: sitesActualizados }),
+    });
+    const data = await res.json();
+    configRemoteSites = data.sites || [];
+    configActiveSite = data.active_site || null;
+    renderSedesAdminTable();
+    renderSuperAdminSedeBanner();
+    cerrarFormularioSede();
+    mostrarMensajeAdmin('Sede guardada.', 'ok');
+  } catch {
+    mostrarMensajeAdmin('Error al guardar la sede.', 'error');
+  }
+}
+
+async function eliminarSede(siteId) {
+  if (!confirm('¿Eliminar esta sede?')) return;
+  const sitesActualizados = configRemoteSites.filter(s => s.id !== siteId);
+  try {
+    const res = await fetch('/api/settings/remote-sites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sites: sitesActualizados }),
+    });
+    const data = await res.json();
+    configRemoteSites = data.sites || [];
+    configActiveSite = data.active_site || null;
+    renderSedesAdminTable();
+    renderSuperAdminSedeBanner();
+  } catch {
+    mostrarMensajeAdmin('Error al eliminar la sede.', 'error');
+  }
+}
+
+async function validarRutaSedeForm() {
+  const data_dir = document.getElementById('admin-sede-form-dir').value.trim();
+  const msgEl = document.getElementById('admin-sede-form-validate-msg');
+  if (!data_dir) { msgEl.textContent = 'Ingresa una carpeta primero.'; msgEl.className = 'modal-desc error-text'; msgEl.classList.remove('oculto'); return; }
+  try {
+    const res = await fetch('/api/settings/remote-sites/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data_dir }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      msgEl.textContent = `✓ Carpeta accesible. ${data.archivos_encontrados} archivo(s) Excel encontrado(s)${data.muestra?.length ? ': ' + data.muestra.join(', ') : ''}.`;
+      msgEl.className = 'modal-desc ok-text';
+    } else {
+      msgEl.textContent = `✗ ${data.mensaje}`;
+      msgEl.className = 'modal-desc error-text';
+    }
+    msgEl.classList.remove('oculto');
+  } catch {
+    msgEl.textContent = 'Error al verificar la carpeta.';
+    msgEl.className = 'modal-desc error-text';
+    msgEl.classList.remove('oculto');
+  }
+}
+
+async function browseCarpetaSedeForm() {
+  try {
+    const res = await fetch('/api/settings/remote-sites/browse', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) return;
+    document.getElementById('admin-sede-form-dir').value = data.data_dir || '';
+    actualizarPreviewSedeForm();
+  } catch { /* ignore */ }
+}
+
+function mostrarMensajeAdmin(texto, tipo) {
+  const msg = document.getElementById('admin-config-msg');
+  msg.textContent = texto;
+  msg.className = `config-msg ${tipo}`;
+  msg.classList.remove('oculto');
+  setTimeout(() => msg.classList.add('oculto'), 3000);
+}
+
 async function cerrarAplicacion() {
   const confirmar = window.confirm('La capturadora se cerrará en este equipo. ¿Desea finalizar ahora?');
   if (!confirmar) return;
@@ -2731,7 +2973,11 @@ async function init() {
     configDataDir = settings.data_dir || '';
     enabledModules = settings.enabled_modules || ['caja', 'gastos'];
     defaultModule = settings.default_module || enabledModules[0];
+    configSuperAdminMode = !!settings.super_admin_mode;
+    configRemoteSites = settings.remote_sites || [];
+    configActiveSite = settings.active_site || null;
   } catch { /* defaults */ }
+  renderSuperAdminSedeBanner();
 
   let _savedDates = null;
   try { _savedDates = JSON.parse(sessionStorage.getItem('moduleDates') || 'null'); } catch {}
@@ -2878,6 +3124,28 @@ async function init() {
     fila.querySelector('[data-field="item_id"]')?.focus();
   });
   document.getElementById('btn-admin-importar-bonos').addEventListener('click', importarNombresBonos);
+
+  // Super admin — sedes remotas
+  document.getElementById('admin-super-admin-mode').addEventListener('change', e => toggleSedesPanel(e.target.checked));
+  document.getElementById('btn-admin-sedes-add').addEventListener('click', () => abrirFormularioSede());
+  document.getElementById('btn-admin-sede-form-save').addEventListener('click', guardarSedeForm);
+  document.getElementById('btn-admin-sede-form-cancel').addEventListener('click', cerrarFormularioSede);
+  document.getElementById('btn-admin-sede-form-browse').addEventListener('click', browseCarpetaSedeForm);
+  document.getElementById('btn-admin-sede-form-validate').addEventListener('click', validarRutaSedeForm);
+  document.getElementById('admin-sede-form-sede').addEventListener('input', actualizarPreviewSedeForm);
+  document.getElementById('admin-sedes-body').addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    if (btn.dataset.action === 'edit-site') {
+      const site = configRemoteSites.find(s => s.id === id);
+      if (site) abrirFormularioSede(site);
+    } else if (btn.dataset.action === 'delete-site') {
+      eliminarSede(id);
+    }
+  });
+  document.getElementById('super-admin-sede-select').addEventListener('change', e => cambiarSedeActiva(e.target.value));
+
   document.getElementById('admin-pass').addEventListener('keydown', e => {
     if (e.key === 'Enter') ingresarAdmin();
   });
