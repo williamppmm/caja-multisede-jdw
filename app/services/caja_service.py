@@ -182,7 +182,7 @@ def consultar_estado_modulo(modulo: str, fecha_str: str) -> dict:
         "existe": existe,
         "requiere_admin": requiere_admin,
         "editable_libre": (
-            ((modulo in ROW_TYPES or modulo == "plataformas") and fecha == date.today())
+            ((modulo in ROW_TYPES or modulo == "plataformas") and fecha == today)
             or (modulo == "caja" and not requiere_admin)
         ),
     }

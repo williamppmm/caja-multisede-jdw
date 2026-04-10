@@ -1,4 +1,5 @@
 import json
+import shutil
 from datetime import date, datetime
 from pathlib import Path
 
@@ -7,7 +8,24 @@ from app.services import excel_service, startup_state_service
 from app.services.local_data_service import get_local_data_path
 
 
-CATALOGO_PATH = get_local_data_path("contadores_items.json")
+_CATALOGO_FILENAME = "contadores_items.json"
+
+
+def _get_catalogo_path() -> Path:
+    """Resuelve la ruta de contadores_items.json junto a los .xlsx de la sede activa.
+    Si todavía vive en data/, lo migra automáticamente la primera vez.
+    """
+    from app.config import get_excel_folder
+
+    target = get_excel_folder() / _CATALOGO_FILENAME
+    if not target.exists():
+        legacy = get_local_data_path(_CATALOGO_FILENAME)
+        if legacy.exists():
+            try:
+                shutil.move(str(legacy), str(target))
+            except Exception:
+                return legacy
+    return target
 
 
 def _leer_json(path: Path, default):
@@ -30,7 +48,7 @@ def _yield(entradas: int, salidas: int, jackpot: int) -> int:
 
 
 def obtener_catalogo() -> list[dict]:
-    data = _leer_json(CATALOGO_PATH, [])
+    data = _leer_json(_get_catalogo_path(), [])
     items = []
     for raw in data:
         try:
@@ -53,13 +71,13 @@ def guardar_catalogo(items: list[dict]) -> list[dict]:
         vistos.add(key)
         normalizados.append(item.model_dump())
 
-    _guardar_json(CATALOGO_PATH, normalizados)
+    _guardar_json(_get_catalogo_path(), normalizados)
     return obtener_catalogo()
 
 
 def pausar_item(item_id: str, pausado: bool) -> dict:
     """Pausa o despausa un ítem del catálogo. Devuelve el catálogo actualizado."""
-    data = _leer_json(CATALOGO_PATH, [])
+    data = _leer_json(_get_catalogo_path(), [])
     encontrado = False
     for raw in data:
         if raw.get("item_id") == item_id:
@@ -68,7 +86,7 @@ def pausar_item(item_id: str, pausado: bool) -> dict:
             break
     if not encontrado:
         return {"ok": False, "mensaje": f"Item '{item_id}' no encontrado en el catálogo."}
-    _guardar_json(CATALOGO_PATH, data)
+    _guardar_json(_get_catalogo_path(), data)
     return {"ok": True, "item_id": item_id, "pausado": pausado}
 
 

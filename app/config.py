@@ -56,3 +56,14 @@ def get_consolidado_path(year: int) -> Path:
     settings = get_settings()
     data_dir = Path(settings.get("data_dir") or DATA_DIR)
     return data_dir / get_consolidado_filename(year, settings.get("sede"))
+
+
+def get_excel_folder() -> Path:
+    """Directorio donde viven los .xlsx de la sede activa.
+    Usado para archivos que deben viajar junto al Excel (ej. startup_state.json,
+    contadores_items.json) y que en la versión super-admin apuntan a la sede remota.
+    """
+    from app.services.settings_service import get_settings
+
+    settings = get_settings()
+    return Path(settings.get("data_dir") or DATA_DIR)
