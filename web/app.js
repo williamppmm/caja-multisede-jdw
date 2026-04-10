@@ -263,7 +263,12 @@ function obtenerEstadoModulo(modulo, fecha) {
 
 function requiereAutorizacionParaFecha(modulo, fecha, data = null) {
   if (!modulo || !fecha || fecha > hoyStr() || isOverrideActive(modulo, fecha)) return false;
-  if (modulo === 'caja' || modulo === 'contadores' || modulo === 'cuadre') {
+  if (modulo === 'caja') {
+    const fechaLibre = fecha === hoyStr() || fecha === ayerStr();
+    if (fechaLibre && !data?.existe) return false;
+    return true;
+  }
+  if (modulo === 'contadores' || modulo === 'cuadre') {
     return Boolean(data?.existe);
   }
   return fecha !== hoyStr();
@@ -1742,8 +1747,9 @@ async function verificarFechaActual() {
     }
 
     if (currentModule === 'caja') {
+      const cajaLibre = fecha === hoyStr() || fecha === ayerStr();
       if (data.existe && !isOverrideActive('caja', fecha)) {
-        estado.textContent = `La caja de ${formatFechaVisual(fecha)} ya existe.`;
+        estado.textContent = `La caja de ${formatFechaVisual(fecha)} ya existe y requiere admin para corregirse.`;
         estado.className = 'fecha-estado existe';
         return;
       }
@@ -1754,10 +1760,10 @@ async function verificarFechaActual() {
         return;
       }
 
-      estado.textContent = fecha === hoyStr() || fecha === ayerStr()
-        ? 'Fecha disponible.'
-        : `Atención: ${formatFechaVisual(fecha)} no es hoy ni ayer. Verifique antes de guardar.`;
-      estado.className = fecha === hoyStr() || fecha === ayerStr() ? 'fecha-estado libre' : 'fecha-estado advertencia-fecha';
+      estado.textContent = cajaLibre
+        ? 'Fecha disponible para capturar caja.'
+        : `Caja en ${formatFechaVisual(fecha)} requiere admin.`;
+      estado.className = cajaLibre ? 'fecha-estado libre' : 'fecha-estado existe';
       return;
     }
 
@@ -1806,12 +1812,13 @@ async function confirmarAccionAdmin() {
 }
 
 async function cargarDatosCaja(fecha) {
+  const cajaLibre = fecha === hoyStr() || fecha === ayerStr();
   try {
     const estadoRes = await fetch(`/api/modulos/caja/fecha/${fecha}/estado`);
     const estado = estadoRes.ok ? await estadoRes.json() : { existe: false };
 
     if (!estado.existe) {
-      setCajaEditable(true);
+      setCajaEditable(cajaLibre || isOverrideActive('caja', fecha));
       if (!aplicarDraftCaja(fecha)) limpiarCaja();
       return;
     }
@@ -1821,7 +1828,7 @@ async function cargarDatosCaja(fecha) {
     const res = await fetch(`/api/modulos/caja/fecha/${fecha}/datos`);
     if (!res.ok) {
       limpiarCaja();
-      setCajaEditable(isOverrideActive('caja', fecha));
+      setCajaEditable(Boolean(isOverrideActive('caja', fecha)));
       return;
     }
     const data = await res.json();
@@ -1834,10 +1841,10 @@ async function cargarDatosCaja(fecha) {
     setNumeroInputValue('billetes_viejos', data.billetes_viejos || '');
     calcularCaja();
     eliminarDraftCaja(fecha);
-    setCajaEditable(isOverrideActive('caja', fecha));
+    setCajaEditable(Boolean(isOverrideActive('caja', fecha)));
   } catch {
     if (!aplicarDraftCaja(fecha)) limpiarCaja();
-    setCajaEditable(true);
+    setCajaEditable(cajaLibre || isOverrideActive('caja', fecha));
   }
 }
 
