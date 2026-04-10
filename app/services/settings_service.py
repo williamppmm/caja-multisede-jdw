@@ -24,6 +24,10 @@ _DEFAULTS = {
     "super_admin_mode": False,
     "remote_sites": [],
     "active_site_id": "",
+    # Referencias externas de Plataformas
+    "plataformas_ref_practi_path": "",
+    "plataformas_ref_bet_path": "",
+    "plataformas_ref": {"practi_header": "", "bet_header": ""},
 }
 
 _settings_cache: dict | None = None
@@ -44,6 +48,15 @@ def _slug(text: str) -> str:
     return s or "sede"
 
 
+def _normalizar_plataformas_ref(raw) -> dict:
+    if not isinstance(raw, dict):
+        return {"practi_header": "", "bet_header": ""}
+    return {
+        "practi_header": str(raw.get("practi_header") or "").strip(),
+        "bet_header": str(raw.get("bet_header") or "").strip(),
+    }
+
+
 def _normalizar_remote_site(raw: dict) -> dict | None:
     if not isinstance(raw, dict):
         return None
@@ -58,6 +71,7 @@ def _normalizar_remote_site(raw: dict) -> dict | None:
         "label": label,
         "sede": sede or label,
         "data_dir": str(Path(data_dir).expanduser()),
+        "plataformas_ref": _normalizar_plataformas_ref(raw.get("plataformas_ref")),
     }
 
 
@@ -95,6 +109,9 @@ def _resolver_settings() -> dict:
     data["super_admin_mode"] = bool(data.get("super_admin_mode", False))
     data["remote_sites"] = _normalizar_remote_sites(data.get("remote_sites", []))
     data["active_site_id"] = str(data.get("active_site_id") or "").strip()
+    data["plataformas_ref_practi_path"] = str(data.get("plataformas_ref_practi_path") or "").strip()
+    data["plataformas_ref_bet_path"] = str(data.get("plataformas_ref_bet_path") or "").strip()
+    data["plataformas_ref"] = _normalizar_plataformas_ref(data.get("plataformas_ref"))
     # El build dedicado siempre opera en super admin, independiente de lo que diga settings.json
     if is_super_admin_build():
         data["super_admin_mode"] = True
@@ -133,7 +150,8 @@ def _invalidar_cache() -> None:
 
 def save_settings(data: dict) -> None:
     allowed = {"modo_entrada", "sede", "data_dir", "enabled_modules", "default_module",
-               "super_admin_mode", "remote_sites", "active_site_id"}
+               "super_admin_mode", "remote_sites", "active_site_id",
+               "plataformas_ref_practi_path", "plataformas_ref_bet_path", "plataformas_ref"}
     cleaned = {k: v for k, v in data.items() if k in allowed}
     if "sede" in cleaned:
         cleaned["sede"] = str(cleaned["sede"]).strip()
@@ -145,6 +163,12 @@ def save_settings(data: dict) -> None:
         cleaned["remote_sites"] = _normalizar_remote_sites(cleaned["remote_sites"])
     if "active_site_id" in cleaned:
         cleaned["active_site_id"] = str(cleaned["active_site_id"] or "").strip()
+    if "plataformas_ref_practi_path" in cleaned:
+        cleaned["plataformas_ref_practi_path"] = str(cleaned["plataformas_ref_practi_path"] or "").strip()
+    if "plataformas_ref_bet_path" in cleaned:
+        cleaned["plataformas_ref_bet_path"] = str(cleaned["plataformas_ref_bet_path"] or "").strip()
+    if "plataformas_ref" in cleaned:
+        cleaned["plataformas_ref"] = _normalizar_plataformas_ref(cleaned["plataformas_ref"])
     enabled_modules = _normalizar_modulos(cleaned.get("enabled_modules"))
     cleaned["enabled_modules"] = enabled_modules
     cleaned["default_module"] = _normalizar_modulo_default(cleaned.get("default_module"), enabled_modules)
@@ -177,6 +201,8 @@ def get_active_site() -> dict | None:
     for site in sites:
         if site["id"] == active_id:
             return site
+    if len(sites) == 1:
+        return sites[0]
     return None
 
 
@@ -214,8 +240,8 @@ def save_remote_sites(sites: list[dict]) -> list[dict]:
     ids = {s["id"] for s in normalizadas}
     current_active = raw.get("active_site_id", "")
     if current_active not in ids:
-        # La sede activa desapareció o nunca hubo una: resetear sin auto-seleccionar
-        raw["active_site_id"] = ""
+        # Si solo existe una sede configurada, activarla automáticamente.
+        raw["active_site_id"] = normalizadas[0]["id"] if len(normalizadas) == 1 else ""
     with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
         json.dump(raw, f, indent=2, ensure_ascii=False)
     _invalidar_cache()
@@ -259,6 +285,31 @@ def validate_remote_site(data_dir: str) -> dict:
         "muestra": [f.name for f in xlsx_files[:5]],
         "sede_detectada": sedes_encontradas[0] if sedes_encontradas else None,
         "sedes_encontradas": sedes_encontradas,
+    }
+
+
+def get_plataformas_ref_config() -> dict:
+    """Devuelve rutas globales y mapeo de encabezados para la sede activa.
+
+    Resuelve el mapeo en este orden:
+    1. Si super_admin_mode y hay active_site → usa plataformas_ref del site
+    2. Si no → usa plataformas_ref del root de settings (versión usuario)
+    """
+    settings = get_settings()
+    practi_path = settings.get("plataformas_ref_practi_path", "")
+    bet_path = settings.get("plataformas_ref_bet_path", "")
+
+    if settings.get("super_admin_mode"):
+        site = get_active_site()
+        ref = site.get("plataformas_ref", {}) if site else {}
+    else:
+        ref = settings.get("plataformas_ref", {})
+
+    return {
+        "practi_path": practi_path,
+        "bet_path": bet_path,
+        "practi_header": str(ref.get("practi_header") or "").strip(),
+        "bet_header": str(ref.get("bet_header") or "").strip(),
     }
 
 

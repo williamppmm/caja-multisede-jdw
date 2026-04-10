@@ -132,7 +132,9 @@ def _normalizar_nombre_hoja(nombre: str | None) -> str:
 
 
 def _obtener_nombre_sede() -> str:
-    return _normalizar_nombre_hoja(get_settings().get("sede"))
+    from app.config import _get_active_dir_and_sede
+    _, sede = _get_active_dir_and_sede()
+    return _normalizar_nombre_hoja(sede)
 
 
 def _obtener_nombre_hoja_seccion(seccion: str) -> str:

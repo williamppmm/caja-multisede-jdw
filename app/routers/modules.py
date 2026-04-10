@@ -18,7 +18,7 @@ from app.models.caja_models import (
 )
 from app.models.contadores_models import ContadoresEntrada, ContadoresRespuesta
 from app.models.cuadre_models import CuadreEntrada, CuadreRespuesta
-from app.services import bonos_service, caja_service, contadores_service, cuadre_service, excel_service, movimientos_service, nombres_service, prestamos_service, settings_service, super_admin_audit_service
+from app.services import bonos_service, caja_service, contadores_service, cuadre_service, excel_service, movimientos_service, nombres_service, plataformas_referencia_service, prestamos_service, settings_service, super_admin_audit_service
 
 router = APIRouter(prefix="/api/modulos")
 
@@ -93,6 +93,15 @@ def datos_fecha_plataformas(fecha: str):
     if datos is None:
         raise HTTPException(status_code=404, detail="No hay datos para esa fecha")
     return datos
+
+
+@router.get("/plataformas/fecha/{fecha}/referencias")
+def referencias_fecha_plataformas(fecha: str):
+    try:
+        d = date.fromisoformat(fecha)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+    return plataformas_referencia_service.obtener_referencias(d)
 
 
 @router.post("/cuadre/guardar", response_model=CuadreRespuesta)

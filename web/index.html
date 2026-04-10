@@ -120,6 +120,24 @@
             <input type="text" inputmode="numeric" id="venta_deportivas" placeholder="0" />
           </div>
         </div>
+        <div id="plataformas-ref-panel" class="plataformas-ref-panel oculto">
+          <div class="plataformas-ref-header">
+            <span class="plataformas-ref-titulo">Referencia externa</span>
+            <span id="plataformas-ref-sede" class="plataformas-ref-sede"></span>
+          </div>
+          <div class="plataformas-ref-grid">
+            <div class="plataformas-ref-item">
+              <span class="plataformas-ref-label">Practisistemas</span>
+              <span id="plataformas-ref-practi-valor" class="plataformas-ref-valor">—</span>
+              <span id="plataformas-ref-practi-estado" class="plataformas-ref-estado"></span>
+            </div>
+            <div class="plataformas-ref-item">
+              <span class="plataformas-ref-label">Deportivas</span>
+              <span id="plataformas-ref-bet-valor" class="plataformas-ref-valor">—</span>
+              <span id="plataformas-ref-bet-estado" class="plataformas-ref-estado"></span>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section class="card modulo-secundario-card modulo-detalle-card">
@@ -638,7 +656,7 @@
               <label><input type="radio" name="modo_entrada" value="subtotal" /> Por total por denominación</label>
             </div>
           </div>
-          <div class="campo-config">
+          <div class="campo-config" id="admin-enabled-modules">
             <span class="campo-config-label">Módulos habilitados</span>
             <div class="check-group">
               <label><input type="checkbox" name="enabled_modules" value="caja" /> Caja</label>
@@ -700,35 +718,35 @@
         </section>
         <section class="admin-section">
           <h4 class="admin-section-title">Autocompletado</h4>
-          <details class="admin-catalogo">
+          <details class="admin-catalogo" id="admin-cat-bonos">
             <summary>Clientes de bonos</summary>
             <div class="admin-catalogo-body">
               <textarea id="admin-bonos-catalogo" class="catalogo-editor" rows="6" placeholder="Un cliente por línea"></textarea>
               <p class="modal-desc">Este catálogo se usa solo para autocompletado. No modifica bonos ya registrados.</p>
             </div>
           </details>
-          <details class="admin-catalogo">
+          <details class="admin-catalogo" id="admin-cat-gastos">
             <summary>Conceptos de gastos</summary>
             <div class="admin-catalogo-body">
               <textarea id="admin-gastos-catalogo" class="catalogo-editor" rows="6" placeholder="Un concepto por línea"></textarea>
               <p class="modal-desc">Puedes corregir ortografía o mantener conceptos frecuentes como "Pago arriendo local".</p>
             </div>
           </details>
-          <details class="admin-catalogo">
+          <details class="admin-catalogo" id="admin-cat-prestamos">
             <summary>Personas frecuentes de préstamos</summary>
             <div class="admin-catalogo-body">
               <textarea id="admin-prestamos-catalogo" class="catalogo-editor" rows="6" placeholder="Una persona por línea"></textarea>
               <p class="modal-desc">Este catálogo se usa para autocompletado rápido de préstamos a operarios.</p>
             </div>
           </details>
-          <details class="admin-catalogo">
+          <details class="admin-catalogo" id="admin-cat-movimientos">
             <summary>Conceptos de movimientos</summary>
             <div class="admin-catalogo-body">
               <textarea id="admin-movimientos-catalogo" class="catalogo-editor" rows="6" placeholder="Un concepto por línea"></textarea>
               <p class="modal-desc">Úsalo para conceptos frecuentes como "Giro", "Consignación" o "Retiro dueño".</p>
             </div>
           </details>
-          <details class="admin-catalogo">
+          <details class="admin-catalogo" id="admin-cat-contadores">
             <summary>Ítems de contadores</summary>
             <div class="admin-catalogo-body">
               <table class="admin-grid-tabla">
@@ -739,6 +757,25 @@
               <p class="modal-desc" style="margin-top:8px">ID corto (ej. <strong>M01</strong>), nombre visible y denominación en pesos.</p>
             </div>
           </details>
+        </section>
+        <section class="admin-section admin-section-super-admin" id="admin-section-plataformas-ref">
+          <h4 class="admin-section-title admin-section-title-super">Referencias Plataformas</h4>
+          <div class="campo-config">
+            <span class="campo-config-label">Carpeta Practisistemas</span>
+            <input type="text" id="admin-practi-path" placeholder="Ej: C:\Dropbox\Ventas" />
+            <div class="acciones-modal acciones-modal-config">
+              <button type="button" id="btn-admin-practi-browse" class="btn btn-secondary">Elegir carpeta</button>
+            </div>
+            <p class="modal-desc">Carpeta que contiene <em>Ventas_dia_Practisistemas.xlsx</em>.</p>
+          </div>
+          <div class="campo-config">
+            <span class="campo-config-label">Carpeta Deportivas/Bet</span>
+            <input type="text" id="admin-bet-path" placeholder="Ej: C:\Dropbox\Ventas" />
+            <div class="acciones-modal acciones-modal-config">
+              <button type="button" id="btn-admin-bet-browse" class="btn btn-secondary">Elegir carpeta</button>
+            </div>
+            <p class="modal-desc">Carpeta que contiene <em>Ventas_dia_Bet.xlsm</em>.</p>
+          </div>
         </section>
         <section class="admin-section admin-section-super-admin" id="admin-section-sedes">
           <h4 class="admin-section-title admin-section-title-super">Sedes remotas</h4>
@@ -776,6 +813,16 @@
                   <span class="campo-config-label">Sede</span>
                   <input type="text" id="admin-sede-form-sede" placeholder="Detectado automáticamente" maxlength="31" />
                   <p class="modal-desc">Se detecta del nombre del Excel (<strong id="admin-sede-form-preview">Contadores_Barbacoas_2026.xlsx</strong>). Solo editar si es necesario.</p>
+                </div>
+                <div class="campo-config">
+                  <span class="campo-config-label">Columna Practisistemas</span>
+                  <input type="text" id="admin-sede-form-practi-header" placeholder="Ej: localbarbacoas" maxlength="60" />
+                  <p class="modal-desc">Nombre exacto de la columna en <em>Ventas_dia_Practisistemas.xlsx</em> para esta sede.</p>
+                </div>
+                <div class="campo-config">
+                  <span class="campo-config-label">Columna Deportivas/Bet</span>
+                  <input type="text" id="admin-sede-form-bet-header" placeholder="Ej: Barbacoas" maxlength="60" />
+                  <p class="modal-desc">Nombre exacto de la columna en <em>Ventas_dia_Bet.xlsm</em> para esta sede.</p>
                 </div>
               </div>
               <div class="acciones-modal acciones-modal-config">

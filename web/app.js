@@ -1857,15 +1857,85 @@ async function cargarDatosPlataformas(fecha) {
     const res = await fetch(`/api/modulos/plataformas/fecha/${fecha}/datos`);
     if (!res.ok) {
       limpiarPlataformas();
-      return;
+    } else {
+      const data = await res.json();
+      setNumeroInputValue('venta_practisistemas', data.venta_practisistemas || '');
+      setNumeroInputValue('venta_deportivas', data.venta_deportivas || '', true);
+      calcularPlataformas();
     }
-    const data = await res.json();
-    setNumeroInputValue('venta_practisistemas', data.venta_practisistemas || '');
-    setNumeroInputValue('venta_deportivas', data.venta_deportivas || '', true);
-    calcularPlataformas();
   } catch {
     limpiarPlataformas();
   }
+  if (configSuperAdminMode && configActiveSite) {
+    cargarReferenciasPlataformas(fecha);
+  } else {
+    document.getElementById('plataformas-ref-panel').classList.add('oculto');
+  }
+}
+
+async function cargarReferenciasPlataformas(fecha) {
+  const panel = document.getElementById('plataformas-ref-panel');
+  try {
+    const res = await fetch(`/api/modulos/plataformas/fecha/${fecha}/referencias`);
+    if (!res.ok) { panel.classList.add('oculto'); return; }
+    const data = await res.json();
+    panel.classList.remove('oculto');
+    document.getElementById('plataformas-ref-sede').textContent = data.sede ? `— ${data.sede}` : '';
+    _renderRefItem('plataformas-ref-practi', data.practisistemas, parsePositivo('venta_practisistemas'));
+    _renderRefItem('plataformas-ref-bet', data.deportivas, parseNumeroInput('venta_deportivas', true) || 0);
+  } catch {
+    panel.classList.add('oculto');
+  }
+}
+
+function _renderRefItem(prefix, ref, valorIngresado) {
+  const valorEl = document.getElementById(`${prefix}-valor`);
+  const estadoEl = document.getElementById(`${prefix}-estado`);
+  if (!valorEl || !estadoEl) return;
+  estadoEl.className = 'plataformas-ref-estado';
+
+  if (!ref || ref.status === 'sin_ruta' || ref.status === 'sin_mapeo') {
+    valorEl.textContent = '—';
+    estadoEl.textContent = ref?.status === 'sin_mapeo' ? 'Sin columna configurada' : 'Sin ruta configurada';
+    estadoEl.classList.add('sin-dato');
+    return;
+  }
+  if (ref.status === 'archivo_no_encontrado') {
+    valorEl.textContent = '—';
+    estadoEl.textContent = 'Archivo no encontrado';
+    estadoEl.classList.add('sin-dato');
+    return;
+  }
+  if (ref.status === 'fecha_no_encontrada') {
+    valorEl.textContent = '—';
+    estadoEl.textContent = 'Sin dato para esta fecha';
+    estadoEl.classList.add('sin-dato');
+    return;
+  }
+  if (ref.status === 'sin_dato' || ref.status === 'vacio') {
+    valorEl.textContent = '—';
+    estadoEl.textContent = 'Sin datos';
+    estadoEl.classList.add('sin-dato');
+    return;
+  }
+  if (ref.status === 'ok' && ref.valor !== null) {
+    valorEl.textContent = fmt(ref.valor);
+    const diff = Math.abs((valorIngresado || 0) - ref.valor);
+    if (valorIngresado === 0 || isNaN(valorIngresado)) {
+      estadoEl.textContent = '';
+    } else if (diff <= 1) {
+      estadoEl.textContent = 'Coincide';
+      estadoEl.classList.add('coincide');
+    } else {
+      estadoEl.textContent = `Difiere ${fmt(diff)}`;
+      estadoEl.classList.add('difiere');
+    }
+    return;
+  }
+  // error u otro estado
+  valorEl.textContent = '—';
+  estadoEl.textContent = ref.status || 'Error';
+  estadoEl.classList.add('sin-dato');
 }
 
 async function cargarDatosModuloItems(modulo, fecha) {
@@ -2613,6 +2683,8 @@ async function ingresarAdmin() {
     actualizarPreviewHojasAdmin();
     document.getElementById('admin-super-admin-mode').checked = !!settings.super_admin_mode;
     toggleSedesPanel(!!settings.super_admin_mode);
+    document.getElementById('admin-practi-path').value = settings.plataformas_ref_practi_path || '';
+    document.getElementById('admin-bet-path').value = settings.plataformas_ref_bet_path || '';
   } catch { /* defaults */ }
 
   // En el build dedicado: ocultar secciones irrelevantes y el toggle de activación
@@ -2620,6 +2692,11 @@ async function ingresarAdmin() {
   document.getElementById('admin-section-archivo-anual').classList.toggle('oculto', configSuperAdminMode);
   document.getElementById('admin-section-startup').classList.toggle('oculto', configSuperAdminMode);
   document.getElementById('admin-super-admin-toggle').classList.toggle('oculto', esBuildSA);
+  document.getElementById('admin-section-plataformas-ref').classList.toggle('oculto', !configSuperAdminMode);
+  // Módulos habilitados no aplica en build SA (siempre todos); catálogos locales tampoco
+  document.getElementById('admin-enabled-modules').classList.toggle('oculto', esBuildSA);
+  ['admin-cat-bonos', 'admin-cat-gastos', 'admin-cat-prestamos', 'admin-cat-movimientos', 'admin-cat-contadores']
+    .forEach(id => document.getElementById(id).classList.toggle('oculto', esBuildSA));
 
   try {
     await cargarCatalogosAdmin();
@@ -2647,6 +2724,8 @@ async function guardarAdmin() {
     sede: document.getElementById('admin-sede').value.trim(),
     data_dir: document.getElementById('admin-data-dir').value.trim(),
     super_admin_mode: document.getElementById('admin-super-admin-mode')?.checked || false,
+    plataformas_ref_practi_path: document.getElementById('admin-practi-path').value.trim(),
+    plataformas_ref_bet_path: document.getElementById('admin-bet-path').value.trim(),
   };
 
   try {
@@ -2745,6 +2824,24 @@ async function buscarCarpetaDatos() {
     msg.className = 'config-msg error';
     msg.classList.remove('oculto');
   }
+}
+
+async function buscarCarpetaPracti() {
+  try {
+    const res = await fetch('/api/settings/browse-directory', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) return;
+    document.getElementById('admin-practi-path').value = data.data_dir || '';
+  } catch { /* ignore */ }
+}
+
+async function buscarCarpetaBet() {
+  try {
+    const res = await fetch('/api/settings/browse-directory', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) return;
+    document.getElementById('admin-bet-path').value = data.data_dir || '';
+  } catch { /* ignore */ }
 }
 
 // ── Super Admin — Sedes remotas ───────────────────────────────────────────────
@@ -2847,6 +2944,8 @@ function abrirFormularioSede(site = null) {
   document.getElementById('admin-sede-form-label').value = site?.label || '';
   document.getElementById('admin-sede-form-sede').value = site?.sede || '';
   document.getElementById('admin-sede-form-dir').value = site?.data_dir || '';
+  document.getElementById('admin-sede-form-practi-header').value = site?.plataformas_ref?.practi_header || '';
+  document.getElementById('admin-sede-form-bet-header').value = site?.plataformas_ref?.bet_header || '';
   actualizarPreviewSedeForm();
   document.getElementById('admin-sede-form-validate-msg').classList.add('oculto');
   document.getElementById('admin-sede-form-label').focus();
@@ -2872,9 +2971,17 @@ async function guardarSedeForm() {
     mostrarMensajeAdmin('El nombre y la carpeta son obligatorios.', 'error');
     return;
   }
+  const practi_header = document.getElementById('admin-sede-form-practi-header').value.trim();
+  const bet_header = document.getElementById('admin-sede-form-bet-header').value.trim();
   const siteActual = id ? configRemoteSites.find(s => s.id === id) : null;
   const sitesActualizados = configRemoteSites.filter(s => s.id !== id);
-  sitesActualizados.push({ id: id || undefined, label, sede: sede || label, data_dir });
+  sitesActualizados.push({
+    id: id || undefined,
+    label,
+    sede: sede || label,
+    data_dir,
+    plataformas_ref: { practi_header, bet_header },
+  });
   try {
     const res = await fetch('/api/settings/remote-sites', {
       method: 'POST',
@@ -3082,12 +3189,22 @@ async function init() {
     startupCashInput.addEventListener('input', () => formatearInputNumerico(startupCashInput, false, true));
   }
 
+  let _refCompareTimer = null;
   ['venta_practisistemas', 'venta_deportivas'].forEach(id => {
     const el = document.getElementById(id);
     const allowNegative = id === 'venta_deportivas';
     formatearInputNumerico(el, allowNegative);
     el.addEventListener('input', calcularPlataformas);
-    el.addEventListener('input', () => formatearInputNumerico(el, allowNegative));
+    el.addEventListener('input', () => {
+      formatearInputNumerico(el, allowNegative);
+      if (configSuperAdminMode && configActiveSite) {
+        clearTimeout(_refCompareTimer);
+        _refCompareTimer = setTimeout(() => {
+          const fecha = moduleDates['plataformas'] || moduleDates[currentModule];
+          if (fecha) cargarReferenciasPlataformas(fecha);
+        }, 600);
+      }
+    });
     el.addEventListener('focus', () => limpiarFormatoInputNumerico(el, allowNegative));
     el.addEventListener('blur', () => formatearInputNumerico(el, allowNegative));
   });
@@ -3144,6 +3261,8 @@ async function init() {
   document.getElementById('btn-admin-ingresar').addEventListener('click', ingresarAdmin);
   document.getElementById('btn-admin-guardar').addEventListener('click', guardarAdmin);
   document.getElementById('btn-admin-buscar-carpeta').addEventListener('click', buscarCarpetaDatos);
+  document.getElementById('btn-admin-practi-browse').addEventListener('click', buscarCarpetaPracti);
+  document.getElementById('btn-admin-bet-browse').addEventListener('click', buscarCarpetaBet);
   document.getElementById('btn-admin-contadores-add').addEventListener('click', () => {
     const body = document.getElementById('admin-contadores-grid-body');
     const fila = _crearFilaCatalogoContadores();

@@ -2140,3 +2140,64 @@ body.super-admin-active {
 }
 
 .ok-text { color: #1a7a45; }
+
+/* ── Plataformas — panel de referencia externa ───────────────────────────── */
+
+.plataformas-ref-panel {
+  margin-top: 14px;
+  border: 1px solid #d0d9f0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: #f4f7fe;
+}
+
+.plataformas-ref-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.plataformas-ref-titulo {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #4f7ef8;
+}
+
+.plataformas-ref-sede {
+  font-size: 0.78rem;
+  color: #7890c8;
+}
+
+.plataformas-ref-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+}
+
+.plataformas-ref-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plataformas-ref-label {
+  font-size: 0.74rem;
+  color: #6b7a9a;
+}
+
+.plataformas-ref-valor {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #222;
+}
+
+.plataformas-ref-estado {
+  font-size: 0.72rem;
+}
+
+.plataformas-ref-estado.coincide { color: #1a7a45; }
+.plataformas-ref-estado.difiere  { color: #c0392b; font-weight: 600; }
+.plataformas-ref-estado.sin-dato { color: #8a8a8a; }
