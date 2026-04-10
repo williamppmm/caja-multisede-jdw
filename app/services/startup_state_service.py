@@ -1,10 +1,28 @@
 import json
+import shutil
 from datetime import date
 
 from app.services.local_data_service import get_local_data_path
 
 
-STARTUP_STATE_PATH = get_local_data_path("startup_state.json")
+_FILENAME = "startup_state.json"
+
+
+def _get_path():
+    """Resuelve la ruta de startup_state.json junto a los .xlsx de la sede activa.
+    Si el archivo todavía vive en data/, lo migra automáticamente la primera vez.
+    """
+    from app.config import get_excel_folder
+
+    target = get_excel_folder() / _FILENAME
+    if not target.exists():
+        legacy = get_local_data_path(_FILENAME)
+        if legacy.exists():
+            try:
+                shutil.move(str(legacy), str(target))
+            except Exception:
+                return legacy
+    return target
 
 
 def _default_state() -> dict:
@@ -33,10 +51,11 @@ def _normalizar_contadores(raw) -> dict[str, dict]:
 
 
 def get_startup_state() -> dict:
-    if not STARTUP_STATE_PATH.exists():
+    path = _get_path()
+    if not path.exists():
         return _default_state()
     try:
-        with open(STARTUP_STATE_PATH, encoding="utf-8") as fh:
+        with open(path, encoding="utf-8") as fh:
             raw = json.load(fh)
         state = {
             "enabled": bool(raw.get("enabled", False)),
@@ -60,7 +79,7 @@ def save_startup_state(data: dict) -> dict:
         "caja_inicial": max(0.0, float(data.get("caja_inicial", 0) or 0)),
         "contadores": _normalizar_contadores(data.get("contadores")),
     }
-    with open(STARTUP_STATE_PATH, "w", encoding="utf-8") as fh:
+    with open(_get_path(), "w", encoding="utf-8") as fh:
         json.dump(state, fh, indent=2, ensure_ascii=False)
     return state
 
