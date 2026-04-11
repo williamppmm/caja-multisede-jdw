@@ -644,17 +644,267 @@ def obtener_items_modulo_fecha(modulo: str, fecha: date, year: int) -> dict | No
         if not hojas:
             return None
 
-        for row in _iterar_filas_fecha(hojas, fecha):
-            if not _fila_es_modulo(modulo, row):
-                continue
-            concepto = row[2] or ""
-            valor = row[6] or 0
-            items.append({"concepto": concepto, "valor": valor})
-            total += valor
+        for ws in hojas:
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                cell_date = row[0]
+                if isinstance(cell_date, datetime):
+                    cell_date = cell_date.date()
+                if not (isinstance(cell_date, date) and cell_date == fecha):
+                    continue
+                if not _fila_es_modulo(modulo, row):
+                    continue
+                concepto = row[2] or ""
+                valor = row[6] or 0
+                ts = row[7]
+                items.append({
+                    "sheet_row": idx,
+                    "concepto": concepto,
+                    "valor": valor,
+                    "fecha": fecha.isoformat(),
+                    "fecha_display": fecha.strftime("%d-%m-%Y"),
+                    "fecha_hora_registro": ts.isoformat() if isinstance(ts, datetime) else str(ts or ""),
+                })
+                total += valor
 
     if not items:
         return None
     return {"items": items, "total": total}
+
+
+def _normalizar_fecha_valor(value):
+    if isinstance(value, datetime):
+        return value.date()
+    return value if isinstance(value, date) else None
+
+
+def _normalizar_timestamp_valor(value):
+    if isinstance(value, datetime):
+        return value
+    return None
+
+
+def _coincide_registro(row_idx: int, row_ts: datetime | None, sheet_row: int | None, fecha_hora_registro: str | None) -> bool:
+    ts_objetivo = str(fecha_hora_registro or "").strip()
+    if ts_objetivo and row_ts and row_ts.isoformat() == ts_objetivo:
+        return True
+    if sheet_row is not None and row_idx == sheet_row:
+        return True
+    return False
+
+
+def _resumen_gastos_fecha(fecha: date, year: int) -> dict:
+    datos = obtener_items_modulo_fecha("gastos", fecha, year) or {"items": [], "total": 0}
+    return {"items": datos.get("items", []), "total": float(datos.get("total", 0) or 0)}
+
+
+def _resumen_movimientos_fecha(fecha: date, year: int) -> dict:
+    registros = obtener_movimientos_fecha(fecha, year)
+    total_ingresos = sum(float(item["valor"] or 0) for item in registros if item["tipo_movimiento"] == "ingreso")
+    total_salidas = sum(float(item["valor"] or 0) for item in registros if item["tipo_movimiento"] == "salida")
+    return {
+        "items": registros,
+        "total_ingresos": total_ingresos,
+        "total_salidas": total_salidas,
+        "neto": total_ingresos - total_salidas,
+    }
+
+
+def obtener_ultimo_gasto(fecha: date, year: int) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    ultimo = None
+    with _abrir_workbook_lectura(path) as wb:
+        hojas = _obtener_hojas_para_lectura(wb, "gastos")
+        if not hojas:
+            return None
+        for ws in hojas:
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                cell_date = _normalizar_fecha_valor(row[0])
+                if cell_date != fecha or not _fila_es_modulo("gastos", row):
+                    continue
+                timestamp = _normalizar_timestamp_valor(row[7])
+                if timestamp is None:
+                    continue
+                if ultimo is None or timestamp >= ultimo["timestamp"]:
+                    ultimo = {
+                        "sheet_name": ws.title,
+                        "sheet_row": idx,
+                        "timestamp": timestamp,
+                        "concepto": str(row[2] or "").strip(),
+                        "valor": float(row[6] or 0),
+                    }
+    if ultimo is None:
+        return None
+    return {
+        "sheet_row": ultimo["sheet_row"],
+        "concepto": ultimo["concepto"],
+        "valor": ultimo["valor"],
+        "fecha_hora_registro": ultimo["timestamp"].isoformat(),
+    }
+
+
+def actualizar_ultimo_gasto(fecha: date, year: int, concepto: str, valor: float, timestamp: datetime) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ultimo_ws = None
+        ultimo_row = None
+        ultimo_ts = None
+        for nombre in _nombres_lectura_modulo("gastos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = _normalizar_fecha_valor(row[0].value)
+                if cell_date != fecha:
+                    continue
+                row_values = [cell.value for cell in row]
+                if not _fila_es_modulo("gastos", row_values):
+                    continue
+                row_ts = _normalizar_timestamp_valor(row[7].value)
+                if row_ts is None:
+                    continue
+                if ultimo_ts is None or row_ts >= ultimo_ts:
+                    ultimo_ts = row_ts
+                    ultimo_ws = ws
+                    ultimo_row = idx
+        if ultimo_ws is None or ultimo_row is None:
+            wb.close()
+            return None
+
+        ultimo_ws.cell(ultimo_row, 3).value = concepto
+        ultimo_ws.cell(ultimo_row, 7).value = valor
+        ultimo_ws.cell(ultimo_row, 8).value = timestamp
+        _formatear_filas_recientes(ultimo_ws, 1)
+        wb.save(path)
+        wb.close()
+
+    return _resumen_gastos_fecha(fecha, year)
+
+
+def eliminar_ultimo_gasto(fecha: date, year: int) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ultimo_ws = None
+        ultimo_row = None
+        ultimo_ts = None
+        for nombre in _nombres_lectura_modulo("gastos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = _normalizar_fecha_valor(row[0].value)
+                if cell_date != fecha:
+                    continue
+                row_values = [cell.value for cell in row]
+                if not _fila_es_modulo("gastos", row_values):
+                    continue
+                row_ts = _normalizar_timestamp_valor(row[7].value)
+                if row_ts is None:
+                    continue
+                if ultimo_ts is None or row_ts >= ultimo_ts:
+                    ultimo_ts = row_ts
+                    ultimo_ws = ws
+                    ultimo_row = idx
+        if ultimo_ws is None or ultimo_row is None:
+            wb.close()
+            return None
+
+        ultimo_ws.delete_rows(ultimo_row)
+        wb.save(path)
+        wb.close()
+
+    return _resumen_gastos_fecha(fecha, year)
+
+
+def actualizar_gasto_registro(
+    fecha: date,
+    year: int,
+    sheet_row: int | None,
+    fecha_hora_registro: str,
+    concepto: str,
+    valor: float,
+    timestamp: datetime,
+) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        target_ws = None
+        target_row = None
+        for nombre in _nombres_lectura_modulo("gastos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = _normalizar_fecha_valor(row[0].value)
+                if cell_date != fecha:
+                    continue
+                row_values = [cell.value for cell in row]
+                if not _fila_es_modulo("gastos", row_values):
+                    continue
+                row_ts = _normalizar_timestamp_valor(row[7].value)
+                if _coincide_registro(idx, row_ts, sheet_row, fecha_hora_registro):
+                    target_ws = ws
+                    target_row = idx
+                    break
+            if target_ws is not None:
+                break
+        if target_ws is None or target_row is None:
+            wb.close()
+            return None
+        target_ws.cell(target_row, 3).value = concepto
+        target_ws.cell(target_row, 7).value = valor
+        target_ws.cell(target_row, 8).value = timestamp
+        _formatear_filas_recientes(target_ws, 1)
+        wb.save(path)
+        wb.close()
+    return _resumen_gastos_fecha(fecha, year)
+
+
+def eliminar_gasto_registro(fecha: date, year: int, sheet_row: int | None, fecha_hora_registro: str) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        target_ws = None
+        target_row = None
+        for nombre in _nombres_lectura_modulo("gastos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = _normalizar_fecha_valor(row[0].value)
+                if cell_date != fecha:
+                    continue
+                row_values = [cell.value for cell in row]
+                if not _fila_es_modulo("gastos", row_values):
+                    continue
+                row_ts = _normalizar_timestamp_valor(row[7].value)
+                if _coincide_registro(idx, row_ts, sheet_row, fecha_hora_registro):
+                    target_ws = ws
+                    target_row = idx
+                    break
+            if target_ws is not None:
+                break
+        if target_ws is None or target_row is None:
+            wb.close()
+            return None
+        target_ws.delete_rows(target_row)
+        wb.save(path)
+        wb.close()
+    return _resumen_gastos_fecha(fecha, year)
 
 
 def obtener_ultima_fecha_modulo(modulo: str, year: int):
@@ -1184,6 +1434,432 @@ def eliminar_ultimo_bono(fecha: date, year: int) -> float | None:
         wb.save(path)
         wb.close()
         return total_dia
+
+
+def actualizar_bono_registro(
+    fecha: date,
+    year: int,
+    sheet_row: int | None,
+    fecha_hora_registro: str,
+    cliente: str,
+    valor: float,
+    timestamp: datetime,
+) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        target_ws = None
+        target_row = None
+        for nombre in _nombres_lectura_modulo("bonos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = _normalizar_fecha_valor(row[0].value)
+                if cell_date != fecha:
+                    continue
+                row_ts = _normalizar_timestamp_valor(row[4].value)
+                if _coincide_registro(idx, row_ts, sheet_row, fecha_hora_registro):
+                    target_ws = ws
+                    target_row = idx
+                    break
+            if target_ws is not None:
+                break
+        if target_ws is None or target_row is None:
+            wb.close()
+            return None
+        target_ws.cell(target_row, 3).value = cliente
+        target_ws.cell(target_row, 4).value = valor
+        target_ws.cell(target_row, 5).value = timestamp
+        _formatear_filas_recientes_bonos(target_ws, 1)
+        total_dia = 0.0
+        for row in target_ws.iter_rows(min_row=2, values_only=True):
+            cell_date = _normalizar_fecha_valor(row[0])
+            if cell_date == fecha:
+                total_dia += float(row[3] or 0)
+        wb.save(path)
+        wb.close()
+    return {"total_dia": total_dia}
+
+
+def eliminar_bono_registro(fecha: date, year: int, sheet_row: int | None, fecha_hora_registro: str) -> float | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        target_ws = None
+        target_row = None
+        for nombre in _nombres_lectura_modulo("bonos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = _normalizar_fecha_valor(row[0].value)
+                if cell_date != fecha:
+                    continue
+                row_ts = _normalizar_timestamp_valor(row[4].value)
+                if _coincide_registro(idx, row_ts, sheet_row, fecha_hora_registro):
+                    target_ws = ws
+                    target_row = idx
+                    break
+            if target_ws is not None:
+                break
+        if target_ws is None or target_row is None:
+            wb.close()
+            return None
+        target_ws.delete_rows(target_row)
+        total_dia = 0.0
+        for row in target_ws.iter_rows(min_row=2, values_only=True):
+            cell_date = _normalizar_fecha_valor(row[0])
+            if cell_date == fecha:
+                total_dia += float(row[3] or 0)
+        wb.save(path)
+        wb.close()
+        return total_dia
+
+
+def obtener_ultimo_prestamo(fecha: date, year: int) -> dict | None:
+    registros = obtener_prestamos_raw_fecha(fecha, year)
+    if not registros:
+        return None
+    return max(registros, key=lambda item: item.get("fecha_hora_registro") or "")
+
+
+def actualizar_ultimo_prestamo(
+    fecha: date,
+    year: int,
+    persona: str,
+    tipo_movimiento: str,
+    valor: float,
+    timestamp: datetime,
+) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ultimo_ws = None
+        ultimo_row = None
+        ultimo_ts = None
+        for nombre in _nombres_lectura_modulo("prestamos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = _normalizar_fecha_valor(row[0].value)
+                if cell_date != fecha:
+                    continue
+                row_ts = _normalizar_timestamp_valor(row[5].value)
+                if row_ts is None:
+                    continue
+                if ultimo_ts is None or row_ts >= ultimo_ts:
+                    ultimo_ts = row_ts
+                    ultimo_ws = ws
+                    ultimo_row = idx
+        if ultimo_ws is None or ultimo_row is None:
+            wb.close()
+            return None
+
+        ultimo_ws.cell(ultimo_row, 3).value = persona
+        ultimo_ws.cell(ultimo_row, 4).value = tipo_movimiento
+        ultimo_ws.cell(ultimo_row, 5).value = valor
+        ultimo_ws.cell(ultimo_row, 6).value = timestamp
+        _formatear_filas_recientes_prestamos(ultimo_ws, 1)
+        wb.save(path)
+        wb.close()
+
+    return obtener_resumen_prestamos(persona=persona)
+
+
+def eliminar_ultimo_prestamo(fecha: date, year: int) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    persona_removida = ""
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ultimo_ws = None
+        ultimo_row = None
+        ultimo_ts = None
+        for nombre in _nombres_lectura_modulo("prestamos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = _normalizar_fecha_valor(row[0].value)
+                if cell_date != fecha:
+                    continue
+                row_ts = _normalizar_timestamp_valor(row[5].value)
+                if row_ts is None:
+                    continue
+                if ultimo_ts is None or row_ts >= ultimo_ts:
+                    ultimo_ts = row_ts
+                    ultimo_ws = ws
+                    ultimo_row = idx
+                    persona_removida = str(row[2].value or "").strip()
+        if ultimo_ws is None or ultimo_row is None:
+            wb.close()
+            return None
+
+        ultimo_ws.delete_rows(ultimo_row)
+        wb.save(path)
+        wb.close()
+
+    return obtener_resumen_prestamos(persona=persona_removida or None)
+
+
+def actualizar_prestamo_registro(
+    fecha: date,
+    year: int,
+    sheet_row: int | None,
+    fecha_hora_registro: str,
+    persona: str,
+    tipo_movimiento: str,
+    valor: float,
+    timestamp: datetime,
+) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        target_ws = None
+        target_row = None
+        for nombre in _nombres_lectura_modulo("prestamos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = _normalizar_fecha_valor(row[0].value)
+                if cell_date != fecha:
+                    continue
+                row_ts = _normalizar_timestamp_valor(row[5].value)
+                if _coincide_registro(idx, row_ts, sheet_row, fecha_hora_registro):
+                    target_ws = ws
+                    target_row = idx
+                    break
+            if target_ws is not None:
+                break
+        if target_ws is None or target_row is None:
+            wb.close()
+            return None
+        target_ws.cell(target_row, 3).value = persona
+        target_ws.cell(target_row, 4).value = tipo_movimiento
+        target_ws.cell(target_row, 5).value = valor
+        target_ws.cell(target_row, 6).value = timestamp
+        _formatear_filas_recientes_prestamos(target_ws, 1)
+        wb.save(path)
+        wb.close()
+    return obtener_resumen_prestamos(persona=persona)
+
+
+def eliminar_prestamo_registro(fecha: date, year: int, sheet_row: int | None, fecha_hora_registro: str) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+    persona_removida = ""
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        target_ws = None
+        target_row = None
+        for nombre in _nombres_lectura_modulo("prestamos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = _normalizar_fecha_valor(row[0].value)
+                if cell_date != fecha:
+                    continue
+                row_ts = _normalizar_timestamp_valor(row[5].value)
+                if _coincide_registro(idx, row_ts, sheet_row, fecha_hora_registro):
+                    target_ws = ws
+                    target_row = idx
+                    persona_removida = str(row[2].value or "").strip()
+                    break
+            if target_ws is not None:
+                break
+        if target_ws is None or target_row is None:
+            wb.close()
+            return None
+        target_ws.delete_rows(target_row)
+        wb.save(path)
+        wb.close()
+    return obtener_resumen_prestamos(persona=persona_removida or None)
+
+
+def obtener_ultimo_movimiento(fecha: date, year: int) -> dict | None:
+    registros = obtener_movimientos_fecha(fecha, year)
+    return max(registros, key=lambda item: item.get("fecha_hora_registro") or "") if registros else None
+
+
+def actualizar_ultimo_movimiento(
+    fecha: date,
+    year: int,
+    tipo_movimiento: str,
+    concepto: str,
+    valor: float,
+    observacion: str,
+    timestamp: datetime,
+) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ultimo_ws = None
+        ultimo_row = None
+        ultimo_ts = None
+        for nombre in _nombres_lectura_modulo("movimientos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = _normalizar_fecha_valor(row[0].value)
+                if cell_date != fecha:
+                    continue
+                row_ts = _normalizar_timestamp_valor(row[6].value)
+                if row_ts is None:
+                    continue
+                if ultimo_ts is None or row_ts >= ultimo_ts:
+                    ultimo_ts = row_ts
+                    ultimo_ws = ws
+                    ultimo_row = idx
+        if ultimo_ws is None or ultimo_row is None:
+            wb.close()
+            return None
+
+        ultimo_ws.cell(ultimo_row, 3).value = tipo_movimiento
+        ultimo_ws.cell(ultimo_row, 4).value = concepto
+        ultimo_ws.cell(ultimo_row, 5).value = valor
+        ultimo_ws.cell(ultimo_row, 6).value = observacion
+        ultimo_ws.cell(ultimo_row, 7).value = timestamp
+        _formatear_filas_recientes_movimientos(ultimo_ws, 1)
+        wb.save(path)
+        wb.close()
+
+    return _resumen_movimientos_fecha(fecha, year)
+
+
+def eliminar_ultimo_movimiento(fecha: date, year: int) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ultimo_ws = None
+        ultimo_row = None
+        ultimo_ts = None
+        for nombre in _nombres_lectura_modulo("movimientos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = _normalizar_fecha_valor(row[0].value)
+                if cell_date != fecha:
+                    continue
+                row_ts = _normalizar_timestamp_valor(row[6].value)
+                if row_ts is None:
+                    continue
+                if ultimo_ts is None or row_ts >= ultimo_ts:
+                    ultimo_ts = row_ts
+                    ultimo_ws = ws
+                    ultimo_row = idx
+        if ultimo_ws is None or ultimo_row is None:
+            wb.close()
+            return None
+
+        ultimo_ws.delete_rows(ultimo_row)
+        wb.save(path)
+        wb.close()
+
+    return _resumen_movimientos_fecha(fecha, year)
+
+
+def actualizar_movimiento_registro(
+    fecha: date,
+    year: int,
+    sheet_row: int | None,
+    fecha_hora_registro: str,
+    tipo_movimiento: str,
+    concepto: str,
+    valor: float,
+    observacion: str,
+    timestamp: datetime,
+) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        target_ws = None
+        target_row = None
+        for nombre in _nombres_lectura_modulo("movimientos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = _normalizar_fecha_valor(row[0].value)
+                if cell_date != fecha:
+                    continue
+                row_ts = _normalizar_timestamp_valor(row[6].value)
+                if _coincide_registro(idx, row_ts, sheet_row, fecha_hora_registro):
+                    target_ws = ws
+                    target_row = idx
+                    break
+            if target_ws is not None:
+                break
+        if target_ws is None or target_row is None:
+            wb.close()
+            return None
+        target_ws.cell(target_row, 3).value = tipo_movimiento
+        target_ws.cell(target_row, 4).value = concepto
+        target_ws.cell(target_row, 5).value = valor
+        target_ws.cell(target_row, 6).value = observacion
+        target_ws.cell(target_row, 7).value = timestamp
+        _formatear_filas_recientes_movimientos(target_ws, 1)
+        wb.save(path)
+        wb.close()
+    return _resumen_movimientos_fecha(fecha, year)
+
+
+def eliminar_movimiento_registro(fecha: date, year: int, sheet_row: int | None, fecha_hora_registro: str) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        target_ws = None
+        target_row = None
+        for nombre in _nombres_lectura_modulo("movimientos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = _normalizar_fecha_valor(row[0].value)
+                if cell_date != fecha:
+                    continue
+                row_ts = _normalizar_timestamp_valor(row[6].value)
+                if _coincide_registro(idx, row_ts, sheet_row, fecha_hora_registro):
+                    target_ws = ws
+                    target_row = idx
+                    break
+            if target_ws is not None:
+                break
+        if target_ws is None or target_row is None:
+            wb.close()
+            return None
+        target_ws.delete_rows(target_row)
+        wb.save(path)
+        wb.close()
+    return _resumen_movimientos_fecha(fecha, year)
 
 
 def obtener_prestamos_raw_fecha(fecha: date, year: int) -> list[dict]:

@@ -38,8 +38,10 @@ let loanNames = [];
 let expenseConcepts = [];
 let movementConcepts = [];
 let bonusDayItems = [];
+let expenseDayItems = [];
 let loanItems = [];
 let movementItems = [];
+let recordEditContext = { bonos: null, gastos: null, prestamos: null, movimientos: null };
 let cajaLocked = false;
 let cajaDrafts = {};
 let contadorCatalog = [];
@@ -344,16 +346,16 @@ function esControlEdicionActual(control) {
     return control.matches('input, textarea, select');
   }
   if (currentModule === 'gastos') {
-    return control.matches('#gasto-concepto, #gasto-valor, #btn-gasto-registrar');
+    return control.matches('#gasto-concepto, #gasto-valor, #btn-gasto-registrar, #btn-gasto-editar-ultimo, #btn-gasto-eliminar-ultimo');
   }
   if (currentModule === 'bonos') {
     return control.matches('#bono-cliente, #bono-valor, #btn-bono-registrar, #btn-bono-editar-ultimo, #btn-bono-eliminar-ultimo');
   }
   if (currentModule === 'prestamos') {
-    return control.matches('#prestamo-persona, #prestamo-valor, #btn-prestamo-registrar, input[name="prestamo-tipo"]');
+    return control.matches('#prestamo-persona, #prestamo-valor, #btn-prestamo-registrar, #btn-prestamo-editar-ultimo, #btn-prestamo-eliminar-ultimo, input[name="prestamo-tipo"]');
   }
   if (currentModule === 'movimientos') {
-    return control.matches('#movimiento-concepto, #movimiento-valor, #btn-movimiento-registrar, input[name="movimiento-tipo"]');
+    return control.matches('#movimiento-concepto, #movimiento-valor, #btn-movimiento-registrar, #btn-movimiento-editar-ultimo, #btn-movimiento-eliminar-ultimo, input[name="movimiento-tipo"]');
   }
   if (currentModule === 'contadores') {
     return control.matches('.contador-campo, .btn-confirmar-critica, .btn-toggle-pausa, summary, .contador-critica input, .contador-pausa input');
@@ -560,22 +562,109 @@ function calcularPlataformas() {
 function renderGastosRegistros(items = [], total = 0) {
   const tbody = document.getElementById('gastos-registros-body');
   if (!tbody) return;
+  expenseDayItems = Array.isArray(items) ? [...items] : [];
+  document.getElementById('gastos-acciones-head')?.classList.toggle('oculto', !puedeEditarCualquierRegistro('gastos'));
   tbody.innerHTML = '';
-  if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="2" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
+  if (!expenseDayItems.length) {
+    tbody.innerHTML = `<tr><td colspan="${puedeEditarCualquierRegistro('gastos') ? 3 : 2}" class="bonos-vacio">Sin registros para esta fecha.</td></tr>`;
   } else {
-    items.forEach(item => {
+    expenseDayItems.forEach(item => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${item.concepto || ''}</td>
         <td>${fmt(item.valor || 0)}</td>
+        ${renderRegistroAcciones('gastos', item)}
       `;
       tbody.appendChild(tr);
     });
   }
   document.getElementById('total-gastos').textContent = fmt(total);
+  actualizarAccionesGastos();
   const detGastos = document.getElementById('gastos-detalle-dia');
   if (detGastos) detGastos.open = items.length > 0;
+}
+
+function esSuperAdminOperativo() {
+  return !!(configSuperAdminMode && configActiveSite);
+}
+
+function puedeEditarCualquierRegistro(modulo) {
+  return esSuperAdminOperativo() && ['bonos', 'gastos', 'prestamos', 'movimientos'].includes(modulo);
+}
+
+function getRegistroEditContext(modulo) {
+  return recordEditContext[modulo] || null;
+}
+
+function limpiarEdicionRegistro(modulo) {
+  recordEditContext[modulo] = null;
+  const mapa = {
+    bonos: 'btn-bono-registrar',
+    gastos: 'btn-gasto-registrar',
+    prestamos: 'btn-prestamo-registrar',
+    movimientos: 'btn-movimiento-registrar',
+  };
+  const textos = {
+    bonos: 'Registrar',
+    gastos: 'Registrar',
+    prestamos: 'Registrar',
+    movimientos: 'Registrar',
+  };
+  const btn = document.getElementById(mapa[modulo]);
+  if (btn) btn.textContent = textos[modulo];
+}
+
+function iniciarEdicionRegistro(modulo, item) {
+  if (item.fecha) {
+    setSharedModuleDate(item.fecha);
+    document.getElementById('fecha').value = item.fecha;
+  }
+  recordEditContext[modulo] = {
+    sheet_row: item.sheet_row ?? null,
+    fecha_hora_registro: item.fecha_hora_registro || '',
+  };
+  if (modulo === 'bonos') {
+    document.getElementById('bono-cliente').value = item.cliente || '';
+    setNumeroInputValue('bono-valor', item.valor || 0);
+    document.getElementById('btn-bono-registrar').textContent = 'Guardar edición';
+    document.getElementById('bono-cliente').focus();
+    document.getElementById('bono-cliente').select?.();
+  } else if (modulo === 'gastos') {
+    document.getElementById('gasto-concepto').value = item.concepto || '';
+    setNumeroInputValue('gasto-valor', item.valor || 0);
+    document.getElementById('btn-gasto-registrar').textContent = 'Guardar edición';
+    document.getElementById('gasto-concepto').focus();
+    document.getElementById('gasto-concepto').select?.();
+  } else if (modulo === 'prestamos') {
+    document.getElementById('prestamo-persona').value = item.persona || '';
+    setNumeroInputValue('prestamo-valor', item.valor || 0);
+    document.querySelector(`input[name="prestamo-tipo"][value="${item.tipo_movimiento || 'prestamo'}"]`)?.click();
+    document.getElementById('btn-prestamo-registrar').textContent = 'Guardar edición';
+    actualizarResumenPersonaPrestamo();
+    document.getElementById('prestamo-persona').focus();
+    document.getElementById('prestamo-persona').select?.();
+  } else if (modulo === 'movimientos') {
+    document.getElementById('movimiento-concepto').value = item.concepto || '';
+    setNumeroInputValue('movimiento-valor', item.valor || 0);
+    document.querySelector(`input[name="movimiento-tipo"][value="${item.tipo_movimiento || 'salida'}"]`)?.click();
+    document.getElementById('btn-movimiento-registrar').textContent = 'Guardar edición';
+    document.getElementById('movimiento-concepto').focus();
+    document.getElementById('movimiento-concepto').select?.();
+  }
+  mostrarMensaje('Registro cargado para edición. Revisa los campos y guarda los cambios.', 'ok');
+}
+
+function renderRegistroAcciones(modulo, item) {
+  if (!puedeEditarCualquierRegistro(modulo)) return '';
+  const payload = encodeURIComponent(JSON.stringify({
+    fecha: item.fecha || '',
+    sheet_row: item.sheet_row ?? null,
+    fecha_hora_registro: item.fecha_hora_registro || '',
+  }));
+  return `<td class="registro-acciones-celda">
+    <button type="button" class="btn btn-secondary btn-mini" data-record-action="edit" data-modulo="${modulo}" data-record="${payload}">Editar</button>
+    <button type="button" class="btn btn-secondary btn-mini" data-record-action="delete" data-modulo="${modulo}" data-record="${payload}">Eliminar</button>
+  </td>`;
 }
 
 function actualizarBonosVisuales() {
@@ -1148,11 +1237,60 @@ function limpiarFormularioMovimientos() {
 }
 
 function actualizarAccionesBonos() {
-  const esHoy = (moduleDates.bonos || hoyStr()) === hoyStr();
   const hayRegistros = document.getElementById('bonos-registros-body')?.querySelectorAll('tr').length > 0
     && !document.querySelector('#bonos-registros-body .bonos-vacio');
-  document.getElementById('btn-bono-editar-ultimo').disabled = !esHoy || !hayRegistros;
-  document.getElementById('btn-bono-eliminar-ultimo').disabled = !esHoy || !hayRegistros;
+  const permitido = puedeCorregirUltimoRegistro('bonos');
+  const editable = puedeCorregirFechaUltimoRegistro('bonos');
+  document.getElementById('btn-bono-editar-ultimo').classList.toggle('oculto', !permitido);
+  document.getElementById('btn-bono-eliminar-ultimo').classList.toggle('oculto', !permitido);
+  document.getElementById('btn-bono-editar-ultimo').disabled = !editable || !hayRegistros;
+  document.getElementById('btn-bono-eliminar-ultimo').disabled = !editable || !hayRegistros;
+}
+
+function puedeCorregirUltimoRegistro(modulo) {
+  if (esSuperAdminOperativo()) {
+    return ['bonos', 'gastos', 'prestamos', 'movimientos'].includes(modulo);
+  }
+  return ['bonos', 'gastos', 'prestamos', 'movimientos'].includes(modulo);
+}
+
+function puedeCorregirFechaUltimoRegistro(modulo) {
+  if (!puedeCorregirUltimoRegistro(modulo)) return false;
+  if (esSuperAdminOperativo()) return true;
+  return (moduleDates[modulo] || hoyStr()) === hoyStr();
+}
+
+function actualizarAccionesGastos() {
+  const hayRegistros = document.getElementById('gastos-registros-body')?.querySelectorAll('tr').length > 0
+    && !document.querySelector('#gastos-registros-body .bonos-vacio');
+  const permitido = puedeCorregirUltimoRegistro('gastos');
+  const editable = puedeCorregirFechaUltimoRegistro('gastos');
+  document.getElementById('btn-gasto-editar-ultimo').classList.toggle('oculto', !permitido);
+  document.getElementById('btn-gasto-eliminar-ultimo').classList.toggle('oculto', !permitido);
+  document.getElementById('btn-gasto-editar-ultimo').disabled = !editable || !hayRegistros;
+  document.getElementById('btn-gasto-eliminar-ultimo').disabled = !editable || !hayRegistros;
+}
+
+function actualizarAccionesPrestamos() {
+  const hayRegistros = document.getElementById('prestamos-registros-body')?.querySelectorAll('tr').length > 0
+    && !document.querySelector('#prestamos-registros-body .bonos-vacio');
+  const permitido = puedeCorregirUltimoRegistro('prestamos');
+  const editable = puedeCorregirFechaUltimoRegistro('prestamos');
+  document.getElementById('btn-prestamo-editar-ultimo').classList.toggle('oculto', !permitido);
+  document.getElementById('btn-prestamo-eliminar-ultimo').classList.toggle('oculto', !permitido);
+  document.getElementById('btn-prestamo-editar-ultimo').disabled = !editable || !hayRegistros;
+  document.getElementById('btn-prestamo-eliminar-ultimo').disabled = !editable || !hayRegistros;
+}
+
+function actualizarAccionesMovimientos() {
+  const hayRegistros = document.getElementById('movimientos-registros-body')?.querySelectorAll('tr').length > 0
+    && !document.querySelector('#movimientos-registros-body .bonos-vacio');
+  const permitido = puedeCorregirUltimoRegistro('movimientos');
+  const editable = puedeCorregirFechaUltimoRegistro('movimientos');
+  document.getElementById('btn-movimiento-editar-ultimo').classList.toggle('oculto', !permitido);
+  document.getElementById('btn-movimiento-eliminar-ultimo').classList.toggle('oculto', !permitido);
+  document.getElementById('btn-movimiento-editar-ultimo').disabled = !editable || !hayRegistros;
+  document.getElementById('btn-movimiento-eliminar-ultimo').disabled = !editable || !hayRegistros;
 }
 
 function obtenerAcumuladoClienteBonos(cliente) {
@@ -1295,9 +1433,10 @@ function obtenerTipoMovimientoSeleccionado() {
 function renderBonosRegistros(items = [], total = 0) {
   const tbody = document.getElementById('bonos-registros-body');
   bonusDayItems = Array.isArray(items) ? [...items] : [];
+  document.getElementById('bonos-acciones-head')?.classList.toggle('oculto', !puedeEditarCualquierRegistro('bonos'));
   tbody.innerHTML = '';
   if (!bonusDayItems.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="${puedeEditarCualquierRegistro('bonos') ? 6 : 5}" class="bonos-vacio">Sin registros para esta fecha.</td></tr>`;
   } else {
     const acumuladosPorCliente = new Map();
     const itemsAsc = [...bonusDayItems];
@@ -1319,6 +1458,7 @@ function renderBonosRegistros(items = [], total = 0) {
         <td>${cliente}</td>
         <td>${fmt(valor)}</td>
         <td>${fmt(item.acumulado_cliente || 0)}</td>
+        ${renderRegistroAcciones('bonos', item)}
       `;
       tbody.appendChild(tr);
     });
@@ -1333,9 +1473,10 @@ function renderBonosRegistros(items = [], total = 0) {
 function renderPrestamosRegistros(items = [], resumen = {}) {
   const tbody = document.getElementById('prestamos-registros-body');
   loanItems = Array.isArray(items) ? [...items] : [];
+  document.getElementById('prestamos-acciones-head')?.classList.toggle('oculto', !puedeEditarCualquierRegistro('prestamos'));
   tbody.innerHTML = '';
   if (!loanItems.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="bonos-vacio">Sin movimientos registrados.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="${puedeEditarCualquierRegistro('prestamos') ? 7 : 6}" class="bonos-vacio">Sin movimientos registrados.</td></tr>`;
   } else {
     [...loanItems].reverse().forEach(item => {
       const tr = document.createElement('tr');
@@ -1346,6 +1487,7 @@ function renderPrestamosRegistros(items = [], resumen = {}) {
         <td>${item.tipo_movimiento === 'pago' ? 'Pago' : 'Préstamo'}</td>
         <td>${fmt(item.valor || 0)}</td>
         <td>${fmt(item.saldo_pendiente || 0)}</td>
+        ${renderRegistroAcciones('prestamos', item)}
       `;
       tbody.appendChild(tr);
     });
@@ -1353,6 +1495,7 @@ function renderPrestamosRegistros(items = [], resumen = {}) {
   document.getElementById('total-prestado').textContent = fmt(resumen.total_prestado || 0);
   document.getElementById('total-pagado').textContent = fmt(resumen.total_pagado || 0);
   document.getElementById('saldo-prestamos').textContent = fmt(resumen.saldo_pendiente || 0);
+  actualizarAccionesPrestamos();
   actualizarResumenPersonaPrestamo();
   const detPrestamos = document.getElementById('prestamos-detalle-dia');
   if (detPrestamos) detPrestamos.open = loanItems.length > 0;
@@ -1361,10 +1504,11 @@ function renderPrestamosRegistros(items = [], resumen = {}) {
 function renderMovimientosRegistros(items = [], resumen = {}) {
   const tbody = document.getElementById('movimientos-registros-body');
   movementItems = Array.isArray(items) ? [...items] : [];
+  document.getElementById('movimientos-acciones-head')?.classList.toggle('oculto', !puedeEditarCualquierRegistro('movimientos'));
   if (!tbody) return;
   tbody.innerHTML = '';
   if (!movementItems.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="${puedeEditarCualquierRegistro('movimientos') ? 6 : 5}" class="bonos-vacio">Sin registros para esta fecha.</td></tr>`;
   } else {
     movementItems.forEach(item => {
       const tr = document.createElement('tr');
@@ -1374,6 +1518,7 @@ function renderMovimientosRegistros(items = [], resumen = {}) {
         <td>${item.tipo_movimiento === 'ingreso' ? 'Ingreso' : 'Salida'}</td>
         <td>${item.concepto || ''}</td>
         <td>${fmt(item.valor || 0)}</td>
+        ${renderRegistroAcciones('movimientos', item)}
       `;
       tbody.appendChild(tr);
     });
@@ -1381,6 +1526,7 @@ function renderMovimientosRegistros(items = [], resumen = {}) {
   document.getElementById('total-movimientos-ingresos').textContent = fmt(resumen.total_ingresos || 0);
   document.getElementById('total-movimientos-salidas').textContent = fmt(resumen.total_salidas || 0);
   document.getElementById('total-movimientos-neto').textContent = fmt(resumen.neto || 0);
+  actualizarAccionesMovimientos();
   const detMovimientos = document.getElementById('movimientos-detalle-dia');
   if (detMovimientos) detMovimientos.open = movementItems.length > 0;
 }
@@ -1399,9 +1545,9 @@ async function cargarBonosDelDia(fecha) {
   }
 }
 
-async function cargarPrestamosDelDia(_fecha) {
+async function cargarPrestamosDelDia(fecha) {
   try {
-    const res = await fetch(`/api/modulos/prestamos/datos?t=${Date.now()}`, { cache: 'no-store' });
+    const res = await fetch(`/api/modulos/prestamos/fecha/${fecha}/datos?t=${Date.now()}`, { cache: 'no-store' });
     if (!res.ok) {
       renderPrestamosRegistros([], {});
       return;
@@ -1534,6 +1680,10 @@ function aplicarDraftCaja(fecha) {
 }
 
 function limpiarModuloActual() {
+  limpiarEdicionRegistro('bonos');
+  limpiarEdicionRegistro('gastos');
+  limpiarEdicionRegistro('prestamos');
+  limpiarEdicionRegistro('movimientos');
   if (currentModule === 'caja') {
     eliminarDraftCaja(document.getElementById('fecha').value);
     limpiarCaja();
@@ -1589,6 +1739,10 @@ function actualizarPaneles() {
   actualizarBonosVisuales();
   actualizarPrestamosVisuales();
   actualizarMovimientosVisuales();
+  actualizarAccionesBonos();
+  actualizarAccionesGastos();
+  actualizarAccionesPrestamos();
+  actualizarAccionesMovimientos();
 }
 
 function sugerirFechaModulo(modulo) {
@@ -1629,6 +1783,10 @@ function setOverride(modulo, fecha) {
 }
 
 async function activarModulo(modulo) {
+  limpiarEdicionRegistro('bonos');
+  limpiarEdicionRegistro('gastos');
+  limpiarEdicionRegistro('prestamos');
+  limpiarEdicionRegistro('movimientos');
   if (currentModule === 'caja') guardarDraftCaja();
   if (currentModule === 'contadores') guardarDraftContadores();
   currentModule = modulo;
@@ -2018,10 +2176,15 @@ async function registrarBono() {
   const cliente = document.getElementById('bono-cliente').value.trim();
   const valor = parseNumeroInput('bono-valor');
 
-  const res = await fetch('/api/modulos/bonos/registrar', {
+  const editCtx = getRegistroEditContext('bonos');
+  const res = await fetch(editCtx ? '/api/modulos/bonos/registro/editar' : '/api/modulos/bonos/registrar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, cliente, valor, forzar: isOverrideActive('bonos', fecha) }),
+    body: JSON.stringify(
+      editCtx
+        ? { fecha, cliente, valor, sheet_row: editCtx.sheet_row, fecha_hora_registro: editCtx.fecha_hora_registro, forzar: false }
+        : { fecha, cliente, valor, forzar: isOverrideActive('bonos', fecha) }
+    ),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -2029,6 +2192,7 @@ async function registrarBono() {
     return;
   }
   limpiarFormularioBonos();
+  limpiarEdicionRegistro('bonos');
   bonusNames = Array.from(new Set([...bonusNames, cliente])).sort((a, b) => a.localeCompare(b, 'es'));
   renderBonusNames();
   await cargarBonosDelDia(fecha);
@@ -2049,10 +2213,15 @@ async function registrarPrestamo() {
   const tipo_movimiento = obtenerTipoPrestamoSeleccionado();
   const valor = parseNumeroInput('prestamo-valor');
 
-  const res = await fetch('/api/modulos/prestamos/registrar', {
+  const editCtx = getRegistroEditContext('prestamos');
+  const res = await fetch(editCtx ? '/api/modulos/prestamos/registro/editar' : '/api/modulos/prestamos/registrar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, persona, tipo_movimiento, valor, forzar: isOverrideActive('prestamos', fecha) }),
+    body: JSON.stringify(
+      editCtx
+        ? { fecha, persona, tipo_movimiento, valor, sheet_row: editCtx.sheet_row, fecha_hora_registro: editCtx.fecha_hora_registro, forzar: false }
+        : { fecha, persona, tipo_movimiento, valor, forzar: isOverrideActive('prestamos', fecha) }
+    ),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -2060,6 +2229,7 @@ async function registrarPrestamo() {
     return;
   }
   limpiarFormularioPrestamos();
+  limpiarEdicionRegistro('prestamos');
   loanNames = Array.from(new Set([...loanNames, persona])).sort((a, b) => a.localeCompare(b, 'es'));
   renderLoanNames();
   await cargarPrestamosDelDia(fecha);
@@ -2080,10 +2250,15 @@ async function registrarMovimiento() {
   const concepto = document.getElementById('movimiento-concepto').value.trim();
   const valor = parseNumeroInput('movimiento-valor');
 
-  const res = await fetch('/api/modulos/movimientos/registrar', {
+  const editCtx = getRegistroEditContext('movimientos');
+  const res = await fetch(editCtx ? '/api/modulos/movimientos/registro/editar' : '/api/modulos/movimientos/registrar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, tipo_movimiento, concepto, valor, observacion: '', forzar: isOverrideActive('movimientos', fecha) }),
+    body: JSON.stringify(
+      editCtx
+        ? { fecha, tipo_movimiento, concepto, valor, observacion: '', sheet_row: editCtx.sheet_row, fecha_hora_registro: editCtx.fecha_hora_registro, forzar: false }
+        : { fecha, tipo_movimiento, concepto, valor, observacion: '', forzar: isOverrideActive('movimientos', fecha) }
+    ),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -2091,6 +2266,7 @@ async function registrarMovimiento() {
     return;
   }
   limpiarFormularioMovimientos();
+  limpiarEdicionRegistro('movimientos');
   movementConcepts = Array.from(new Set([...movementConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
   renderMovementConcepts();
   await cargarMovimientosDelDia(fecha);
@@ -2120,10 +2296,15 @@ async function registrarGasto() {
   const concepto = document.getElementById('gasto-concepto').value.trim();
   const valor = parseNumeroInput('gasto-valor');
 
-  const res = await fetch('/api/modulos/gastos/guardar', {
+  const editCtx = getRegistroEditContext('gastos');
+  const res = await fetch(editCtx ? '/api/modulos/gastos/registro/editar' : '/api/modulos/gastos/guardar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, items: [{ concepto, valor }], forzar: isOverrideActive('gastos', fecha) }),
+    body: JSON.stringify(
+      editCtx
+        ? { fecha, items: [{ concepto, valor }], sheet_row: editCtx.sheet_row, fecha_hora_registro: editCtx.fecha_hora_registro, forzar: false }
+        : { fecha, items: [{ concepto, valor }], forzar: isOverrideActive('gastos', fecha) }
+    ),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -2131,6 +2312,7 @@ async function registrarGasto() {
     return;
   }
   limpiarFormularioGastos();
+  limpiarEdicionRegistro('gastos');
   expenseConcepts = Array.from(new Set([...expenseConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
   renderExpenseConcepts();
   await cargarDatosModuloItems('gastos', fecha);
@@ -2414,6 +2596,208 @@ async function eliminarUltimoBono() {
   await cargarBonosDelDia(fecha);
   mostrarMensaje(`✓ ${data.mensaje} — Total día: ${fmt(data.total_dia)}`, 'ok');
   document.getElementById('bono-cliente').focus();
+}
+
+function obtenerItemRegistro(modulo, meta) {
+  const lista = modulo === 'bonos'
+    ? bonusDayItems
+    : modulo === 'prestamos'
+      ? loanItems
+      : movementItems;
+  return (lista || []).find(item =>
+    ((meta.sheet_row != null && item.sheet_row === meta.sheet_row) || (meta.fecha_hora_registro && item.fecha_hora_registro === meta.fecha_hora_registro))
+  ) || null;
+}
+
+function obtenerGastoRegistro(meta) {
+  return expenseDayItems.find(item =>
+    ((meta.sheet_row != null && item.sheet_row === meta.sheet_row) || (meta.fecha_hora_registro && item.fecha_hora_registro === meta.fecha_hora_registro))
+  ) || null;
+}
+
+async function manejarAccionRegistro(modulo, accion, meta) {
+  const fecha = meta.fecha || document.getElementById('fecha').value;
+  let item = null;
+  if (modulo === 'gastos') item = obtenerGastoRegistro(meta);
+  else item = obtenerItemRegistro(modulo, meta);
+
+  if (accion === 'edit') {
+    if (!item) {
+      mostrarMensaje('No se pudo localizar el registro seleccionado.', 'advertencia');
+      return;
+    }
+    iniciarEdicionRegistro(modulo, { ...item, ...meta, fecha });
+    return;
+  }
+
+  const moduloLabel = MODULE_META[modulo]?.label || modulo;
+  const confirmar = window.confirm(`Se eliminará el registro seleccionado de ${moduloLabel.toLowerCase()} para ${formatFechaVisual(fecha)}. ¿Deseas continuar?`);
+  if (!confirmar) return;
+  const res = await fetch(`/api/modulos/${modulo}/registro/eliminar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha, sheet_row: meta.sheet_row, fecha_hora_registro: meta.fecha_hora_registro }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    mostrarMensaje(data.mensaje, 'advertencia');
+    return;
+  }
+  limpiarEdicionRegistro(modulo);
+  if (modulo === 'bonos') await cargarBonosDelDia(fecha);
+  else if (modulo === 'gastos') await cargarDatosModuloItems('gastos', fecha);
+  else if (modulo === 'prestamos') await cargarPrestamosDelDia(fecha);
+  else if (modulo === 'movimientos') await cargarMovimientosDelDia(fecha);
+  mostrarMensaje(`✓ ${data.mensaje}`, 'ok');
+}
+
+async function editarUltimoGasto() {
+  const error = validarGasto();
+  if (error) {
+    mostrarMensaje(error, 'error');
+    return;
+  }
+  const fecha = document.getElementById('fecha').value;
+  const concepto = document.getElementById('gasto-concepto').value.trim();
+  const valor = parseNumeroInput('gasto-valor');
+  const confirmar = window.confirm(`Vas a editar el ultimo gasto registrado para esta fecha.\n\nDescripción: ${concepto}\nValor: ${fmt(valor)}\n\n¿Deseas continuar?`);
+  if (!confirmar) return;
+  const res = await fetch('/api/modulos/gastos/ultimo/editar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha, items: [{ concepto, valor }], forzar: false }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    mostrarMensaje(data.mensaje, 'advertencia');
+    return;
+  }
+  limpiarFormularioGastos();
+  limpiarEdicionRegistro('gastos');
+  expenseConcepts = Array.from(new Set([...expenseConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
+  renderExpenseConcepts();
+  await cargarDatosModuloItems('gastos', fecha);
+  mostrarMensaje(`✓ ${data.mensaje} — ${concepto}: ${fmt(valor)} — Total día: ${fmt(data.total)}`, 'ok');
+  document.getElementById('gasto-concepto').focus();
+}
+
+async function eliminarUltimoGasto() {
+  const fecha = document.getElementById('fecha').value;
+  const confirmar = window.confirm('Se eliminará el último gasto registrado para esta fecha. ¿Deseas continuar?');
+  if (!confirmar) return;
+  const res = await fetch('/api/modulos/gastos/ultimo/eliminar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    mostrarMensaje(data.mensaje, 'advertencia');
+    return;
+  }
+  await cargarDatosModuloItems('gastos', fecha);
+  mostrarMensaje(`✓ ${data.mensaje} — Total día: ${fmt(data.total)}`, 'ok');
+  document.getElementById('gasto-concepto').focus();
+}
+
+async function editarUltimoPrestamo() {
+  const error = validarPrestamo();
+  if (error) {
+    mostrarMensaje(error, 'error');
+    return;
+  }
+  const fecha = document.getElementById('fecha').value;
+  const persona = document.getElementById('prestamo-persona').value.trim();
+  const tipo_movimiento = obtenerTipoPrestamoSeleccionado();
+  const valor = parseNumeroInput('prestamo-valor');
+  const confirmar = window.confirm(`Vas a editar el ultimo movimiento de préstamos para esta fecha.\n\nPersona: ${persona}\nTipo: ${tipo_movimiento === 'pago' ? 'Pago' : 'Préstamo'}\nValor: ${fmt(valor)}\n\n¿Deseas continuar?`);
+  if (!confirmar) return;
+  const res = await fetch('/api/modulos/prestamos/ultimo/editar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha, persona, tipo_movimiento, valor, forzar: false }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    mostrarMensaje(data.mensaje, 'advertencia');
+    return;
+  }
+  limpiarFormularioPrestamos();
+  limpiarEdicionRegistro('prestamos');
+  loanNames = Array.from(new Set([...loanNames, persona])).sort((a, b) => a.localeCompare(b, 'es'));
+  renderLoanNames();
+  await cargarPrestamosDelDia(fecha);
+  mostrarMensaje(`✓ ${data.mensaje} — ${data.persona}: ${fmt(data.valor)} — Saldo pendiente: ${fmt(data.saldo_pendiente)}`, 'ok');
+  document.getElementById('prestamo-persona').focus();
+}
+
+async function eliminarUltimoPrestamo() {
+  const fecha = document.getElementById('fecha').value;
+  const confirmar = window.confirm('Se eliminará el último movimiento de préstamos registrado para esta fecha. ¿Deseas continuar?');
+  if (!confirmar) return;
+  const res = await fetch('/api/modulos/prestamos/ultimo/eliminar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    mostrarMensaje(data.mensaje, 'advertencia');
+    return;
+  }
+  await cargarPrestamosDelDia(fecha);
+  mostrarMensaje(`✓ ${data.mensaje} — Saldo pendiente: ${fmt(data.saldo_pendiente)}`, 'ok');
+  document.getElementById('prestamo-persona').focus();
+}
+
+async function editarUltimoMovimiento() {
+  const error = validarMovimiento();
+  if (error) {
+    mostrarMensaje(error, 'error');
+    return;
+  }
+  const fecha = document.getElementById('fecha').value;
+  const tipo_movimiento = obtenerTipoMovimientoSeleccionado();
+  const concepto = document.getElementById('movimiento-concepto').value.trim();
+  const valor = parseNumeroInput('movimiento-valor');
+  const confirmar = window.confirm(`Vas a editar el ultimo movimiento registrado para esta fecha.\n\nTipo: ${tipo_movimiento === 'ingreso' ? 'Ingreso' : 'Salida'}\nConcepto: ${concepto}\nValor: ${fmt(valor)}\n\n¿Deseas continuar?`);
+  if (!confirmar) return;
+  const res = await fetch('/api/modulos/movimientos/ultimo/editar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha, tipo_movimiento, concepto, valor, observacion: '', forzar: false }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    mostrarMensaje(data.mensaje, 'advertencia');
+    return;
+  }
+  limpiarFormularioMovimientos();
+  limpiarEdicionRegistro('movimientos');
+  movementConcepts = Array.from(new Set([...movementConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
+  renderMovementConcepts();
+  await cargarMovimientosDelDia(fecha);
+  mostrarMensaje(`✓ ${data.mensaje} — ${data.concepto}: ${fmt(data.valor)} — Neto día: ${fmt(data.neto)}`, 'ok');
+  document.getElementById('movimiento-concepto').focus();
+}
+
+async function eliminarUltimoMovimiento() {
+  const fecha = document.getElementById('fecha').value;
+  const confirmar = window.confirm('Se eliminará el último movimiento registrado para esta fecha. ¿Deseas continuar?');
+  if (!confirmar) return;
+  const res = await fetch('/api/modulos/movimientos/ultimo/eliminar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    mostrarMensaje(data.mensaje, 'advertencia');
+    return;
+  }
+  await cargarMovimientosDelDia(fecha);
+  mostrarMensaje(`✓ ${data.mensaje} — Neto día: ${fmt(data.neto)}`, 'ok');
+  document.getElementById('movimiento-concepto').focus();
 }
 
 async function importarNombresBonos() {
@@ -3211,6 +3595,10 @@ async function init() {
 
   document.getElementById('fecha').addEventListener('change', e => {
     const fechaAnterior = moduleDates[currentModule];
+    limpiarEdicionRegistro('bonos');
+    limpiarEdicionRegistro('gastos');
+    limpiarEdicionRegistro('prestamos');
+    limpiarEdicionRegistro('movimientos');
     if (currentModule === 'caja') guardarDraftCaja(fechaAnterior);
     if (currentModule === 'contadores') guardarDraftContadores(fechaAnterior);
     setSharedModuleDate(e.target.value);
@@ -3314,6 +3702,12 @@ async function init() {
   document.getElementById('btn-prestamo-registrar').addEventListener('click', registrarPrestamo);
   document.getElementById('btn-gasto-registrar').addEventListener('click', registrarGasto);
   document.getElementById('btn-movimiento-registrar').addEventListener('click', registrarMovimiento);
+  document.getElementById('btn-gasto-editar-ultimo').addEventListener('click', editarUltimoGasto);
+  document.getElementById('btn-gasto-eliminar-ultimo').addEventListener('click', eliminarUltimoGasto);
+  document.getElementById('btn-prestamo-editar-ultimo').addEventListener('click', editarUltimoPrestamo);
+  document.getElementById('btn-prestamo-eliminar-ultimo').addEventListener('click', eliminarUltimoPrestamo);
+  document.getElementById('btn-movimiento-editar-ultimo').addEventListener('click', editarUltimoMovimiento);
+  document.getElementById('btn-movimiento-eliminar-ultimo').addEventListener('click', eliminarUltimoMovimiento);
   document.getElementById('btn-cuadre-guardar').addEventListener('click', guardarCuadre);
   const cuadreBaseInput = document.getElementById('cuadre-base-input');
   cuadreBaseInput.addEventListener('input', () => formatearInputNumerico(cuadreBaseInput, false));
@@ -3321,6 +3715,15 @@ async function init() {
   cuadreBaseInput.addEventListener('blur', () => formatearInputNumerico(cuadreBaseInput, false));
   document.getElementById('btn-bono-editar-ultimo').addEventListener('click', editarUltimoBono);
   document.getElementById('btn-bono-eliminar-ultimo').addEventListener('click', eliminarUltimoBono);
+  document.addEventListener('click', async e => {
+    const btn = e.target.closest('[data-record-action]');
+    if (!btn) return;
+    const modulo = btn.dataset.modulo;
+    const accion = btn.dataset.recordAction;
+    let meta = {};
+    try { meta = JSON.parse(decodeURIComponent(btn.dataset.record || '')); } catch { meta = {}; }
+    await manejarAccionRegistro(modulo, accion, meta);
+  });
   document.getElementById('contadores-body').addEventListener('click', e => {
     if (e.target.matches('.btn-confirmar-critica')) {
       confirmarReferenciaCritica(e.target.closest('tr'));

@@ -51,3 +51,107 @@ def obtener_registros(fecha: date) -> dict:
         "total_salidas": total_salidas,
         "neto": total_ingresos - total_salidas,
     }
+
+
+def actualizar_ultimo_movimiento(entrada: MovimientoEntrada) -> dict:
+    try:
+        timestamp = datetime.now().replace(microsecond=0)
+        resumen = excel_service.actualizar_ultimo_movimiento(
+            entrada.fecha,
+            entrada.fecha.year,
+            entrada.tipo_movimiento,
+            entrada.concepto,
+            entrada.valor,
+            entrada.observacion,
+            timestamp,
+        )
+        if resumen is None:
+            return {"ok": False, "mensaje": "No hay un último movimiento para corregir.", "fecha": str(entrada.fecha)}
+        nombres_service.agregar_item_catalogo("movimientos", entrada.concepto)
+    except excel_service.ArchivoCajaOcupadoError as exc:
+        return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
+
+    return {
+        "ok": True,
+        "mensaje": "Último movimiento actualizado correctamente",
+        "fecha": str(entrada.fecha),
+        "tipo_movimiento": entrada.tipo_movimiento,
+        "concepto": entrada.concepto,
+        "valor": float(entrada.valor),
+        "observacion": entrada.observacion,
+        "total_ingresos": resumen["total_ingresos"],
+        "total_salidas": resumen["total_salidas"],
+        "neto": resumen["neto"],
+        "fecha_hora_registro": timestamp.isoformat(),
+    }
+
+
+def eliminar_ultimo_movimiento(fecha: date) -> dict:
+    try:
+        resumen = excel_service.eliminar_ultimo_movimiento(fecha, fecha.year)
+        if resumen is None:
+            return {"ok": False, "mensaje": "No hay un último movimiento para eliminar.", "fecha": str(fecha)}
+    except excel_service.ArchivoCajaOcupadoError as exc:
+        return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
+
+    return {
+        "ok": True,
+        "mensaje": "Último movimiento eliminado correctamente",
+        "fecha": str(fecha),
+        "total_ingresos": resumen["total_ingresos"],
+        "total_salidas": resumen["total_salidas"],
+        "neto": resumen["neto"],
+        "fecha_hora_registro": datetime.now().replace(microsecond=0).isoformat(),
+    }
+
+
+def actualizar_movimiento_registro(entrada: MovimientoEntrada, sheet_row: int | None, fecha_hora_registro: str) -> dict:
+    try:
+        timestamp = datetime.now().replace(microsecond=0)
+        resumen = excel_service.actualizar_movimiento_registro(
+            entrada.fecha,
+            entrada.fecha.year,
+            sheet_row,
+            fecha_hora_registro,
+            entrada.tipo_movimiento,
+            entrada.concepto,
+            entrada.valor,
+            entrada.observacion,
+            timestamp,
+        )
+        if resumen is None:
+            return {"ok": False, "mensaje": "No se encontró el movimiento seleccionado para corregir.", "fecha": str(entrada.fecha)}
+        nombres_service.agregar_item_catalogo("movimientos", entrada.concepto)
+    except excel_service.ArchivoCajaOcupadoError as exc:
+        return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
+    return {
+        "ok": True,
+        "mensaje": "Movimiento actualizado correctamente",
+        "fecha": str(entrada.fecha),
+        "tipo_movimiento": entrada.tipo_movimiento,
+        "concepto": entrada.concepto,
+        "valor": float(entrada.valor),
+        "observacion": entrada.observacion,
+        "total_ingresos": resumen["total_ingresos"],
+        "total_salidas": resumen["total_salidas"],
+        "neto": resumen["neto"],
+        "fecha_hora_registro": timestamp.isoformat(),
+    }
+
+
+def eliminar_movimiento_registro(fecha: date, sheet_row: int | None, fecha_hora_registro: str) -> dict:
+    try:
+        resumen = excel_service.eliminar_movimiento_registro(fecha, fecha.year, sheet_row, fecha_hora_registro)
+        if resumen is None:
+            return {"ok": False, "mensaje": "No se encontró el movimiento seleccionado para eliminar.", "fecha": str(fecha)}
+    except excel_service.ArchivoCajaOcupadoError as exc:
+        return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
+    return {
+        "ok": True,
+        "mensaje": "Movimiento eliminado correctamente",
+        "fecha": str(fecha),
+        "total_ingresos": resumen["total_ingresos"],
+        "total_salidas": resumen["total_salidas"],
+        "neto": resumen["neto"],
+        "fecha_hora_registro": datetime.now().replace(microsecond=0).isoformat(),
+    }

@@ -73,6 +73,11 @@ class ModuloItemsEntrada(BaseModel):
     forzar: bool = False
 
 
+class ModuloRegistroEditarEntrada(ModuloItemsEntrada):
+    sheet_row: int | None = None
+    fecha_hora_registro: str = ""
+
+
 class BonoEntrada(BaseModel):
     fecha: date
     cliente: str
@@ -90,6 +95,11 @@ class BonoEntrada(BaseModel):
         if v <= 0:
             raise ValueError("El valor del bono debe ser mayor que cero")
         return v
+
+
+class BonoRegistroEditarEntrada(BonoEntrada):
+    sheet_row: int | None = None
+    fecha_hora_registro: str = ""
 
 
 class PrestamoEntrada(BaseModel):
@@ -118,6 +128,11 @@ class PrestamoEntrada(BaseModel):
         if v <= 0:
             raise ValueError("El valor del prestamo debe ser mayor que cero")
         return v
+
+
+class PrestamoRegistroEditarEntrada(PrestamoEntrada):
+    sheet_row: int | None = None
+    fecha_hora_registro: str = ""
 
 
 class MovimientoEntrada(BaseModel):
@@ -152,6 +167,17 @@ class MovimientoEntrada(BaseModel):
         if v <= 0:
             raise ValueError("El valor del movimiento debe ser mayor que cero")
         return v
+
+
+class MovimientoRegistroEditarEntrada(MovimientoEntrada):
+    sheet_row: int | None = None
+    fecha_hora_registro: str = ""
+
+
+class RegistroEliminarEntrada(BaseModel):
+    fecha: date
+    sheet_row: int | None = None
+    fecha_hora_registro: str = ""
 
 
 class CajaRespuesta(BaseModel):
