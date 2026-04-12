@@ -1422,16 +1422,25 @@ function renderBonosRegistros(items = [], total = 0) {
     tbody.innerHTML = '<tr><td colspan="5" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
   } else {
     const acumuladosPorCliente = new Map();
+    const ultimoRegistroPorCliente = new Map();
     const itemsAsc = [...bonusDayItems];
     itemsAsc.forEach(item => {
       const cliente = (item.cliente || '').trim();
       const valor = Number(item.valor || 0);
-      const acumuladoCliente = (acumuladosPorCliente.get(cliente) || 0) + valor;
-      item.acumulado_cliente = acumuladoCliente;
-      acumuladosPorCliente.set(cliente, acumuladoCliente);
+      const llaveCliente = cliente.toLocaleLowerCase('es-CO');
+      const acumuladoCliente = (acumuladosPorCliente.get(llaveCliente) || 0) + valor;
+      const itemConAcumulado = { ...item, acumulado_cliente: acumuladoCliente };
+      acumuladosPorCliente.set(llaveCliente, acumuladoCliente);
+      ultimoRegistroPorCliente.set(llaveCliente, itemConAcumulado);
     });
 
-    [...itemsAsc].reverse().forEach(item => {
+    const registrosUnicos = [...ultimoRegistroPorCliente.values()].sort((a, b) => {
+      const tsA = String(a.fecha_hora_registro || '');
+      const tsB = String(b.fecha_hora_registro || '');
+      return tsB.localeCompare(tsA);
+    });
+
+    registrosUnicos.forEach(item => {
       const cliente = (item.cliente || '').trim();
       const valor = Number(item.valor || 0);
       const tr = document.createElement('tr');
