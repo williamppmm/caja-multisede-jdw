@@ -1,5 +1,6 @@
 const DENOMINACIONES = [100000, 50000, 20000, 10000, 5000, 2000];
 const CONTRASENA = '1980';
+const ADMIN_CONTRASENA = '190380';
 const OBSERVACION_CRITICA_DEFAULT = 'reinicio técnico';
 const MODULE_META = {
   caja: { label: 'Caja', panelId: 'panel-caja', dateLabel: 'Fecha del arqueo' },
@@ -85,13 +86,42 @@ function setNumeroInputValue(id, valor, allowNegative = false) {
     : formatNumeroTexto(valor, allowNegative);
 }
 
+function contarDigitosAntesCursor(texto, cursor) {
+  return (String(texto || '').slice(0, Math.max(0, cursor)).match(/\d/g) || []).length;
+}
+
+function posicionCursorPorCantidadDigitos(texto, cantidadDigitos, allowNegative = false) {
+  const valor = String(texto || '');
+  if (cantidadDigitos <= 0) {
+    return allowNegative && valor.startsWith('-') ? 1 : 0;
+  }
+  let vistos = 0;
+  for (let i = 0; i < valor.length; i += 1) {
+    if (/\d/.test(valor[i])) {
+      vistos += 1;
+      if (vistos >= cantidadDigitos) return i + 1;
+    }
+  }
+  return valor.length;
+}
+
 function formatearInputNumerico(input, allowNegative = false, useThousands = true) {
   if (!input) return;
+  const activo = document.activeElement === input;
+  const inicio = activo ? (input.selectionStart ?? input.value.length) : null;
+  const fin = activo ? (input.selectionEnd ?? input.value.length) : null;
+  const digitosAntesInicio = activo ? contarDigitosAntesCursor(input.value, inicio) : null;
+  const digitosAntesFin = activo ? contarDigitosAntesCursor(input.value, fin) : null;
   if (!useThousands) {
     input.value = limpiarNumeroTexto(input.value, allowNegative);
-    return;
+  } else {
+    input.value = formatNumeroTexto(input.value, allowNegative);
   }
-  input.value = formatNumeroTexto(input.value, allowNegative);
+  if (activo && typeof input.setSelectionRange === 'function') {
+    const nuevoInicio = posicionCursorPorCantidadDigitos(input.value, digitosAntesInicio, allowNegative);
+    const nuevoFin = posicionCursorPorCantidadDigitos(input.value, digitosAntesFin, allowNegative);
+    input.setSelectionRange(nuevoInicio, nuevoFin);
+  }
 }
 
 function limpiarFormatoInputNumerico(input, allowNegative = false) {
@@ -783,6 +813,38 @@ function applyContadoresDraft(fecha) {
   });
   recalcularContadores();
   return true;
+}
+
+function draftCajaTieneContenido(draft) {
+  if (!draft) return false;
+  const billetes = Object.values(draft.billetes || {}).some(item =>
+    String(item?.cantidad || '').trim() !== '' || String(item?.subtotal || '').trim() !== ''
+  );
+  return billetes
+    || String(draft.total_monedas || '').trim() !== ''
+    || String(draft.billetes_viejos || '').trim() !== '';
+}
+
+function draftContadoresTieneContenido(draft) {
+  if (!draft?.items?.length) return false;
+  return draft.items.some(item =>
+    ['entradas', 'salidas', 'jackpot', 'ref_entradas', 'ref_salidas', 'ref_jackpot', 'produccion_pre_reset']
+      .some(key => String(item?.[key] || '').trim() !== '')
+    || Boolean(item?.critica_autorizada)
+  );
+}
+
+function sincronizarDraftActualParaAviso() {
+  if (currentModule === 'caja') guardarDraftCaja();
+  if (currentModule === 'contadores') guardarDraftContadores();
+}
+
+function obtenerModulosConCambiosSinGuardar() {
+  sincronizarDraftActualParaAviso();
+  const pendientes = [];
+  if (Object.values(cajaDrafts || {}).some(draftCajaTieneContenido)) pendientes.push('Caja');
+  if (Object.values(contadoresDrafts || {}).some(draftContadoresTieneContenido)) pendientes.push('Contadores');
+  return pendientes;
 }
 
 function crearInputContador(role, value = '') {
@@ -1527,8 +1589,11 @@ function validarPlataformas() {
   const deport = parseNumeroInput('venta_deportivas', true);
   const practiVal = isNaN(practi) ? 0 : practi;
   const deportVal = isNaN(deport) ? 0 : deport;
+  const fecha = document.getElementById('fecha')?.value || '';
   if (practiVal < 0) return 'La venta de Practisistemas no puede ser negativa.';
-  if (practiVal === 0 && deportVal === 0) return 'Debes ingresar al menos un valor en Plataformas.';
+  if (practiVal === 0 && deportVal === 0 && !isOverrideActive('plataformas', fecha)) {
+    return 'Debes ingresar al menos un valor en Plataformas.';
+  }
   return null;
 }
 
@@ -2863,7 +2928,7 @@ function cerrarAdmin() {
 }
 
 async function ingresarAdmin() {
-  if (document.getElementById('admin-pass').value !== CONTRASENA) {
+  if (document.getElementById('admin-pass').value !== ADMIN_CONTRASENA) {
     document.getElementById('admin-pass-error').classList.remove('oculto');
     return;
   }
@@ -2998,7 +3063,11 @@ async function buscarCarpetaDatos() {
 }
 
 async function cerrarAplicacion() {
-  const confirmar = window.confirm('La capturadora se cerrará en este equipo. ¿Desea finalizar ahora?');
+  const pendientes = obtenerModulosConCambiosSinGuardar();
+  const mensaje = pendientes.length
+    ? `Hay datos sin guardar en ${pendientes.join(' y ')}.\n\nSi finalizas ahora, esa captura se perderá.\n\n¿Desea cerrar de todos modos?`
+    : 'La capturadora se cerrará en este equipo. ¿Desea finalizar ahora?';
+  const confirmar = window.confirm(mensaje);
   if (!confirmar) return;
 
   try {
@@ -3398,6 +3467,11 @@ async function init() {
   });
   document.getElementById('modal-editar').addEventListener('click', e => {
     if (e.target === e.currentTarget) cerrarModalEditar();
+  });
+  window.addEventListener('beforeunload', e => {
+    if (!obtenerModulosConCambiosSinGuardar().length) return;
+    e.preventDefault();
+    e.returnValue = '';
   });
   window.addEventListener('resize', posicionarTarjetaAuth);
   window.addEventListener('scroll', posicionarTarjetaAuth, true);
