@@ -4,21 +4,26 @@ from fastapi import APIRouter, HTTPException
 
 from app.models.caja_models import (
     BonoEntrada,
+    BonoRegistroEditarEntrada,
     BonoRespuesta,
     CajaEntrada,
     CajaRespuesta,
+    GastoRegistroEditarEntrada,
     ModuloItemsEntrada,
     ModuloItemsRespuesta,
     MovimientoEntrada,
+    MovimientoRegistroEditarEntrada,
     MovimientoRespuesta,
     PlataformasEntrada,
     PlataformasRespuesta,
     PrestamoEntrada,
+    PrestamoRegistroEditarEntrada,
     PrestamoRespuesta,
+    RegistroEliminarEntrada,
 )
 from app.models.contadores_models import ContadoresEntrada, ContadoresRespuesta
 from app.models.cuadre_models import CuadreEntrada, CuadreRespuesta
-from app.services import bonos_service, caja_service, contadores_service, cuadre_service, excel_service, movimientos_service, nombres_service, plataformas_referencia_service, prestamos_service, settings_service, super_admin_audit_service
+from app.services import bonos_service, caja_service, contadores_service, cuadre_service, excel_service, gastos_service, movimientos_service, nombres_service, plataformas_referencia_service, prestamos_service, settings_service, super_admin_audit_service
 
 router = APIRouter(prefix="/api/modulos")
 
@@ -152,7 +157,7 @@ def registrar_movimiento(entrada: MovimientoEntrada):
 
 @router.get("/prestamos/datos")
 def datos_prestamos():
-    return prestamos_service.obtener_registros()
+    return prestamos_service.obtener_registros(date.today())
 
 
 @router.get("/cuadre/fecha/{fecha}/estado")
@@ -205,10 +210,10 @@ def datos_fecha_prestamos(fecha: str):
         d = date.fromisoformat(fecha)
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
-    registros = excel_service.obtener_prestamos_fecha(d, d.year)
-    if not registros:
+    datos = prestamos_service.obtener_registros(d)
+    if not datos["items"]:
         raise HTTPException(status_code=404, detail="No hay datos para esa fecha")
-    return {"items": registros, "total": sum(item["valor"] for item in registros)}
+    return datos
 
 
 @router.get("/movimientos/fecha/{fecha}/datos")
@@ -312,6 +317,83 @@ def eliminar_ultimo_bono(body: dict):
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
     return bonos_service.eliminar_ultimo_bono(d)
+
+
+@router.get("/gastos/fecha/{fecha}/registros")
+def registros_fecha_gastos(fecha: str):
+    try:
+        d = date.fromisoformat(fecha)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+    return gastos_service.obtener_registros_completos(d)
+
+
+@router.post("/bonos/registro/editar", response_model=BonoRespuesta)
+def editar_bono_por_registro(entrada: BonoRegistroEditarEntrada):
+    resultado = bonos_service.actualizar_bono_por_ts(entrada.fecha, entrada.ts, entrada.cliente, entrada.valor)
+    if resultado.get("ok"):
+        _audit("editar_registro", "bonos", str(entrada.fecha))
+    return BonoRespuesta(**resultado)
+
+
+@router.post("/bonos/registro/eliminar")
+def eliminar_bono_por_registro(entrada: RegistroEliminarEntrada):
+    resultado = bonos_service.eliminar_bono_por_ts(entrada.fecha, entrada.ts)
+    if resultado.get("ok"):
+        _audit("eliminar_registro", "bonos", str(entrada.fecha))
+    return resultado
+
+
+@router.post("/gastos/registro/editar")
+def editar_gasto_por_registro(entrada: GastoRegistroEditarEntrada):
+    resultado = gastos_service.actualizar_gasto_por_ts(entrada.fecha, entrada.ts, entrada.concepto, entrada.valor)
+    if resultado.get("ok"):
+        _audit("editar_registro", "gastos", str(entrada.fecha))
+    return resultado
+
+
+@router.post("/gastos/registro/eliminar")
+def eliminar_gasto_por_registro(entrada: RegistroEliminarEntrada):
+    resultado = gastos_service.eliminar_gasto_por_ts(entrada.fecha, entrada.ts)
+    if resultado.get("ok"):
+        _audit("eliminar_registro", "gastos", str(entrada.fecha))
+    return resultado
+
+
+@router.post("/prestamos/registro/editar", response_model=PrestamoRespuesta)
+def editar_prestamo_por_registro(entrada: PrestamoRegistroEditarEntrada):
+    resultado = prestamos_service.actualizar_prestamo_por_ts(
+        entrada.fecha, entrada.ts, entrada.persona, entrada.tipo_movimiento, entrada.valor
+    )
+    if resultado.get("ok"):
+        _audit("editar_registro", "prestamos", str(entrada.fecha))
+    return PrestamoRespuesta(**resultado)
+
+
+@router.post("/prestamos/registro/eliminar")
+def eliminar_prestamo_por_registro(entrada: RegistroEliminarEntrada):
+    resultado = prestamos_service.eliminar_prestamo_por_ts(entrada.fecha, entrada.ts)
+    if resultado.get("ok"):
+        _audit("eliminar_registro", "prestamos", str(entrada.fecha))
+    return resultado
+
+
+@router.post("/movimientos/registro/editar", response_model=MovimientoRespuesta)
+def editar_movimiento_por_registro(entrada: MovimientoRegistroEditarEntrada):
+    resultado = movimientos_service.actualizar_movimiento_por_ts(
+        entrada.fecha, entrada.ts, entrada.tipo_movimiento, entrada.concepto, entrada.valor, entrada.observacion
+    )
+    if resultado.get("ok"):
+        _audit("editar_registro", "movimientos", str(entrada.fecha))
+    return MovimientoRespuesta(**resultado)
+
+
+@router.post("/movimientos/registro/eliminar")
+def eliminar_movimiento_por_registro(entrada: RegistroEliminarEntrada):
+    resultado = movimientos_service.eliminar_movimiento_por_ts(entrada.fecha, entrada.ts)
+    if resultado.get("ok"):
+        _audit("eliminar_registro", "movimientos", str(entrada.fecha))
+    return resultado
 
 
 @router.get("/{modulo}/fecha/{fecha}/estado")

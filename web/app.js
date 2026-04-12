@@ -1,5 +1,6 @@
 const DENOMINACIONES = [100000, 50000, 20000, 10000, 5000, 2000];
 const CONTRASENA = '1980';
+const ADMIN_CONTRASENA = '190380';
 const OBSERVACION_CRITICA_DEFAULT = 'reinicio técnico';
 const MODULE_META = {
   caja: { label: 'Caja', panelId: 'panel-caja', dateLabel: 'Fecha del arqueo' },
@@ -38,6 +39,7 @@ let loanNames = [];
 let expenseConcepts = [];
 let movementConcepts = [];
 let bonusDayItems = [];
+let gastosItems = [];
 let loanItems = [];
 let movementItems = [];
 let cajaLocked = false;
@@ -48,6 +50,10 @@ let contadoresLocked = false;
 
 function fmt(n) {
   return '$ ' + Math.round(n).toLocaleString('es-CO');
+}
+
+function esSuperAdminActivo() {
+  return Boolean(configSuperAdminMode && configActiveSite);
 }
 
 function limpiarNumeroTexto(valor, allowNegative = false) {
@@ -93,7 +99,28 @@ function formatearInputNumerico(input, allowNegative = false, useThousands = tru
     input.value = limpiarNumeroTexto(input.value, allowNegative);
     return;
   }
-  input.value = formatNumeroTexto(input.value, allowNegative);
+  const valorAnterior = String(input.value ?? '');
+  const start = input.selectionStart ?? valorAnterior.length;
+  const estabaNegativo = allowNegative && limpiarNumeroTexto(valorAnterior, allowNegative).startsWith('-');
+  const digitosAntes = valorAnterior
+    .slice(0, start)
+    .replace(/[^\d]/g, '')
+    .length;
+  input.value = formatNumeroTexto(valorAnterior, allowNegative);
+  if (document.activeElement !== input) return;
+  let vistos = 0;
+  let nuevaPos = estabaNegativo && digitosAntes === 0 ? 1 : input.value.length;
+  for (let i = 0; i < input.value.length; i += 1) {
+    if (/\d/.test(input.value[i])) {
+      vistos += 1;
+      if (vistos >= digitosAntes) {
+        nuevaPos = i + 1;
+        break;
+      }
+    }
+  }
+  if (digitosAntes === 0 && !estabaNegativo) nuevaPos = 0;
+  input.setSelectionRange(nuevaPos, nuevaPos);
 }
 
 function limpiarFormatoInputNumerico(input, allowNegative = false) {
@@ -560,15 +587,24 @@ function calcularPlataformas() {
 function renderGastosRegistros(items = [], total = 0) {
   const tbody = document.getElementById('gastos-registros-body');
   if (!tbody) return;
+  gastosItems = Array.isArray(items) ? [...items] : [];
   tbody.innerHTML = '';
-  if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="2" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
+  if (!gastosItems.length) {
+    tbody.innerHTML = `<tr><td colspan="${esSuperAdminActivo() ? 3 : 2}" class="bonos-vacio">Sin registros para esta fecha.</td></tr>`;
   } else {
-    items.forEach(item => {
+    [...gastosItems].reverse().forEach(item => {
       const tr = document.createElement('tr');
+      const ts = item.fecha_hora_registro || '';
+      if (ts) tr.dataset.ts = ts;
       tr.innerHTML = `
         <td>${item.concepto || ''}</td>
         <td>${fmt(item.valor || 0)}</td>
+        ${esSuperAdminActivo() ? `
+          <td class="td-acciones">
+            <button type="button" class="btn-tabla-accion btn-tabla-editar" data-modulo="gastos" data-ts="${ts}">Editar</button>
+            <button type="button" class="btn-tabla-accion btn-tabla-eliminar" data-modulo="gastos" data-ts="${ts}">Eliminar</button>
+          </td>
+        ` : ''}
       `;
       tbody.appendChild(tr);
     });
@@ -1297,7 +1333,7 @@ function renderBonosRegistros(items = [], total = 0) {
   bonusDayItems = Array.isArray(items) ? [...items] : [];
   tbody.innerHTML = '';
   if (!bonusDayItems.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="${esSuperAdminActivo() ? 6 : 5}" class="bonos-vacio">Sin registros para esta fecha.</td></tr>`;
   } else {
     const acumuladosPorCliente = new Map();
     const itemsAsc = [...bonusDayItems];
@@ -1312,13 +1348,21 @@ function renderBonosRegistros(items = [], total = 0) {
     [...itemsAsc].reverse().forEach(item => {
       const cliente = (item.cliente || '').trim();
       const valor = Number(item.valor || 0);
+      const ts = item.fecha_hora_registro || '';
       const tr = document.createElement('tr');
+      if (ts) tr.dataset.ts = ts;
       tr.innerHTML = `
         <td>${item.fecha_display || formatFechaVisual(item.fecha)}</td>
         <td>${item.hora_display || ''}</td>
         <td>${cliente}</td>
         <td>${fmt(valor)}</td>
         <td>${fmt(item.acumulado_cliente || 0)}</td>
+        ${esSuperAdminActivo() ? `
+          <td class="td-acciones">
+            <button type="button" class="btn-tabla-accion btn-tabla-editar" data-modulo="bonos" data-ts="${ts}">Editar</button>
+            <button type="button" class="btn-tabla-accion btn-tabla-eliminar" data-modulo="bonos" data-ts="${ts}">Eliminar</button>
+          </td>
+        ` : ''}
       `;
       tbody.appendChild(tr);
     });
@@ -1335,10 +1379,12 @@ function renderPrestamosRegistros(items = [], resumen = {}) {
   loanItems = Array.isArray(items) ? [...items] : [];
   tbody.innerHTML = '';
   if (!loanItems.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="bonos-vacio">Sin movimientos registrados.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="${esSuperAdminActivo() ? 7 : 6}" class="bonos-vacio">Sin movimientos registrados.</td></tr>`;
   } else {
     [...loanItems].reverse().forEach(item => {
+      const ts = item.fecha_hora_registro || '';
       const tr = document.createElement('tr');
+      if (ts) tr.dataset.ts = ts;
       tr.innerHTML = `
         <td>${item.fecha_display || formatFechaVisual(item.fecha)}</td>
         <td>${item.hora_display || ''}</td>
@@ -1346,6 +1392,12 @@ function renderPrestamosRegistros(items = [], resumen = {}) {
         <td>${item.tipo_movimiento === 'pago' ? 'Pago' : 'Préstamo'}</td>
         <td>${fmt(item.valor || 0)}</td>
         <td>${fmt(item.saldo_pendiente || 0)}</td>
+        ${esSuperAdminActivo() ? `
+          <td class="td-acciones">
+            <button type="button" class="btn-tabla-accion btn-tabla-editar" data-modulo="prestamos" data-ts="${ts}">Editar</button>
+            <button type="button" class="btn-tabla-accion btn-tabla-eliminar" data-modulo="prestamos" data-ts="${ts}">Eliminar</button>
+          </td>
+        ` : ''}
       `;
       tbody.appendChild(tr);
     });
@@ -1364,16 +1416,24 @@ function renderMovimientosRegistros(items = [], resumen = {}) {
   if (!tbody) return;
   tbody.innerHTML = '';
   if (!movementItems.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="${esSuperAdminActivo() ? 6 : 5}" class="bonos-vacio">Sin registros para esta fecha.</td></tr>`;
   } else {
-    movementItems.forEach(item => {
+    [...movementItems].reverse().forEach(item => {
+      const ts = item.fecha_hora_registro || '';
       const tr = document.createElement('tr');
+      if (ts) tr.dataset.ts = ts;
       tr.innerHTML = `
         <td>${item.fecha_display || formatFechaVisual(item.fecha)}</td>
         <td>${item.hora_display || ''}</td>
         <td>${item.tipo_movimiento === 'ingreso' ? 'Ingreso' : 'Salida'}</td>
         <td>${item.concepto || ''}</td>
         <td>${fmt(item.valor || 0)}</td>
+        ${esSuperAdminActivo() ? `
+          <td class="td-acciones">
+            <button type="button" class="btn-tabla-accion btn-tabla-editar" data-modulo="movimientos" data-ts="${ts}">Editar</button>
+            <button type="button" class="btn-tabla-accion btn-tabla-eliminar" data-modulo="movimientos" data-ts="${ts}">Eliminar</button>
+          </td>
+        ` : ''}
       `;
       tbody.appendChild(tr);
     });
@@ -1399,9 +1459,23 @@ async function cargarBonosDelDia(fecha) {
   }
 }
 
-async function cargarPrestamosDelDia(_fecha) {
+async function cargarGastosDelDia(fecha) {
   try {
-    const res = await fetch(`/api/modulos/prestamos/datos?t=${Date.now()}`, { cache: 'no-store' });
+    const res = await fetch(`/api/modulos/gastos/fecha/${fecha}/registros?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) {
+      renderGastosRegistros([], 0);
+      return;
+    }
+    const data = await res.json();
+    renderGastosRegistros(data.items || [], data.total || 0);
+  } catch {
+    renderGastosRegistros([], 0);
+  }
+}
+
+async function cargarPrestamosDelDia(fecha) {
+  try {
+    const res = await fetch(`/api/modulos/prestamos/fecha/${fecha}/datos?t=${Date.now()}`, { cache: 'no-store' });
     if (!res.ok) {
       renderPrestamosRegistros([], {});
       return;
@@ -1410,6 +1484,149 @@ async function cargarPrestamosDelDia(_fecha) {
     renderPrestamosRegistros(data.items || [], data);
   } catch {
     renderPrestamosRegistros([], {});
+  }
+}
+
+function obtenerRegistroPorTs(modulo, ts) {
+  const itemsByModulo = {
+    bonos: bonusDayItems,
+    gastos: gastosItems,
+    prestamos: loanItems,
+    movimientos: movementItems,
+  };
+  return (itemsByModulo[modulo] || []).find(item => (item.fecha_hora_registro || '') === ts) || null;
+}
+
+async function recargarModuloPorFecha(modulo, fecha) {
+  if (modulo === 'bonos') return cargarBonosDelDia(fecha);
+  if (modulo === 'gastos') return cargarGastosDelDia(fecha);
+  if (modulo === 'prestamos') return cargarPrestamosDelDia(fecha);
+  if (modulo === 'movimientos') return cargarMovimientosDelDia(fecha);
+}
+
+async function editarRegistroPorTs(modulo, ts) {
+  const fecha = document.getElementById('fecha')?.value;
+  const item = obtenerRegistroPorTs(modulo, ts);
+  if (!fecha || !item) {
+    mostrarMensaje('No se encontró el registro a editar.', 'advertencia');
+    return;
+  }
+
+  let endpoint = '';
+  let payload = { fecha, ts };
+  let resumen = '';
+
+  if (modulo === 'bonos') {
+    const cliente = window.prompt('Cliente', item.cliente || '');
+    if (cliente === null) return;
+    const valorTexto = window.prompt('Valor del bono', String(Number(item.valor || 0)));
+    if (valorTexto === null) return;
+    const valor = Number(String(valorTexto).replace(/[^\d]/g, ''));
+    if (!cliente.trim() || !Number.isFinite(valor) || valor <= 0) {
+      mostrarMensaje('Debes ingresar un cliente y un valor válido.', 'advertencia');
+      return;
+    }
+    endpoint = '/api/modulos/bonos/registro/editar';
+    payload = { ...payload, cliente: cliente.trim(), valor };
+    resumen = `Cliente: ${cliente.trim()}\nValor: ${fmt(valor)}`;
+  } else if (modulo === 'gastos') {
+    const concepto = window.prompt('Concepto', item.concepto || '');
+    if (concepto === null) return;
+    const valorTexto = window.prompt('Valor del gasto', String(Number(item.valor || 0)));
+    if (valorTexto === null) return;
+    const valor = Number(String(valorTexto).replace(/[^\d]/g, ''));
+    if (!concepto.trim() || !Number.isFinite(valor) || valor <= 0) {
+      mostrarMensaje('Debes ingresar un concepto y un valor válido.', 'advertencia');
+      return;
+    }
+    endpoint = '/api/modulos/gastos/registro/editar';
+    payload = { ...payload, concepto: concepto.trim(), valor };
+    resumen = `Concepto: ${concepto.trim()}\nValor: ${fmt(valor)}`;
+  } else if (modulo === 'prestamos') {
+    const persona = window.prompt('Persona', item.persona || '');
+    if (persona === null) return;
+    const tipoActual = item.tipo_movimiento === 'pago' ? 'pago' : 'prestamo';
+    const tipoPrompt = window.prompt('Tipo (prestamo o pago)', tipoActual);
+    if (tipoPrompt === null) return;
+    const tipo_movimiento = String(tipoPrompt).trim().toLowerCase();
+    const valorTexto = window.prompt('Valor', String(Number(item.valor || 0)));
+    if (valorTexto === null) return;
+    const valor = Number(String(valorTexto).replace(/[^\d]/g, ''));
+    if (!persona.trim() || !['prestamo', 'pago'].includes(tipo_movimiento) || !Number.isFinite(valor) || valor <= 0) {
+      mostrarMensaje('Debes ingresar persona, tipo y valor válidos.', 'advertencia');
+      return;
+    }
+    endpoint = '/api/modulos/prestamos/registro/editar';
+    payload = { ...payload, persona: persona.trim(), tipo_movimiento, valor };
+    resumen = `Persona: ${persona.trim()}\nTipo: ${tipo_movimiento}\nValor: ${fmt(valor)}`;
+  } else if (modulo === 'movimientos') {
+    const tipoActual = item.tipo_movimiento === 'ingreso' ? 'ingreso' : 'salida';
+    const tipoPrompt = window.prompt('Tipo (ingreso o salida)', tipoActual);
+    if (tipoPrompt === null) return;
+    const tipo_movimiento = String(tipoPrompt).trim().toLowerCase();
+    const concepto = window.prompt('Concepto', item.concepto || '');
+    if (concepto === null) return;
+    const valorTexto = window.prompt('Valor', String(Number(item.valor || 0)));
+    if (valorTexto === null) return;
+    const observacion = window.prompt('Observación', item.observacion || '');
+    if (observacion === null) return;
+    const valor = Number(String(valorTexto).replace(/[^\d]/g, ''));
+    if (!concepto.trim() || !['ingreso', 'salida'].includes(tipo_movimiento) || !Number.isFinite(valor) || valor <= 0) {
+      mostrarMensaje('Debes ingresar tipo, concepto y valor válidos.', 'advertencia');
+      return;
+    }
+    endpoint = '/api/modulos/movimientos/registro/editar';
+    payload = { ...payload, tipo_movimiento, concepto: concepto.trim(), valor, observacion: observacion.trim() };
+    resumen = `Tipo: ${tipo_movimiento}\nConcepto: ${concepto.trim()}\nValor: ${fmt(valor)}`;
+  } else {
+    return;
+  }
+
+  const confirmar = window.confirm(`Vas a editar un registro de ${modulo} en ${formatFechaVisual(fecha)}.\n\n${resumen}\n\n¿Deseas continuar?`);
+  if (!confirmar) return;
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      mostrarMensaje(data.mensaje || 'No se pudo editar el registro.', 'advertencia');
+      return;
+    }
+    await recargarModuloPorFecha(modulo, fecha);
+    mostrarMensaje(data.mensaje || 'Registro actualizado correctamente.', 'ok');
+  } catch {
+    mostrarMensaje('Error de conexión al editar el registro.', 'error');
+  }
+}
+
+async function eliminarRegistroPorTs(modulo, ts) {
+  const fecha = document.getElementById('fecha')?.value;
+  const item = obtenerRegistroPorTs(modulo, ts);
+  if (!fecha || !item) {
+    mostrarMensaje('No se encontró el registro a eliminar.', 'advertencia');
+    return;
+  }
+  const confirmar = window.confirm(`Vas a eliminar un registro de ${modulo} en ${formatFechaVisual(fecha)}.\n\nEsta acción no se puede deshacer.\n\n¿Deseas continuar?`);
+  if (!confirmar) return;
+  try {
+    const res = await fetch(`/api/modulos/${modulo}/registro/eliminar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha, ts }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      mostrarMensaje(data.mensaje || 'No se pudo eliminar el registro.', 'advertencia');
+      return;
+    }
+    await recargarModuloPorFecha(modulo, fecha);
+    mostrarMensaje(data.mensaje || 'Registro eliminado correctamente.', 'ok');
+  } catch {
+    mostrarMensaje('Error de conexión al eliminar el registro.', 'error');
   }
 }
 
@@ -1466,8 +1683,58 @@ function validarPlataformas() {
   const practiVal = isNaN(practi) ? 0 : practi;
   const deportVal = isNaN(deport) ? 0 : deport;
   if (practiVal < 0) return 'La venta de Practisistemas no puede ser negativa.';
-  if (practiVal === 0 && deportVal === 0) return 'Debes ingresar al menos un valor en Plataformas.';
+  const fecha = document.getElementById('fecha')?.value || '';
+  const correccionAutorizada = esSuperAdminActivo() || isOverrideActive('plataformas', fecha);
+  if (practiVal === 0 && deportVal === 0 && !correccionAutorizada) {
+    return 'Debes ingresar al menos un valor en Plataformas.';
+  }
   return null;
+}
+
+function cajaDraftTieneContenido(draft) {
+  if (!draft) return false;
+  if (String(draft.total_monedas || '').trim()) return true;
+  if (String(draft.billetes_viejos || '').trim()) return true;
+  return Object.values(draft.billetes || {}).some(item =>
+    String(item?.cantidad || '').trim() !== '' || String(item?.subtotal || '').trim() !== ''
+  );
+}
+
+function contadoresDraftTieneContenido(draft) {
+  if (!draft?.items?.length) return false;
+  return draft.items.some(item => [
+    item.entradas,
+    item.salidas,
+    item.jackpot,
+    item.ref_entradas,
+    item.ref_salidas,
+    item.ref_jackpot,
+    item.produccion_pre_reset,
+  ].some(valor => String(valor || '').trim() !== ''));
+}
+
+function sincronizarDraftsActualesParaAviso() {
+  if (currentModule === 'caja') guardarDraftCaja();
+  if (currentModule === 'contadores') guardarDraftContadores();
+}
+
+function obtenerModulosConCambiosSinGuardar() {
+  sincronizarDraftsActualesParaAviso();
+  const modulos = [];
+  if (Object.values(cajaDrafts).some(cajaDraftTieneContenido)) modulos.push('Caja');
+  if (Object.values(contadoresDrafts).some(contadoresDraftTieneContenido)) modulos.push('Contadores');
+  return modulos;
+}
+
+function cambiarFechaPorDelta(deltaDias) {
+  const fechaInput = document.getElementById('fecha');
+  if (!fechaInput?.value) return;
+  const actual = new Date(`${fechaInput.value}T00:00:00`);
+  if (Number.isNaN(actual.getTime())) return;
+  actual.setDate(actual.getDate() + deltaDias);
+  const nuevaFecha = dateToStr(actual);
+  fechaInput.value = nuevaFecha;
+  fechaInput.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 function limpiarCaja() {
@@ -1941,6 +2208,10 @@ function _renderRefItem(prefix, ref, valorIngresado) {
 async function cargarDatosModuloItems(modulo, fecha) {
   if (modulo === 'contadores') {
     await cargarDatosContadores(fecha);
+    return;
+  }
+  if (modulo === 'gastos') {
+    await cargarGastosDelDia(fecha);
     return;
   }
   if (modulo === 'bonos') {
@@ -2663,7 +2934,7 @@ function cerrarAdmin() {
 }
 
 async function ingresarAdmin() {
-  if (!configSuperAdminMode && document.getElementById('admin-pass').value !== CONTRASENA) {
+  if (!configSuperAdminMode && document.getElementById('admin-pass').value !== ADMIN_CONTRASENA) {
     document.getElementById('admin-pass-error').classList.remove('oculto');
     return;
   }
@@ -3075,6 +3346,13 @@ function mostrarMensajeAdmin(texto, tipo) {
 }
 
 async function cerrarAplicacion() {
+  const modulosPendientes = obtenerModulosConCambiosSinGuardar();
+  if (modulosPendientes.length) {
+    const confirmarPendientes = window.confirm(
+      `Tienes datos sin guardar en ${modulosPendientes.join(' y ')}.\n\nSelecciona Aceptar para cerrar sin guardar o Cancelar para volver.`
+    );
+    if (!confirmarPendientes) return;
+  }
   const confirmar = window.confirm('La capturadora se cerrará en este equipo. ¿Desea finalizar ahora?');
   if (!confirmar) return;
 
@@ -3245,6 +3523,8 @@ async function init() {
   document.getElementById('btn-limpiar').addEventListener('click', limpiarModuloActual);
   document.getElementById('btn-ultima').addEventListener('click', ultimoRegistro);
   document.getElementById('btn-finalizar').addEventListener('click', cerrarAplicacion);
+  document.getElementById('btn-fecha-anterior')?.addEventListener('click', () => cambiarFechaPorDelta(-1));
+  document.getElementById('btn-fecha-siguiente')?.addEventListener('click', () => cambiarFechaPorDelta(1));
   document.getElementById('btn-cancelar-edicion').addEventListener('click', async () => {
     resetOverride(currentModule);
     aplicarFechaModulo(currentModule);
@@ -3321,6 +3601,24 @@ async function init() {
   cuadreBaseInput.addEventListener('blur', () => formatearInputNumerico(cuadreBaseInput, false));
   document.getElementById('btn-bono-editar-ultimo').addEventListener('click', editarUltimoBono);
   document.getElementById('btn-bono-eliminar-ultimo').addEventListener('click', eliminarUltimoBono);
+  document.addEventListener('click', e => {
+    const actionBtn = e.target.closest('.btn-tabla-accion');
+    if (!actionBtn) return;
+    const { modulo, ts } = actionBtn.dataset;
+    if (!modulo || !ts) return;
+    if (actionBtn.classList.contains('btn-tabla-editar')) {
+      editarRegistroPorTs(modulo, ts);
+      return;
+    }
+    if (actionBtn.classList.contains('btn-tabla-eliminar')) {
+      eliminarRegistroPorTs(modulo, ts);
+    }
+  });
+  window.addEventListener('beforeunload', e => {
+    if (!obtenerModulosConCambiosSinGuardar().length) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
   document.getElementById('contadores-body').addEventListener('click', e => {
     if (e.target.matches('.btn-confirmar-critica')) {
       confirmarReferenciaCritica(e.target.closest('tr'));

@@ -51,3 +51,52 @@ def obtener_registros(fecha: date) -> dict:
         "total_salidas": total_salidas,
         "neto": total_ingresos - total_salidas,
     }
+
+
+def actualizar_movimiento_por_ts(fecha: date, ts_str: str, tipo_movimiento: str, concepto: str, valor: float, observacion: str) -> dict:
+    try:
+        timestamp = datetime.now().replace(microsecond=0)
+        resumen = excel_service.actualizar_movimiento_por_ts(
+            fecha, fecha.year, ts_str, tipo_movimiento, concepto.strip(), valor, observacion.strip(), timestamp
+        )
+        if resumen is None:
+            return {"ok": False, "mensaje": "Registro no encontrado.", "fecha": str(fecha)}
+    except excel_service.ArchivoCajaOcupadoError as exc:
+        return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
+
+    return {
+        "ok": True,
+        "mensaje": "Movimiento actualizado correctamente",
+        "fecha": str(fecha),
+        "tipo_movimiento": tipo_movimiento,
+        "concepto": concepto.strip(),
+        "valor": float(valor),
+        "observacion": observacion.strip(),
+        "total_ingresos": resumen["total_ingresos"],
+        "total_salidas": resumen["total_salidas"],
+        "neto": resumen["neto"],
+        "fecha_hora_registro": timestamp.isoformat(),
+    }
+
+
+def eliminar_movimiento_por_ts(fecha: date, ts_str: str) -> dict:
+    try:
+        resumen = excel_service.eliminar_movimiento_por_ts(fecha, fecha.year, ts_str)
+        if resumen is None:
+            return {"ok": False, "mensaje": "Registro no encontrado.", "fecha": str(fecha)}
+    except excel_service.ArchivoCajaOcupadoError as exc:
+        return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
+
+    return {
+        "ok": True,
+        "mensaje": "Movimiento eliminado correctamente",
+        "fecha": str(fecha),
+        "tipo_movimiento": "",
+        "concepto": "",
+        "valor": 0,
+        "observacion": "",
+        "total_ingresos": resumen["total_ingresos"],
+        "total_salidas": resumen["total_salidas"],
+        "neto": resumen["neto"],
+        "fecha_hora_registro": datetime.now().replace(microsecond=0).isoformat(),
+    }

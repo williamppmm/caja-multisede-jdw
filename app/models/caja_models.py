@@ -154,6 +154,111 @@ class MovimientoEntrada(BaseModel):
         return v
 
 
+class RegistroEliminarEntrada(BaseModel):
+    fecha: date
+    ts: str
+
+
+class BonoRegistroEditarEntrada(BaseModel):
+    fecha: date
+    ts: str
+    cliente: str
+    valor: float
+
+    @field_validator("cliente")
+    @classmethod
+    def validar_cliente(cls, v):
+        return _validar_texto_no_numerico_puro(v, "nombre del cliente")
+
+    @field_validator("valor")
+    @classmethod
+    def validar_valor(cls, v):
+        if v <= 0:
+            raise ValueError("El valor del bono debe ser mayor que cero")
+        return v
+
+
+class GastoRegistroEditarEntrada(BaseModel):
+    fecha: date
+    ts: str
+    concepto: str
+    valor: float
+
+    @field_validator("concepto")
+    @classmethod
+    def validar_concepto(cls, v):
+        return _validar_texto_no_numerico_puro(v, "concepto")
+
+    @field_validator("valor")
+    @classmethod
+    def validar_valor(cls, v):
+        if v <= 0:
+            raise ValueError("El valor del gasto debe ser mayor que cero")
+        return v
+
+
+class PrestamoRegistroEditarEntrada(BaseModel):
+    fecha: date
+    ts: str
+    persona: str
+    tipo_movimiento: str = "prestamo"
+    valor: float
+
+    @field_validator("persona")
+    @classmethod
+    def validar_persona(cls, v):
+        return _validar_texto_no_numerico_puro(v, "nombre de la persona")
+
+    @field_validator("tipo_movimiento")
+    @classmethod
+    def validar_tipo_movimiento(cls, v):
+        tipo = str(v or "").strip().lower()
+        if tipo not in {"prestamo", "pago"}:
+            raise ValueError("El tipo de movimiento debe ser prestamo o pago")
+        return tipo
+
+    @field_validator("valor")
+    @classmethod
+    def validar_valor(cls, v):
+        if v <= 0:
+            raise ValueError("El valor del prestamo debe ser mayor que cero")
+        return v
+
+
+class MovimientoRegistroEditarEntrada(BaseModel):
+    fecha: date
+    ts: str
+    tipo_movimiento: str
+    concepto: str
+    valor: float
+    observacion: str = ""
+
+    @field_validator("tipo_movimiento")
+    @classmethod
+    def validar_tipo_movimiento(cls, v):
+        tipo = str(v or "").strip().lower()
+        if tipo not in {"ingreso", "salida"}:
+            raise ValueError("El tipo de movimiento debe ser ingreso o salida")
+        return tipo
+
+    @field_validator("concepto")
+    @classmethod
+    def validar_concepto(cls, v):
+        return _validar_texto_no_numerico_puro(v, "concepto")
+
+    @field_validator("observacion")
+    @classmethod
+    def validar_observacion(cls, v):
+        return _validar_texto_no_numerico_puro(v, "observación", obligatorio=False)
+
+    @field_validator("valor")
+    @classmethod
+    def validar_valor(cls, v):
+        if v <= 0:
+            raise ValueError("El valor del movimiento debe ser mayor que cero")
+        return v
+
+
 class CajaRespuesta(BaseModel):
     ok: bool
     mensaje: str

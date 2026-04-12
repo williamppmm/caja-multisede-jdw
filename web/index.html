@@ -35,7 +35,9 @@
       <h2>Fecha</h2>
       <div class="fecha-row">
         <label for="fecha" id="fecha-label">Fecha del módulo</label>
+        <button id="btn-fecha-anterior" class="btn btn-secondary btn-fecha-nav" type="button" aria-label="Ir un día atrás">◀</button>
         <input type="date" id="fecha" name="fecha" required />
+        <button id="btn-fecha-siguiente" class="btn btn-secondary btn-fecha-nav" type="button" aria-label="Ir un día adelante">▶</button>
         <span id="fecha-estado" class="fecha-estado"></span>
       </div>
     </section>
@@ -193,11 +195,12 @@
                 <tr>
                   <th>Descripción</th>
                   <th>Valor</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody id="gastos-registros-body">
                 <tr>
-                  <td colspan="2" class="bonos-vacio">Sin registros para esta fecha.</td>
+                  <td colspan="3" class="bonos-vacio">Sin registros para esta fecha.</td>
                 </tr>
               </tbody>
             </table>
@@ -254,11 +257,12 @@
                   <th>Cliente</th>
                   <th>Valor</th>
                   <th>Acumulado cliente</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody id="bonos-registros-body">
                 <tr>
-                  <td colspan="5" class="bonos-vacio">Sin registros para esta fecha.</td>
+                  <td colspan="6" class="bonos-vacio">Sin registros para esta fecha.</td>
                 </tr>
               </tbody>
             </table>
@@ -324,11 +328,12 @@
                   <th>Tipo</th>
                   <th>Valor</th>
                   <th>Saldo persona</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody id="prestamos-registros-body">
                 <tr>
-                  <td colspan="6" class="bonos-vacio">Sin movimientos registrados.</td>
+                  <td colspan="7" class="bonos-vacio">Sin movimientos registrados.</td>
                 </tr>
               </tbody>
             </table>
@@ -392,11 +397,12 @@
                   <th>Tipo</th>
                   <th>Concepto</th>
                   <th>Valor</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody id="movimientos-registros-body">
                 <tr>
-                  <td colspan="5" class="bonos-vacio">Sin registros para esta fecha.</td>
+                  <td colspan="6" class="bonos-vacio">Sin registros para esta fecha.</td>
                 </tr>
               </tbody>
             </table>
@@ -426,7 +432,7 @@
                 <th>Entradas</th>
                 <th>Salidas</th>
                 <th>Jackpot</th>
-                <th>Yield actual</th>
+                <th>Yield</th>
                 <th>Yield ref.</th>
                 <th>Resultado</th>
               </tr>
@@ -634,7 +640,7 @@
         <h3>Administración</h3>
         <div class="campo-manual">
           <label for="admin-pass">Contraseña</label>
-          <input type="password" id="admin-pass" placeholder="••••" autocomplete="off" />
+          <input type="password" id="admin-pass" placeholder="••••" autocomplete="new-password" />
         </div>
         <p id="admin-pass-error" class="error-text oculto">Contraseña incorrecta</p>
         <div class="acciones-modal">

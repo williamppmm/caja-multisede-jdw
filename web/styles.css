@@ -141,6 +141,12 @@ h2 {
   color: #27ae60;
 }
 
+.btn-fecha-nav {
+  min-width: 40px;
+  padding: 8px 10px;
+  line-height: 1;
+}
+
 /* Tabla billetes */
 .tabla-billetes {
   width: 100%;
@@ -524,6 +530,46 @@ input[type="number"]::-webkit-outer-spin-button {
   text-align: right;
 }
 
+.td-acciones {
+  text-align: center !important;
+  white-space: nowrap;
+  width: 1%;
+}
+
+.btn-tabla-accion {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.btn-tabla-editar {
+  background: #e8f0fe;
+  color: var(--brand);
+  margin-right: 4px;
+}
+
+.btn-tabla-editar:hover {
+  background: #c5d8fb;
+}
+
+.btn-tabla-eliminar {
+  background: #fde8e8;
+  color: #c0392b;
+}
+
+.btn-tabla-eliminar:hover {
+  background: #fbc5c5;
+}
+
 .bonos-vacio {
   color: #6b7280;
   text-align: center !important;
@@ -598,6 +644,22 @@ table.contadores-tabla th {
   border-radius: 5px;
   text-align: right;
   font-size: 0.88rem;
+}
+
+.contadores-tabla th:nth-child(3),
+.contadores-tabla td:nth-child(3),
+.contadores-tabla th:nth-child(4),
+.contadores-tabla td:nth-child(4),
+#panel-contadores .contadores-tabla th:nth-child(3),
+#panel-contadores .contadores-tabla td:nth-child(3),
+#panel-contadores .contadores-tabla th:nth-child(4),
+#panel-contadores .contadores-tabla td:nth-child(4) {
+  min-width: 110px;
+}
+
+#panel-contadores .contador-campo[data-role="entradas"],
+#panel-contadores .contador-campo[data-role="salidas"] {
+  width: 104px;
 }
 
 .contador-campo:focus,
@@ -1186,18 +1248,6 @@ body.auth-banner-open::before {
 }
 
 
-/* Fecha estado con botón inline */
-.fecha-estado .btn-inline-editar {
-  background: none;
-  border: none;
-  color: #2F5496;
-  cursor: pointer;
-  font-size: 0.88rem;
-  font-weight: 600;
-  padding: 0;
-  text-decoration: underline;
-}
-
 /* Modales */
 .modal-overlay {
   position: fixed;
@@ -1490,36 +1540,6 @@ body.auth-banner-open::before {
   margin: 0 0 12px 2px;
 }
 
-table.cuadre-tabla {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.92rem;
-  margin-bottom: 4px;
-}
-
-table.cuadre-tabla th {
-  background: #edf1f7;
-  color: #2f3f5a;
-  font-weight: 600;
-  padding: 7px 10px;
-  text-align: left;
-}
-
-table.cuadre-tabla td {
-  padding: 6px 10px;
-  border-bottom: 1px solid #f0f2f6;
-  color: #2f3f5a;
-}
-
-table.cuadre-tabla tr:last-child td {
-  border-bottom: none;
-}
-
-table.cuadre-tabla td.num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
 .cuadre-positivo {
   color: #1a7a2e;
   font-weight: 600;
@@ -1559,26 +1579,6 @@ table.cuadre-tabla td.num {
 }
 
 
-.cuadre-balance-item {
-  background: #fff;
-  border-radius: 8px;
-  padding: 10px 14px;
-  border: 1px solid #dce3ef;
-}
-
-.cuadre-balance-item .label {
-  font-size: 0.8rem;
-  color: #6b7a99;
-  margin-bottom: 4px;
-}
-
-.cuadre-balance-item .valor {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #2f3f5a;
-  font-variant-numeric: tabular-nums;
-}
-
 .cuadre-diferencia-row {
   display: flex;
   align-items: center;
@@ -1613,26 +1613,6 @@ table.cuadre-tabla td.num {
   margin: 0 0 12px;
 }
 
-
-.cuadre-resumen-item {
-  background: #fff;
-  border-radius: 8px;
-  padding: 10px 14px;
-  border: 1px solid #c2e0cc;
-}
-
-.cuadre-resumen-item .label {
-  font-size: 0.8rem;
-  color: #3a7a52;
-  margin-bottom: 4px;
-}
-
-.cuadre-resumen-item .valor {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #1a5c30;
-  font-variant-numeric: tabular-nums;
-}
 
 @media (min-width: 920px) {
   .cuadre-grid {
@@ -1813,9 +1793,7 @@ table.cuadre-tabla td.num {
 }
 
 .modulo-panel .bonos-tabla th,
-.modulo-panel .bonos-tabla td,
-.modulo-panel table.cuadre-tabla th,
-.modulo-panel table.cuadre-tabla td {
+.modulo-panel .bonos-tabla td {
   padding-top: 6px;
   padding-bottom: 6px;
 }
@@ -1908,10 +1886,7 @@ h2,
 .bonos-meta-label,
 .modulo-panel .card details > summary,
 .admin-grid-tabla th,
-.bonos-tabla th,
-table.cuadre-tabla th,
-.cuadre-balance-item .label,
-.cuadre-resumen-item .label {
+.bonos-tabla th {
   font-size: 0.85rem;
   letter-spacing: 0.04em;
 }

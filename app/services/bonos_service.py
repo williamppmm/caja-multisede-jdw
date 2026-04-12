@@ -42,6 +42,48 @@ def obtener_registros(fecha: date) -> dict:
     return {"items": items, "total": sum(item["valor"] for item in items)}
 
 
+def actualizar_bono_por_ts(fecha: date, ts_str: str, cliente: str, valor: float) -> dict:
+    try:
+        timestamp = datetime.now().replace(microsecond=0)
+        result = excel_service.actualizar_bono_por_ts(fecha, fecha.year, ts_str, cliente.strip(), valor, timestamp)
+        if result is None:
+            return {"ok": False, "mensaje": "Registro no encontrado.", "fecha": str(fecha)}
+        nombres_service.agregar_nombre(cliente)
+    except excel_service.ArchivoCajaOcupadoError as exc:
+        return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
+
+    return {
+        "ok": True,
+        "mensaje": "Bono actualizado correctamente",
+        "fecha": str(fecha),
+        "hora": timestamp.strftime("%I:%M %p"),
+        "cliente": cliente.strip(),
+        "valor": valor,
+        "total_dia": result["total_dia"],
+        "fecha_hora_registro": timestamp.isoformat(),
+    }
+
+
+def eliminar_bono_por_ts(fecha: date, ts_str: str) -> dict:
+    try:
+        total_dia = excel_service.eliminar_bono_por_ts(fecha, fecha.year, ts_str)
+        if total_dia is None:
+            return {"ok": False, "mensaje": "Registro no encontrado.", "fecha": str(fecha)}
+    except excel_service.ArchivoCajaOcupadoError as exc:
+        return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
+
+    return {
+        "ok": True,
+        "mensaje": "Bono eliminado correctamente",
+        "fecha": str(fecha),
+        "hora": "",
+        "cliente": "",
+        "valor": 0,
+        "total_dia": total_dia,
+        "fecha_hora_registro": datetime.now().replace(microsecond=0).isoformat(),
+    }
+
+
 def actualizar_ultimo_bono(fecha: date, cliente: str, valor: float) -> dict:
     try:
         timestamp = datetime.now().replace(microsecond=0)

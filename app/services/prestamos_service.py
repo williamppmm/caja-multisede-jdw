@@ -54,6 +54,60 @@ def guardar_prestamo(entrada: PrestamoEntrada) -> dict:
     }
 
 
-def obtener_registros() -> dict:
-    resumen = excel_service.obtener_resumen_prestamos()
-    return resumen
+def obtener_registros(fecha: date) -> dict:
+    items = excel_service.obtener_prestamos_fecha(fecha, fecha.year)
+    total_prestado = sum(float(item["valor"] or 0) for item in items if item["tipo_movimiento"] == "prestamo")
+    total_pagado = sum(float(item["valor"] or 0) for item in items if item["tipo_movimiento"] == "pago")
+    return {
+        "items": items,
+        "total_prestado": total_prestado,
+        "total_pagado": total_pagado,
+        "saldo_pendiente": total_prestado - total_pagado,
+    }
+
+
+def actualizar_prestamo_por_ts(fecha: date, ts_str: str, persona: str, tipo_movimiento: str, valor: float) -> dict:
+    try:
+        timestamp = datetime.now().replace(microsecond=0)
+        resumen = excel_service.actualizar_prestamo_por_ts(fecha, fecha.year, ts_str, persona.strip(), tipo_movimiento, valor, timestamp)
+        if resumen is None:
+            return {"ok": False, "mensaje": "Registro no encontrado.", "fecha": str(fecha)}
+        nombres_service.agregar_item_catalogo("prestamos", persona)
+    except excel_service.ArchivoCajaOcupadoError as exc:
+        return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
+
+    mensaje = "Préstamo actualizado correctamente" if tipo_movimiento == "prestamo" else "Pago actualizado correctamente"
+    return {
+        "ok": True,
+        "mensaje": mensaje,
+        "fecha": str(fecha),
+        "persona": persona.strip(),
+        "tipo_movimiento": tipo_movimiento,
+        "valor": valor,
+        "total_prestado": resumen["total_prestado"],
+        "total_pagado": resumen["total_pagado"],
+        "saldo_pendiente": resumen["saldo_pendiente"],
+        "fecha_hora_registro": timestamp.isoformat(),
+    }
+
+
+def eliminar_prestamo_por_ts(fecha: date, ts_str: str) -> dict:
+    try:
+        resumen = excel_service.eliminar_prestamo_por_ts(fecha, fecha.year, ts_str)
+        if resumen is None:
+            return {"ok": False, "mensaje": "Registro no encontrado.", "fecha": str(fecha)}
+    except excel_service.ArchivoCajaOcupadoError as exc:
+        return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
+
+    return {
+        "ok": True,
+        "mensaje": "Movimiento de préstamo eliminado correctamente",
+        "fecha": str(fecha),
+        "persona": "",
+        "tipo_movimiento": "",
+        "valor": 0,
+        "total_prestado": resumen["total_prestado"],
+        "total_pagado": resumen["total_pagado"],
+        "saldo_pendiente": resumen["saldo_pendiente"],
+        "fecha_hora_registro": datetime.now().replace(microsecond=0).isoformat(),
+    }

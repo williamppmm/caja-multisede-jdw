@@ -1250,3 +1250,283 @@ def obtener_datos_cuadre_fecha(fecha: date, year: int) -> dict | None:
         for row in _iterar_filas_fecha(hojas, fecha):
             return _parsear_fila_cuadre(row)
     return None
+
+
+def _ts_matches(cell_val, ts_str: str) -> bool:
+    if isinstance(cell_val, datetime):
+        return cell_val.isoformat() == ts_str
+    return str(cell_val or "").strip() == ts_str
+
+
+def _obtener_hoja_existente_modulo(wb, modulo: str):
+    for nombre in _nombres_lectura_modulo(modulo):
+        if nombre in wb.sheetnames:
+            return wb[nombre]
+    return None
+
+
+def obtener_gastos_fecha(fecha: date, year: int) -> list[dict]:
+    path = get_excel_path(year)
+    if not path.exists():
+        return []
+
+    registros = []
+    with _abrir_workbook_lectura(path) as wb:
+        hojas = _obtener_hojas_para_lectura(wb, "gastos")
+        if not hojas:
+            return []
+        for ws in hojas:
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                if row[0] is None:
+                    continue
+                cell_date = row[0]
+                if isinstance(cell_date, datetime):
+                    cell_date = cell_date.date()
+                if not (isinstance(cell_date, date) and cell_date == fecha):
+                    continue
+                if str(row[1] or "").strip().lower() != "gasto":
+                    continue
+                ts = row[7]
+                registros.append({
+                    "sheet_row": idx,
+                    "fecha": cell_date.isoformat(),
+                    "fecha_display": cell_date.strftime("%d-%m-%Y"),
+                    "hora_display": ts.strftime("%I:%M %p") if isinstance(ts, datetime) else "",
+                    "concepto": str(row[2] or "").strip(),
+                    "valor": float(row[6] or 0),
+                    "fecha_hora_registro": ts.isoformat() if isinstance(ts, datetime) else str(ts or ""),
+                })
+    registros.sort(key=lambda item: item["fecha_hora_registro"] or "", reverse=True)
+    return registros
+
+
+def actualizar_bono_por_ts(fecha: date, year: int, ts_str: str, cliente: str, valor: float, new_ts: datetime) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ws = _asegurar_hoja(wb, "bonos")
+        target = None
+        for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+            if _ts_matches(row[4].value, ts_str):
+                target = idx
+                break
+        if target is None:
+            wb.close()
+            return None
+        ws.cell(target, 3).value = cliente
+        ws.cell(target, 4).value = valor
+        ws.cell(target, 5).value = new_ts
+        _formatear_filas_recientes_bonos(ws, 1)
+        total_dia = sum(
+            float(r[3] or 0)
+            for r in ws.iter_rows(min_row=2, values_only=True)
+            if (r[0].date() if isinstance(r[0], datetime) else r[0]) == fecha
+        )
+        wb.save(path)
+        wb.close()
+    return {"cliente": cliente, "valor": valor, "total_dia": total_dia}
+
+
+def eliminar_bono_por_ts(fecha: date, year: int, ts_str: str) -> float | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ws = _asegurar_hoja(wb, "bonos")
+        target = None
+        for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+            if _ts_matches(row[4].value, ts_str):
+                target = idx
+                break
+        if target is None:
+            wb.close()
+            return None
+        ws.delete_rows(target)
+        total_dia = sum(
+            float(r[3] or 0)
+            for r in ws.iter_rows(min_row=2, values_only=True)
+            if (r[0].date() if isinstance(r[0], datetime) else r[0]) == fecha
+        )
+        wb.save(path)
+        wb.close()
+    return total_dia
+
+
+def actualizar_gasto_por_ts(fecha: date, year: int, ts_str: str, concepto: str, valor: float, new_ts: datetime) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ws = _obtener_hoja_existente_modulo(wb, "gastos")
+        if ws is None:
+            wb.close()
+            return None
+        target = None
+        for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+            if str(row[1].value or "").strip().lower() == "gasto" and _ts_matches(row[7].value, ts_str):
+                target = idx
+                break
+        if target is None:
+            wb.close()
+            return None
+        ws.cell(target, 3).value = concepto
+        ws.cell(target, 7).value = valor
+        ws.cell(target, 8).value = new_ts
+        _formatear_filas_recientes(ws, 1)
+        total_dia = sum(
+            float(r[6] or 0)
+            for r in ws.iter_rows(min_row=2, values_only=True)
+            if str(r[1] or "").strip().lower() == "gasto"
+            and (r[0].date() if isinstance(r[0], datetime) else r[0]) == fecha
+        )
+        wb.save(path)
+        wb.close()
+    return {"concepto": concepto, "valor": valor, "total_dia": total_dia}
+
+
+def eliminar_gasto_por_ts(fecha: date, year: int, ts_str: str) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ws = _obtener_hoja_existente_modulo(wb, "gastos")
+        if ws is None:
+            wb.close()
+            return None
+        target = None
+        for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+            if str(row[1].value or "").strip().lower() == "gasto" and _ts_matches(row[7].value, ts_str):
+                target = idx
+                break
+        if target is None:
+            wb.close()
+            return None
+        ws.delete_rows(target)
+        total_dia = sum(
+            float(r[6] or 0)
+            for r in ws.iter_rows(min_row=2, values_only=True)
+            if str(r[1] or "").strip().lower() == "gasto"
+            and (r[0].date() if isinstance(r[0], datetime) else r[0]) == fecha
+        )
+        wb.save(path)
+        wb.close()
+    return {"total_dia": total_dia}
+
+
+def actualizar_prestamo_por_ts(fecha: date, year: int, ts_str: str, persona: str, tipo: str, valor: float, new_ts: datetime) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ws = _asegurar_hoja(wb, "prestamos")
+        target = None
+        for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+            if _ts_matches(row[5].value, ts_str):
+                target = idx
+                break
+        if target is None:
+            wb.close()
+            return None
+        ws.cell(target, 3).value = persona
+        ws.cell(target, 4).value = tipo
+        ws.cell(target, 5).value = valor
+        ws.cell(target, 6).value = new_ts
+        _formatear_filas_recientes_prestamos(ws, 1)
+        wb.save(path)
+        wb.close()
+    return {
+        "items": obtener_prestamos_fecha(fecha, year),
+        **obtener_resumen_prestamos(persona=persona),
+    }
+
+
+def eliminar_prestamo_por_ts(fecha: date, year: int, ts_str: str) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ws = _asegurar_hoja(wb, "prestamos")
+        target = None
+        persona = ""
+        for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+            if _ts_matches(row[5].value, ts_str):
+                target = idx
+                persona = str(row[2].value or "").strip()
+                break
+        if target is None:
+            wb.close()
+            return None
+        ws.delete_rows(target)
+        wb.save(path)
+        wb.close()
+    return {
+        "items": obtener_prestamos_fecha(fecha, year),
+        **obtener_resumen_prestamos(persona=persona),
+    }
+
+
+def actualizar_movimiento_por_ts(fecha: date, year: int, ts_str: str, tipo: str, concepto: str, valor: float, observacion: str, new_ts: datetime) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ws = _asegurar_hoja(wb, "movimientos")
+        target = None
+        for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+            if _ts_matches(row[6].value, ts_str):
+                target = idx
+                break
+        if target is None:
+            wb.close()
+            return None
+        ws.cell(target, 3).value = tipo
+        ws.cell(target, 4).value = concepto
+        ws.cell(target, 5).value = valor
+        ws.cell(target, 6).value = observacion
+        ws.cell(target, 7).value = new_ts
+        wb.save(path)
+        wb.close()
+    items = obtener_movimientos_fecha(fecha, year)
+    total_ingresos = sum(float(i["valor"] or 0) for i in items if i["tipo_movimiento"] == "ingreso")
+    total_salidas = sum(float(i["valor"] or 0) for i in items if i["tipo_movimiento"] == "salida")
+    return {"items": items, "total_ingresos": total_ingresos, "total_salidas": total_salidas, "neto": total_ingresos - total_salidas}
+
+
+def eliminar_movimiento_por_ts(fecha: date, year: int, ts_str: str) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        ws = _asegurar_hoja(wb, "movimientos")
+        target = None
+        for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+            if _ts_matches(row[6].value, ts_str):
+                target = idx
+                break
+        if target is None:
+            wb.close()
+            return None
+        ws.delete_rows(target)
+        wb.save(path)
+        wb.close()
+    items = obtener_movimientos_fecha(fecha, year)
+    total_ingresos = sum(float(i["valor"] or 0) for i in items if i["tipo_movimiento"] == "ingreso")
+    total_salidas = sum(float(i["valor"] or 0) for i in items if i["tipo_movimiento"] == "salida")
+    return {"items": items, "total_ingresos": total_ingresos, "total_salidas": total_salidas, "neto": total_ingresos - total_salidas}
