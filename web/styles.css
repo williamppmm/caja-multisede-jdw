@@ -2001,6 +2001,11 @@ table.cuadre-tabla th,
   min-height: 28px;
 }
 
+#panel-contadores .contador-campo[data-role="entradas"],
+#panel-contadores .contador-campo[data-role="salidas"] {
+  width: 92px;
+}
+
 #panel-contadores .contador-yield,
 #panel-contadores .contador-resultado {
   padding-top: 1px;
@@ -2015,6 +2020,13 @@ table.cuadre-tabla th,
 #panel-contadores .contadores-tabla th:nth-child(2),
 #panel-contadores .contadores-tabla td:nth-child(2) {
   min-width: 54px;
+}
+
+#panel-contadores .contadores-tabla th:nth-child(3),
+#panel-contadores .contadores-tabla td:nth-child(3),
+#panel-contadores .contadores-tabla th:nth-child(4),
+#panel-contadores .contadores-tabla td:nth-child(4) {
+  min-width: 106px;
 }
 
 #panel-contadores .contadores-tabla th:nth-child(7),

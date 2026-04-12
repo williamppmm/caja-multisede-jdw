@@ -12,6 +12,9 @@ WEB_DIR = get_web_dir()
 app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 
 
+# Se mantiene no-cache en /static para evitar que Chrome sirva JS/CSS viejos
+# tras actualizar el EXE. Sin esto, puede haber desalineación entre el frontend
+# cacheado y el backend nuevo, generando comportamientos de "cambio no aplicado".
 class NoCacheMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)

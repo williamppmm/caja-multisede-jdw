@@ -139,7 +139,7 @@
     <section id="panel-gastos" class="modulo-panel modulo-panel-dos-columnas oculto">
       <section class="card modulo-captura-card">
         <h2>Gastos del día</h2>
-        <p class="modulo-ayuda">Registra los gastos del día. Para corregir otro día contacta al admin.</p>
+        <p class="modulo-ayuda">Registra los gastos del día.</p>
         <div class="gastos-form">
           <div class="campo-manual gastos-descripcion">
             <label for="gasto-concepto">Descripción</label>
@@ -153,6 +153,8 @@
         </div>
         <div class="bonos-acciones">
           <button id="btn-gasto-registrar" class="btn btn-primary" type="button">Registrar</button>
+          <button id="btn-gasto-editar-ultimo" class="btn btn-secondary" type="button">Editar último</button>
+          <button id="btn-gasto-eliminar-ultimo" class="btn btn-secondary" type="button">Eliminar último</button>
         </div>
         <div class="gasto-total-row">
           <span>Total gastos</span>
@@ -184,7 +186,7 @@
     <section id="panel-bonos" class="modulo-panel modulo-panel-dos-columnas oculto">
       <section class="card modulo-captura-card">
         <h2>Bonos del día</h2>
-        <p class="modulo-ayuda">Cada bono se registra de inmediato. Si requiere corregir contacte al admin.</p>
+        <p class="modulo-ayuda">Cada bono se registra de inmediato.</p>
         <div class="bonos-meta">
           <div class="bonos-meta-item">
             <span class="bonos-meta-label">Fecha</span>
@@ -228,7 +230,7 @@
                   <th>Hora</th>
                   <th>Cliente</th>
                   <th>Valor</th>
-                  <th>Acumulado cliente</th>
+                  <th>Acumulado</th>
                 </tr>
               </thead>
               <tbody id="bonos-registros-body">
@@ -270,6 +272,8 @@
         </div>
         <div class="bonos-acciones">
           <button id="btn-prestamo-registrar" class="btn btn-primary" type="button">Registrar</button>
+          <button id="btn-prestamo-editar-ultimo" class="btn btn-secondary" type="button">Editar último</button>
+          <button id="btn-prestamo-eliminar-ultimo" class="btn btn-secondary" type="button">Eliminar último</button>
         </div>
         <div class="resumen-grid resumen-grid-simple">
           <div class="resumen-item">
@@ -339,6 +343,8 @@
         </div>
         <div class="bonos-acciones">
           <button id="btn-movimiento-registrar" class="btn btn-primary" type="button">Registrar</button>
+          <button id="btn-movimiento-editar-ultimo" class="btn btn-secondary" type="button">Editar último</button>
+          <button id="btn-movimiento-eliminar-ultimo" class="btn btn-secondary" type="button">Eliminar último</button>
         </div>
         <div class="resumen-grid resumen-grid-simple resumen-movimientos">
           <div class="resumen-item">
@@ -401,7 +407,7 @@
                 <th>Entradas</th>
                 <th>Salidas</th>
                 <th>Jackpot</th>
-                <th>Yield actual</th>
+                <th>Yield</th>
                 <th>Yield ref.</th>
                 <th>Resultado</th>
               </tr>
@@ -609,7 +615,7 @@
         <h3>Administración</h3>
         <div class="campo-manual">
           <label for="admin-pass">Contraseña</label>
-          <input type="password" id="admin-pass" placeholder="••••" autocomplete="off" />
+          <input type="password" id="admin-pass" placeholder="••••" autocomplete="new-password" />
         </div>
         <p id="admin-pass-error" class="error-text oculto">Contraseña incorrecta</p>
         <div class="acciones-modal">

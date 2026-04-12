@@ -133,10 +133,10 @@ La configuración local se reparte entre:
 |---|---|---|
 | `Caja` | Arqueo físico del día | si la fecha ya existe, requiere admin |
 | `Plataformas` | Ventas de plataformas | fecha actual libre, otra fecha requiere admin |
-| `Gastos` | Egresos del día | fecha actual libre, otra fecha requiere admin |
-| `Bonos` | Bonos por cliente | fecha actual libre, otra fecha requiere admin |
-| `Prestamos` | Préstamos y pagos | fecha actual libre, otra fecha requiere admin |
-| `Movimientos` | Ingresos y salidas extraordinarias | fecha actual libre, otra fecha requiere admin |
+| `Gastos` | Egresos del día | fecha actual libre (editar/eliminar último incluido); otra fecha requiere admin |
+| `Bonos` | Bonos por cliente | fecha actual libre (editar/eliminar último incluido); otra fecha requiere admin |
+| `Prestamos` | Préstamos y pagos | fecha actual libre (editar/eliminar último incluido); otra fecha requiere admin |
+| `Movimientos` | Ingresos y salidas extraordinarias | fecha actual libre (editar/eliminar último incluido); otra fecha requiere admin |
 | `Contadores` | Captura por ítem con referencias | si la fecha ya existe, requiere admin |
 | `Cuadre` | Consolidación del período | si ya existe, corregir requiere admin |
 
@@ -246,5 +246,6 @@ Puntos auditados en esta versión:
 - configuración administrativa más completa, incluyendo estado inicial del sistema
 - persistencia operativa en `Contadores_{sede}_{año}.xlsx` y cuadre en `Consolidado_{sede}_{año}.xlsx`
 - catálogos locales editables desde la propia app
+- flujos de edición rápida para la fecha actual: Gastos, Bonos, Préstamos y Movimientos permiten editar y eliminar el último registro del día sin necesidad de admin
 
 Su siguiente límite natural, si crece la concurrencia o la exigencia de seguridad, será migrar la operación central a una base de datos y dejar Excel como respaldo o salida analítica.
