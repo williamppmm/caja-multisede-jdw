@@ -225,15 +225,23 @@ Hoja `Plataformas` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por día:
 - El total diario se acumula con cada nuevo registro.
 - Los conceptos nuevos se agregan automáticamente al catálogo local (`data/gastos_conceptos.json`) para autocompletado en registros futuros.
 
-### 6.3 Reglas de edición
+### 6.3 Editar el último gasto
+
+Permite cambiar concepto y valor del **gasto con timestamp más reciente** de la fecha actual. No afecta gastos anteriores. Solo disponible si existe al menos un gasto en la fecha.
+
+### 6.4 Eliminar el último gasto
+
+Elimina el **gasto con timestamp más reciente** de la fecha actual. El total se recalcula. Si no hay gastos, la operación no hace nada.
+
+### 6.5 Reglas de edición
 
 | Situación | Comportamiento |
 |---|---|
-| Fecha actual | Guardar libre. |
-| Fecha distinta a hoy | Requiere admin. |
+| Fecha actual | Guardar, editar y eliminar libres. |
+| Fecha distinta a hoy | Requiere admin para guardar. Editar y eliminar no disponibles. |
 | Fecha futura | Bloqueado siempre. |
 
-### 6.4 Persistencia en Excel
+### 6.6 Persistencia en Excel
 
 Hoja `Gastos` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por concepto registrado:
 
@@ -318,17 +326,25 @@ La interfaz muestra por persona:
 - Total pagado acumulado
 - Saldo pendiente vigente
 
-### 8.5 Reglas de edición
+### 8.5 Editar el último préstamo o pago
+
+Permite cambiar persona, tipo y valor del **movimiento con timestamp más reciente** de la fecha actual. Solo disponible si existe al menos un movimiento en la fecha.
+
+La edición recalcula el saldo: revierte el efecto del movimiento anterior antes de aplicar el nuevo. Si el nuevo valor excede el saldo disponible, la operación es rechazada con mensaje de error.
+
+### 8.6 Eliminar el último préstamo o pago
+
+Elimina el **movimiento con timestamp más reciente** de la fecha actual. El saldo se recalcula. Si no hay movimientos, la operación no hace nada.
+
+### 8.7 Reglas de edición
 
 | Situación | Comportamiento |
 |---|---|
-| Fecha actual | Registrar libre. |
-| Fecha distinta a hoy | Requiere admin. |
+| Fecha actual | Registrar, editar y eliminar libres. |
+| Fecha distinta a hoy | Requiere admin para registrar. Editar y eliminar no disponibles. |
 | Fecha futura | Bloqueado siempre. |
 
-No existe función de editar o eliminar un préstamo individual (a diferencia de Bonos).
-
-### 8.6 Persistencia en Excel
+### 8.8 Persistencia en Excel
 
 Hoja `Prestamos` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por movimiento:
 
@@ -356,15 +372,23 @@ Hoja `Prestamos` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por movimie
 - Los conceptos se agregan al catálogo local (`data/movimientos_conceptos.json`) para autocompletado.
 - El resumen del día muestra: Total ingresos, Total salidas, Neto (ingresos − salidas).
 
-### 9.3 Reglas de edición
+### 9.3 Editar el último movimiento
+
+Permite cambiar tipo, concepto, valor y observación del **movimiento con timestamp más reciente** de la fecha actual. Solo disponible si existe al menos un movimiento en la fecha.
+
+### 9.4 Eliminar el último movimiento
+
+Elimina el **movimiento con timestamp más reciente** de la fecha actual. El resumen (ingresos, salidas, neto) se recalcula. Si no hay movimientos, la operación no hace nada.
+
+### 9.5 Reglas de edición
 
 | Situación | Comportamiento |
 |---|---|
-| Fecha actual | Registrar libre. |
-| Fecha distinta a hoy | Requiere admin. |
+| Fecha actual | Registrar, editar y eliminar libres. |
+| Fecha distinta a hoy | Requiere admin para registrar. Editar y eliminar no disponibles. |
 | Fecha futura | Bloqueado siempre. |
 
-### 9.4 Persistencia en Excel
+### 9.6 Persistencia en Excel
 
 Hoja `Movimientos` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por movimiento:
 
