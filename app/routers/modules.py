@@ -18,7 +18,7 @@ from app.models.caja_models import (
 )
 from app.models.contadores_models import ContadoresEntrada, ContadoresRespuesta
 from app.models.cuadre_models import CuadreEntrada, CuadreRespuesta
-from app.services import bonos_service, caja_service, contadores_service, cuadre_service, excel_service, movimientos_service, nombres_service, prestamos_service, settings_service
+from app.services import bonos_service, caja_service, contadores_service, cuadre_service, excel_service, gastos_service, movimientos_service, nombres_service, prestamos_service, settings_service
 
 router = APIRouter(prefix="/api/modulos")
 
@@ -168,7 +168,15 @@ def datos_fecha_prestamos(fecha: str):
     registros = excel_service.obtener_prestamos_fecha(d, d.year)
     if not registros:
         raise HTTPException(status_code=404, detail="No hay datos para esa fecha")
-    return {"items": registros, "total": sum(item["valor"] for item in registros)}
+    total_prestado = sum(float(item["valor"] or 0) for item in registros if item.get("tipo_movimiento") == "prestamo")
+    total_pagado = sum(float(item["valor"] or 0) for item in registros if item.get("tipo_movimiento") == "pago")
+    return {
+        "items": registros,
+        "total": sum(float(item["valor"] or 0) for item in registros),
+        "total_prestado": total_prestado,
+        "total_pagado": total_pagado,
+        "saldo_pendiente": total_prestado - total_pagado,
+    }
 
 
 @router.get("/movimientos/fecha/{fecha}/datos")
@@ -272,6 +280,54 @@ def eliminar_ultimo_bono(body: dict):
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
     return bonos_service.eliminar_ultimo_bono(d)
+
+
+@router.post("/gastos/ultimo/editar", response_model=ModuloItemsRespuesta)
+def editar_ultimo_gasto(entrada: ModuloItemsEntrada):
+    resultado = gastos_service.actualizar_ultimo_gasto(entrada)
+    return ModuloItemsRespuesta(**resultado)
+
+
+@router.post("/gastos/ultimo/eliminar")
+def eliminar_ultimo_gasto(body: dict):
+    fecha_raw = body.get("fecha")
+    try:
+        d = date.fromisoformat(str(fecha_raw))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+    return gastos_service.eliminar_ultimo_gasto(d)
+
+
+@router.post("/prestamos/ultimo/editar", response_model=PrestamoRespuesta)
+def editar_ultimo_prestamo(entrada: PrestamoEntrada):
+    resultado = prestamos_service.actualizar_ultimo_prestamo(entrada)
+    return PrestamoRespuesta(**resultado)
+
+
+@router.post("/prestamos/ultimo/eliminar")
+def eliminar_ultimo_prestamo(body: dict):
+    fecha_raw = body.get("fecha")
+    try:
+        d = date.fromisoformat(str(fecha_raw))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+    return prestamos_service.eliminar_ultimo_prestamo(d)
+
+
+@router.post("/movimientos/ultimo/editar", response_model=MovimientoRespuesta)
+def editar_ultimo_movimiento(entrada: MovimientoEntrada):
+    resultado = movimientos_service.actualizar_ultimo_movimiento(entrada)
+    return MovimientoRespuesta(**resultado)
+
+
+@router.post("/movimientos/ultimo/eliminar")
+def eliminar_ultimo_movimiento(body: dict):
+    fecha_raw = body.get("fecha")
+    try:
+        d = date.fromisoformat(str(fecha_raw))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+    return movimientos_service.eliminar_ultimo_movimiento(d)
 
 
 @router.get("/{modulo}/fecha/{fecha}/estado")

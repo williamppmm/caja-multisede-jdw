@@ -1184,6 +1184,260 @@ def eliminar_ultimo_bono(fecha: date, year: int) -> float | None:
         return total_dia
 
 
+def obtener_ultimo_gasto(fecha: date, year: int) -> dict | None:
+    datos = obtener_items_modulo_fecha("gastos", fecha, year)
+    if not datos or not datos.get("items"):
+        return None
+    return datos["items"][-1]
+
+
+def actualizar_ultimo_gasto(fecha: date, year: int, concepto: str, valor: float, timestamp: datetime) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        target_ws = None
+        target_row = None
+        ultimo_ts = None
+        for nombre in _nombres_lectura_modulo("gastos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = row[0].value
+                if isinstance(cell_date, datetime):
+                    cell_date = cell_date.date()
+                if not (isinstance(cell_date, date) and cell_date == fecha):
+                    continue
+                row_values = [cell.value for cell in row]
+                if not _fila_es_modulo("gastos", row_values):
+                    continue
+                ts = row[7].value
+                if isinstance(ts, datetime) and (ultimo_ts is None or ts >= ultimo_ts):
+                    ultimo_ts = ts
+                    target_ws = ws
+                    target_row = idx
+        if target_ws is None or target_row is None:
+            wb.close()
+            return None
+        target_ws.cell(target_row, 3).value = concepto
+        target_ws.cell(target_row, 7).value = valor
+        target_ws.cell(target_row, 8).value = timestamp
+        _formatear_filas_recientes(target_ws, 1)
+        wb.save(path)
+        wb.close()
+    return obtener_items_modulo_fecha("gastos", fecha, year) or {"items": [], "total": 0}
+
+
+def eliminar_ultimo_gasto(fecha: date, year: int) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        target_ws = None
+        target_row = None
+        ultimo_ts = None
+        for nombre in _nombres_lectura_modulo("gastos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = row[0].value
+                if isinstance(cell_date, datetime):
+                    cell_date = cell_date.date()
+                if not (isinstance(cell_date, date) and cell_date == fecha):
+                    continue
+                row_values = [cell.value for cell in row]
+                if not _fila_es_modulo("gastos", row_values):
+                    continue
+                ts = row[7].value
+                if isinstance(ts, datetime) and (ultimo_ts is None or ts >= ultimo_ts):
+                    ultimo_ts = ts
+                    target_ws = ws
+                    target_row = idx
+        if target_ws is None or target_row is None:
+            wb.close()
+            return None
+        target_ws.delete_rows(target_row)
+        wb.save(path)
+        wb.close()
+    return obtener_items_modulo_fecha("gastos", fecha, year) or {"items": [], "total": 0}
+
+
+def obtener_ultimo_prestamo(fecha: date, year: int) -> dict | None:
+    registros = obtener_prestamos_raw_fecha(fecha, year)
+    return max(registros, key=lambda item: item.get("fecha_hora_registro") or "") if registros else None
+
+
+def actualizar_ultimo_prestamo(
+    fecha: date,
+    year: int,
+    persona: str,
+    tipo_movimiento: str,
+    valor: float,
+    timestamp: datetime,
+) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        target_ws = None
+        target_row = None
+        ultimo_ts = None
+        for nombre in _nombres_lectura_modulo("prestamos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = row[0].value
+                if isinstance(cell_date, datetime):
+                    cell_date = cell_date.date()
+                if not (isinstance(cell_date, date) and cell_date == fecha):
+                    continue
+                ts = row[5].value
+                if isinstance(ts, datetime) and (ultimo_ts is None or ts >= ultimo_ts):
+                    ultimo_ts = ts
+                    target_ws = ws
+                    target_row = idx
+        if target_ws is None or target_row is None:
+            wb.close()
+            return None
+        target_ws.cell(target_row, 3).value = persona
+        target_ws.cell(target_row, 4).value = tipo_movimiento
+        target_ws.cell(target_row, 5).value = valor
+        target_ws.cell(target_row, 6).value = timestamp
+        _formatear_filas_recientes_prestamos(target_ws, 1)
+        wb.save(path)
+        wb.close()
+    return obtener_prestamos_fecha(fecha, year)
+
+
+def eliminar_ultimo_prestamo(fecha: date, year: int) -> list[dict] | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        target_ws = None
+        target_row = None
+        ultimo_ts = None
+        for nombre in _nombres_lectura_modulo("prestamos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = row[0].value
+                if isinstance(cell_date, datetime):
+                    cell_date = cell_date.date()
+                if not (isinstance(cell_date, date) and cell_date == fecha):
+                    continue
+                ts = row[5].value
+                if isinstance(ts, datetime) and (ultimo_ts is None or ts >= ultimo_ts):
+                    ultimo_ts = ts
+                    target_ws = ws
+                    target_row = idx
+        if target_ws is None or target_row is None:
+            wb.close()
+            return None
+        target_ws.delete_rows(target_row)
+        wb.save(path)
+        wb.close()
+    return obtener_prestamos_fecha(fecha, year)
+
+
+def obtener_ultimo_movimiento(fecha: date, year: int) -> dict | None:
+    registros = obtener_movimientos_fecha(fecha, year)
+    return max(registros, key=lambda item: item.get("fecha_hora_registro") or "") if registros else None
+
+
+def actualizar_ultimo_movimiento(
+    fecha: date,
+    year: int,
+    tipo_movimiento: str,
+    concepto: str,
+    valor: float,
+    observacion: str,
+    timestamp: datetime,
+) -> dict | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        target_ws = None
+        target_row = None
+        ultimo_ts = None
+        for nombre in _nombres_lectura_modulo("movimientos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = row[0].value
+                if isinstance(cell_date, datetime):
+                    cell_date = cell_date.date()
+                if not (isinstance(cell_date, date) and cell_date == fecha):
+                    continue
+                ts = row[6].value
+                if isinstance(ts, datetime) and (ultimo_ts is None or ts >= ultimo_ts):
+                    ultimo_ts = ts
+                    target_ws = ws
+                    target_row = idx
+        if target_ws is None or target_row is None:
+            wb.close()
+            return None
+        target_ws.cell(target_row, 3).value = tipo_movimiento
+        target_ws.cell(target_row, 4).value = concepto
+        target_ws.cell(target_row, 5).value = valor
+        target_ws.cell(target_row, 6).value = observacion
+        target_ws.cell(target_row, 7).value = timestamp
+        _formatear_filas_recientes_movimientos(target_ws, 1)
+        wb.save(path)
+        wb.close()
+    return obtener_movimientos_fecha(fecha, year)
+
+
+def eliminar_ultimo_movimiento(fecha: date, year: int) -> list[dict] | None:
+    path = get_excel_path(year)
+    if not path.exists():
+        return None
+
+    with _bloqueo_escritura(path):
+        wb = _abrir_o_crear_workbook(path)
+        target_ws = None
+        target_row = None
+        ultimo_ts = None
+        for nombre in _nombres_lectura_modulo("movimientos"):
+            if nombre not in wb.sheetnames:
+                continue
+            ws = wb[nombre]
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                cell_date = row[0].value
+                if isinstance(cell_date, datetime):
+                    cell_date = cell_date.date()
+                if not (isinstance(cell_date, date) and cell_date == fecha):
+                    continue
+                ts = row[6].value
+                if isinstance(ts, datetime) and (ultimo_ts is None or ts >= ultimo_ts):
+                    ultimo_ts = ts
+                    target_ws = ws
+                    target_row = idx
+        if target_ws is None or target_row is None:
+            wb.close()
+            return None
+        target_ws.delete_rows(target_row)
+        wb.save(path)
+        wb.close()
+    return obtener_movimientos_fecha(fecha, year)
+
+
 def obtener_prestamos_raw_fecha(fecha: date, year: int) -> list[dict]:
     """Todos los movimientos de préstamos de una fecha, sin filtro de ciclo activo."""
     path = get_excel_path(year)
