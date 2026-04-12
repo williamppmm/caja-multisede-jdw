@@ -374,7 +374,7 @@ function esControlEdicionActual(control) {
     return control.matches('#gasto-concepto, #gasto-valor, #btn-gasto-registrar');
   }
   if (currentModule === 'bonos') {
-    return control.matches('#bono-cliente, #bono-valor, #btn-bono-registrar, #btn-bono-editar-ultimo, #btn-bono-eliminar-ultimo');
+    return control.matches('#bono-cliente, #bono-valor, #btn-bono-registrar');
   }
   if (currentModule === 'prestamos') {
     return control.matches('#prestamo-persona, #prestamo-valor, #btn-prestamo-registrar, input[name="prestamo-tipo"]');
@@ -601,8 +601,8 @@ function renderGastosRegistros(items = [], total = 0) {
         <td>${fmt(item.valor || 0)}</td>
         ${esSuperAdminActivo() ? `
           <td class="td-acciones">
-            <button type="button" class="btn-tabla-accion btn-tabla-editar" data-modulo="gastos" data-ts="${ts}">Editar</button>
-            <button type="button" class="btn-tabla-accion btn-tabla-eliminar" data-modulo="gastos" data-ts="${ts}">Eliminar</button>
+            <button type="button" class="btn-tabla-accion btn-tabla-editar" data-modulo="gastos" data-ts="${ts}">✎</button>
+            <button type="button" class="btn-tabla-accion btn-tabla-eliminar" data-modulo="gastos" data-ts="${ts}">✕</button>
           </td>
         ` : ''}
       `;
@@ -1089,8 +1089,9 @@ function actualizarSummaryCritica(row) {
   const summary = row.querySelector('.contador-critica-detalle summary');
   if (!summary) return;
   const autorizado = row.dataset.criticaAutorizada === '1';
-  summary.textContent = autorizado ? 'Autorizado' : 'Referencia crítica';
-  summary.className = autorizado ? 'autorizado' : '';
+  summary.textContent = autorizado ? '✓' : '⚠';
+  summary.title = autorizado ? 'Autorizado' : 'Ref. crítica';
+  summary.className = `critica-summary${autorizado ? ' autorizado' : ''}`;
 }
 
 function confirmarReferenciaCritica(row) {
@@ -1183,13 +1184,7 @@ function limpiarFormularioMovimientos() {
   if (valor) valor.value = '';
 }
 
-function actualizarAccionesBonos() {
-  const esHoy = (moduleDates.bonos || hoyStr()) === hoyStr();
-  const hayRegistros = document.getElementById('bonos-registros-body')?.querySelectorAll('tr').length > 0
-    && !document.querySelector('#bonos-registros-body .bonos-vacio');
-  document.getElementById('btn-bono-editar-ultimo').disabled = !esHoy || !hayRegistros;
-  document.getElementById('btn-bono-eliminar-ultimo').disabled = !esHoy || !hayRegistros;
-}
+function actualizarAccionesBonos() {}
 
 function obtenerAcumuladoClienteBonos(cliente) {
   const nombre = String(cliente || '').trim().toLocaleLowerCase('es-CO');
@@ -1359,8 +1354,8 @@ function renderBonosRegistros(items = [], total = 0) {
         <td>${fmt(item.acumulado_cliente || 0)}</td>
         ${esSuperAdminActivo() ? `
           <td class="td-acciones">
-            <button type="button" class="btn-tabla-accion btn-tabla-editar" data-modulo="bonos" data-ts="${ts}">Editar</button>
-            <button type="button" class="btn-tabla-accion btn-tabla-eliminar" data-modulo="bonos" data-ts="${ts}">Eliminar</button>
+            <button type="button" class="btn-tabla-accion btn-tabla-editar" data-modulo="bonos" data-ts="${ts}">✎</button>
+            <button type="button" class="btn-tabla-accion btn-tabla-eliminar" data-modulo="bonos" data-ts="${ts}">✕</button>
           </td>
         ` : ''}
       `;
@@ -1394,8 +1389,8 @@ function renderPrestamosRegistros(items = [], resumen = {}) {
         <td>${fmt(item.saldo_pendiente || 0)}</td>
         ${esSuperAdminActivo() ? `
           <td class="td-acciones">
-            <button type="button" class="btn-tabla-accion btn-tabla-editar" data-modulo="prestamos" data-ts="${ts}">Editar</button>
-            <button type="button" class="btn-tabla-accion btn-tabla-eliminar" data-modulo="prestamos" data-ts="${ts}">Eliminar</button>
+            <button type="button" class="btn-tabla-accion btn-tabla-editar" data-modulo="prestamos" data-ts="${ts}">✎</button>
+            <button type="button" class="btn-tabla-accion btn-tabla-eliminar" data-modulo="prestamos" data-ts="${ts}">✕</button>
           </td>
         ` : ''}
       `;
@@ -1430,8 +1425,8 @@ function renderMovimientosRegistros(items = [], resumen = {}) {
         <td>${fmt(item.valor || 0)}</td>
         ${esSuperAdminActivo() ? `
           <td class="td-acciones">
-            <button type="button" class="btn-tabla-accion btn-tabla-editar" data-modulo="movimientos" data-ts="${ts}">Editar</button>
-            <button type="button" class="btn-tabla-accion btn-tabla-eliminar" data-modulo="movimientos" data-ts="${ts}">Eliminar</button>
+            <button type="button" class="btn-tabla-accion btn-tabla-editar" data-modulo="movimientos" data-ts="${ts}">✎</button>
+            <button type="button" class="btn-tabla-accion btn-tabla-eliminar" data-modulo="movimientos" data-ts="${ts}">✕</button>
           </td>
         ` : ''}
       `;
@@ -2639,53 +2634,7 @@ async function cargarStartupAdmin() {
   renderStartupContadoresGrid(data.contadores || {}, parseContadoresCatalogoGrid());
 }
 
-async function editarUltimoBono() {
-  const error = validarBono();
-  if (error) {
-    mostrarMensaje(error, 'error');
-    return;
-  }
-  const fecha = document.getElementById('fecha').value;
-  const cliente = document.getElementById('bono-cliente').value.trim();
-  const valor = parseNumeroInput('bono-valor');
-  const confirmar = window.confirm(`Vas a editar el ultimo bono registrado para esta fecha.\n\nCliente: ${cliente}\nValor: ${fmt(valor)}\n\n¿Deseas continuar?`);
-  if (!confirmar) return;
-  const res = await fetch('/api/modulos/bonos/ultimo/editar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, cliente, valor, forzar: false }),
-  });
-  const data = await res.json();
-  if (!data.ok) {
-    mostrarMensaje(data.mensaje, 'advertencia');
-    return;
-  }
-  limpiarFormularioBonos();
-  bonusNames = Array.from(new Set([...bonusNames, cliente])).sort((a, b) => a.localeCompare(b, 'es'));
-  renderBonusNames();
-  await cargarBonosDelDia(fecha);
-  mostrarMensaje(`✓ ${data.mensaje} — Total día: ${fmt(data.total_dia)}`, 'ok');
-  document.getElementById('bono-cliente').focus();
-}
 
-async function eliminarUltimoBono() {
-  const fecha = document.getElementById('fecha').value;
-  const confirmar = window.confirm('Se eliminará el último bono registrado para esta fecha. ¿Deseas continuar?');
-  if (!confirmar) return;
-  const res = await fetch('/api/modulos/bonos/ultimo/eliminar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha }),
-  });
-  const data = await res.json();
-  if (!data.ok) {
-    mostrarMensaje(data.mensaje, 'advertencia');
-    return;
-  }
-  await cargarBonosDelDia(fecha);
-  mostrarMensaje(`✓ ${data.mensaje} — Total día: ${fmt(data.total_dia)}`, 'ok');
-  document.getElementById('bono-cliente').focus();
-}
 
 async function importarNombresBonos() {
   const msg = document.getElementById('admin-config-msg');
@@ -3599,8 +3548,6 @@ async function init() {
   cuadreBaseInput.addEventListener('input', () => formatearInputNumerico(cuadreBaseInput, false));
   cuadreBaseInput.addEventListener('focus', () => limpiarFormatoInputNumerico(cuadreBaseInput, false));
   cuadreBaseInput.addEventListener('blur', () => formatearInputNumerico(cuadreBaseInput, false));
-  document.getElementById('btn-bono-editar-ultimo').addEventListener('click', editarUltimoBono);
-  document.getElementById('btn-bono-eliminar-ultimo').addEventListener('click', eliminarUltimoBono);
   document.addEventListener('click', e => {
     const actionBtn = e.target.closest('.btn-tabla-accion');
     if (!actionBtn) return;
