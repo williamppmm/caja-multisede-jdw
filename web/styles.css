@@ -493,6 +493,11 @@ input[type="number"]::-webkit-outer-spin-button {
   content: '−';
 }
 
+.modulo-panel .card .contador-critica-detalle > summary::after,
+.modulo-panel .card .contador-pausa-detalle > summary::after {
+  content: none !important;
+}
+
 .modulo-panel .card details > summary:hover {
   color: #2F5496;
 }
@@ -620,15 +625,27 @@ table.contadores-tabla th {
 .critica-summary {
   cursor: pointer;
   list-style: none;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 22px !important;
+  height: 22px;
+  padding: 0 !important;
+  box-sizing: border-box;
   font-size: 0.85rem;
   font-weight: 700;
-  color: #b07800;
-  padding: 1px 5px;
+  line-height: 1;
   border-radius: 4px;
   background: #fff8e1;
   border: 1px solid #ffe082;
-  line-height: 1.4;
+  color: #b07800;
+  transition: background 0.15s, color 0.15s;
   user-select: none;
+}
+
+.critica-summary:hover {
+  background: #fff0b3;
+  border-color: #ffd54f;
 }
 
 .critica-summary.autorizado {
@@ -637,7 +654,16 @@ table.contadores-tabla th {
   border-color: #a5d6a7;
 }
 
+.critica-summary.autorizado:hover {
+  background: #d6f0db;
+  border-color: #81c784;
+}
+
 .critica-summary::-webkit-details-marker {
+  display: none;
+}
+
+.critica-summary::marker {
   display: none;
 }
 
@@ -783,28 +809,44 @@ table.contadores-tabla th {
 .contador-pausa-detalle summary {
   cursor: pointer;
   list-style: none;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 22px !important;
+  height: 22px;
+  padding: 0 !important;
+  box-sizing: border-box;
+  font-size: 0.82rem;
+  line-height: 1;
+  border-radius: 4px;
+  border: none;
+  background: #f0f2f6;
   color: #7b8798;
-  font-size: 0.9rem;
-  opacity: 0.6;
-  transition: opacity 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
 }
 
 .contador-pausa-detalle summary:hover {
-  opacity: 1;
+  background: #dde3ef;
+  color: #2F5496;
 }
 
 .contador-pausado .contador-pausa-detalle summary {
+  background: #f0faf0;
   color: #2e7d32;
-  opacity: 0.8;
 }
 
 .contador-pausa-detalle summary::-webkit-details-marker {
   display: none;
 }
 
+.contador-pausa-detalle summary::marker {
+  display: none;
+}
+
 .contador-pausa-detalle[open] summary {
+  background: #e8f0fe;
   color: #2F5496;
-  opacity: 1;
 }
 
 .contador-pausa-accion {

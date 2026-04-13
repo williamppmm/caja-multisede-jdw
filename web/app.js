@@ -1114,8 +1114,9 @@ function actualizarSummaryCritica(row) {
   const summary = row.querySelector('.contador-critica-detalle summary');
   if (!summary) return;
   const autorizado = row.dataset.criticaAutorizada === '1';
-  summary.textContent = autorizado ? 'Autorizado' : 'Referencia crítica';
-  summary.className = autorizado ? 'autorizado' : '';
+  summary.textContent = autorizado ? '✓' : '⚠';
+  summary.title = autorizado ? 'Autorizado' : 'Ref. crítica';
+  summary.className = `critica-summary${autorizado ? ' autorizado' : ''}`;
 }
 
 function confirmarReferenciaCritica(row) {
