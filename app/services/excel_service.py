@@ -1099,6 +1099,47 @@ def obtener_resumen_prestamos(persona: str | None = None) -> dict:
     }
 
 
+def obtener_movimientos_prestamos_super_admin(fecha_objetivo: date) -> dict:
+    registros = []
+    fecha_iso = fecha_objetivo.isoformat()
+    for path in _obtener_paths_excel_sede():
+        if not path.exists():
+            continue
+        with _abrir_workbook_lectura(path) as wb:
+            hojas = _obtener_hojas_para_lectura(wb, "prestamos")
+            for ws in hojas:
+                registros.extend(_leer_movimientos_prestamos_desde_hoja(ws))
+
+    registros.sort(key=lambda item: (item["fecha"], item["fecha_hora_registro"] or ""))
+
+    saldos_por_persona: dict[str, float] = {}
+    items_del_dia: list[dict] = []
+
+    for item in registros:
+        if item["fecha"] > fecha_iso:
+            break
+        persona_key = item["persona"].strip().lower()
+        saldo = saldos_por_persona.get(persona_key, 0.0)
+        valor = float(item["valor"] or 0)
+        if item["tipo_movimiento"] == "pago":
+            saldo -= valor
+        else:
+            saldo += valor
+        saldo = round(saldo, 2)
+        saldos_por_persona[persona_key] = saldo
+        if item["fecha"] == fecha_iso:
+            item_dia = dict(item)
+            item_dia["saldo_pendiente"] = saldo
+            items_del_dia.append(item_dia)
+
+    deuda_total_activa = round(sum(max(saldo, 0.0) for saldo in saldos_por_persona.values()), 2)
+    return {
+        "items": items_del_dia,
+        "saldos_por_persona": {k: round(v, 2) for k, v in saldos_por_persona.items()},
+        "deuda_total_activa": deuda_total_activa,
+    }
+
+
 def obtener_ultimo_bono(fecha: date, year: int) -> dict | None:
     registros = obtener_bonos_fecha(fecha, year)
     return registros[-1] if registros else None

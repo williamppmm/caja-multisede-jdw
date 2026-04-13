@@ -41,6 +41,7 @@ let movementConcepts = [];
 let bonusDayItems = [];
 let gastosItems = [];
 let loanItems = [];
+let loanSaldos = {};
 let movementItems = [];
 let cajaLocked = false;
 let cajaDrafts = {};
@@ -1264,15 +1265,16 @@ function obtenerResumenPersonaPrestamo(persona) {
   if (!nombre) {
     return { totalPrestado: 0, totalPagado: 0, saldoPendiente: 0 };
   }
-  return loanItems.reduce((acc, item) => {
+  const resumenDia = loanItems.reduce((acc, item) => {
     const actual = String(item.persona || '').trim().toLocaleLowerCase('es-CO');
     if (actual !== nombre) return acc;
     const valor = Number(item.valor || 0);
     if (item.tipo_movimiento === 'pago') acc.totalPagado += valor;
     else acc.totalPrestado += valor;
-    acc.saldoPendiente = acc.totalPrestado - acc.totalPagado;
     return acc;
   }, { totalPrestado: 0, totalPagado: 0, saldoPendiente: 0 });
+  resumenDia.saldoPendiente = Number(loanSaldos[nombre] || 0);
+  return resumenDia;
 }
 
 function actualizarResumenPersonaPrestamo() {
@@ -1284,8 +1286,8 @@ function actualizarResumenPersonaPrestamo() {
     return;
   }
   const resumen = obtenerResumenPersonaPrestamo(persona);
-  if (!resumen.totalPrestado && !resumen.totalPagado) {
-    hint.textContent = 'Sin movimientos previos para esta persona.';
+  if (!resumen.totalPrestado && !resumen.totalPagado && !resumen.saldoPendiente) {
+    hint.textContent = 'Sin deuda registrada para esta persona.';
     return;
   }
   hint.textContent = `Prestado: ${fmt(resumen.totalPrestado)} | Pagado: ${fmt(resumen.totalPagado)} | Saldo: ${fmt(resumen.saldoPendiente)}`;
@@ -1378,9 +1380,12 @@ function renderBonosRegistros(items = [], total = 0) {
 function renderPrestamosRegistros(items = [], resumen = {}) {
   const tbody = document.getElementById('prestamos-registros-body');
   loanItems = Array.isArray(items) ? [...items] : [];
+  loanSaldos = resumen?.saldos_por_persona && typeof resumen.saldos_por_persona === 'object'
+    ? { ...resumen.saldos_por_persona }
+    : {};
   tbody.innerHTML = '';
   if (!loanItems.length) {
-    tbody.innerHTML = `<tr><td colspan="${esSuperAdminActivo() ? 5 : 4}" class="bonos-vacio">Sin movimientos registrados.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${esSuperAdminActivo() ? 6 : 5}" class="bonos-vacio">Sin movimientos de préstamos para esta fecha.</td></tr>`;
   } else {
     [...loanItems].reverse().forEach(item => {
       const ts = item.fecha_hora_registro || '';
@@ -1391,6 +1396,7 @@ function renderPrestamosRegistros(items = [], resumen = {}) {
         <td>${item.persona || ''}</td>
         <td>${item.tipo_movimiento === 'pago' ? 'Pago' : 'Préstamo'}</td>
         <td>${fmt(item.valor || 0)}</td>
+        <td>${fmt(item.saldo_pendiente || 0)}</td>
         ${esSuperAdminActivo() ? `
           <td class="td-acciones">
             <button type="button" class="btn-tabla-accion btn-tabla-editar" data-modulo="prestamos" data-ts="${ts}">✎</button>
@@ -1403,7 +1409,7 @@ function renderPrestamosRegistros(items = [], resumen = {}) {
   }
   document.getElementById('total-prestado').textContent = fmt(resumen.total_prestado || 0);
   document.getElementById('total-pagado').textContent = fmt(resumen.total_pagado || 0);
-  document.getElementById('saldo-prestamos').textContent = fmt(resumen.saldo_pendiente || 0);
+  document.getElementById('saldo-prestamos').textContent = fmt(resumen.deuda_total_activa || 0);
   actualizarResumenPersonaPrestamo();
   const detPrestamos = document.getElementById('prestamos-detalle-dia');
   if (detPrestamos) detPrestamos.open = loanItems.length > 0;

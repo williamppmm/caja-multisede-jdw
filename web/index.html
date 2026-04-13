@@ -300,22 +300,22 @@
         </div>
         <div class="resumen-grid resumen-grid-simple">
           <div class="resumen-item">
-            <span class="resumen-label">Total prestado</span>
+            <span class="resumen-label">Prestado del día</span>
             <span id="total-prestado" class="resumen-valor">$ 0</span>
           </div>
           <div class="resumen-item">
-            <span class="resumen-label">Total pagado</span>
+            <span class="resumen-label">Pagado del día</span>
             <span id="total-pagado" class="resumen-valor">$ 0</span>
           </div>
           <div class="resumen-item resumen-total">
-            <span class="resumen-label">Saldo pendiente</span>
+            <span class="resumen-label">Deuda total activa</span>
             <span id="saldo-prestamos" class="resumen-valor">$ 0</span>
           </div>
         </div>
       </section>
       <section class="card modulo-secundario-card modulo-detalle-card">
         <details id="prestamos-detalle-dia">
-          <summary>Historial de movimientos</summary>
+          <summary>Movimientos del día</summary>
           <div class="bonos-listado-wrap">
             <table class="bonos-tabla">
               <thead>
@@ -324,12 +324,13 @@
                   <th>Persona</th>
                   <th>Tipo</th>
                   <th>Valor</th>
+                  <th>Saldo acumulado</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody id="prestamos-registros-body">
                 <tr>
-                  <td colspan="5" class="bonos-vacio">Sin movimientos registrados.</td>
+                  <td colspan="6" class="bonos-vacio">Sin movimientos de préstamos para esta fecha.</td>
                 </tr>
               </tbody>
             </table>
