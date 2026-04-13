@@ -1552,6 +1552,26 @@ body.auth-banner-open::before {
   padding-bottom: 8px;
 }
 
+.cuadre-aviso {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+
+.cuadre-aviso-info {
+  background: #eef9f0;
+  border: 1px solid #b7dec0;
+  color: #245a2f;
+}
+
+.cuadre-aviso-error {
+  background: #fff1f0;
+  border: 1px solid #f2b8b5;
+  color: #b23b33;
+}
+
 
 .cuadre-resumen-guardado {
   background: #f0fff4;
