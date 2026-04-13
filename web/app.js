@@ -134,8 +134,8 @@ function parsePositivo(id) {
   return isNaN(v) || v < 0 ? 0 : v;
 }
 
-function esTextoSoloNumeros(texto) {
-  return /^\d+$/.test(String(texto || '').trim());
+function textoContieneNumeros(texto) {
+  return /\d/.test(String(texto || '').trim());
 }
 
 function dateToStr(d) {
@@ -158,6 +158,17 @@ function mostrarMensaje(texto, tipo) {
   const el = document.getElementById('mensaje');
   el.textContent = texto;
   el.className = 'mensaje ' + tipo;
+}
+
+function marcarCampoInvalido(id) {
+  const input = document.getElementById(id);
+  if (!input) return;
+  input.classList.add('campo-invalido');
+  input.focus();
+}
+
+function limpiarCamposInvalidos(ids = []) {
+  ids.forEach((id) => document.getElementById(id)?.classList.remove('campo-invalido'));
 }
 
 function formatFechaVisual(fechaIso) {
@@ -590,11 +601,12 @@ function renderGastosRegistros(items = [], total = 0) {
   expenseDayItems = Array.isArray(items) ? [...items] : [];
   tbody.innerHTML = '';
   if (!expenseDayItems.length) {
-    tbody.innerHTML = '<tr><td colspan="2" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
   } else {
     expenseDayItems.forEach(item => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
+        <td>${item.hora_display || ''}</td>
         <td>${item.concepto || ''}</td>
         <td>${fmt(item.valor || 0)}</td>
       `;
@@ -1420,7 +1432,7 @@ function renderBonosRegistros(items = [], total = 0) {
   bonusDayItems = Array.isArray(items) ? [...items] : [];
   tbody.innerHTML = '';
   if (!bonusDayItems.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
   } else {
     const acumuladosPorCliente = new Map();
     const ultimoRegistroPorCliente = new Map();
@@ -1446,7 +1458,6 @@ function renderBonosRegistros(items = [], total = 0) {
       const valor = Number(item.valor || 0);
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${item.fecha_display || formatFechaVisual(item.fecha)}</td>
         <td>${item.hora_display || ''}</td>
         <td>${cliente}</td>
         <td>${fmt(valor)}</td>
@@ -1467,17 +1478,15 @@ function renderPrestamosRegistros(items = [], resumen = {}) {
   loanItems = Array.isArray(items) ? [...items] : [];
   tbody.innerHTML = '';
   if (!loanItems.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="bonos-vacio">Sin movimientos registrados.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="bonos-vacio">Sin movimientos registrados.</td></tr>';
   } else {
     [...loanItems].reverse().forEach(item => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${item.fecha_display || formatFechaVisual(item.fecha)}</td>
         <td>${item.hora_display || ''}</td>
         <td>${item.persona || ''}</td>
         <td>${item.tipo_movimiento === 'pago' ? 'Pago' : 'Préstamo'}</td>
         <td>${fmt(item.valor || 0)}</td>
-        <td>${fmt(item.saldo_pendiente || 0)}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -1497,12 +1506,11 @@ function renderMovimientosRegistros(items = [], resumen = {}) {
   if (!tbody) return;
   tbody.innerHTML = '';
   if (!movementItems.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="bonos-vacio">Sin registros para esta fecha.</td></tr>';
   } else {
     movementItems.forEach(item => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${item.fecha_display || formatFechaVisual(item.fecha)}</td>
         <td>${item.hora_display || ''}</td>
         <td>${item.tipo_movimiento === 'ingreso' ? 'Ingreso' : 'Salida'}</td>
         <td>${item.concepto || ''}</td>
@@ -1562,20 +1570,34 @@ async function cargarMovimientosDelDia(fecha) {
 }
 
 function validarBono() {
+  limpiarCamposInvalidos(['bono-cliente']);
   const cliente = document.getElementById('bono-cliente').value.trim();
   const valorRaw = document.getElementById('bono-valor').value;
   const valor = valorRaw === '' ? 0 : Number(valorRaw);
-  if (!cliente) return 'Debes ingresar el nombre del cliente.';
-  if (esTextoSoloNumeros(cliente)) return 'El nombre del cliente no puede ser solo números.';
+  if (!cliente) {
+    marcarCampoInvalido('bono-cliente');
+    return 'Debes ingresar el nombre del cliente.';
+  }
+  if (textoContieneNumeros(cliente)) {
+    marcarCampoInvalido('bono-cliente');
+    return 'El nombre del cliente no puede contener números.';
+  }
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de bono mayor que cero.';
   return null;
 }
 
 function validarPrestamo() {
+  limpiarCamposInvalidos(['prestamo-persona']);
   const persona = document.getElementById('prestamo-persona').value.trim();
   const valor = parseNumeroInput('prestamo-valor');
-  if (!persona) return 'Debes ingresar el nombre de la persona.';
-  if (esTextoSoloNumeros(persona)) return 'El nombre de la persona no puede ser solo números.';
+  if (!persona) {
+    marcarCampoInvalido('prestamo-persona');
+    return 'Debes ingresar el nombre de la persona.';
+  }
+  if (textoContieneNumeros(persona)) {
+    marcarCampoInvalido('prestamo-persona');
+    return 'El nombre de la persona no puede contener números.';
+  }
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de préstamo mayor que cero.';
   if (obtenerTipoPrestamoSeleccionado() === 'pago') {
     const resumen = obtenerResumenPersonaPrestamo(persona);
@@ -1586,10 +1608,22 @@ function validarPrestamo() {
 }
 
 function validarMovimiento() {
+  limpiarCamposInvalidos(['movimiento-concepto', 'movimiento-observacion']);
   const concepto = document.getElementById('movimiento-concepto').value.trim();
+  const observacion = document.getElementById('movimiento-observacion')?.value.trim() || '';
   const valor = parseNumeroInput('movimiento-valor');
-  if (!concepto) return 'Debes ingresar el concepto del movimiento.';
-  if (esTextoSoloNumeros(concepto)) return 'El concepto del movimiento no puede ser solo números.';
+  if (!concepto) {
+    marcarCampoInvalido('movimiento-concepto');
+    return 'Debes ingresar el concepto del movimiento.';
+  }
+  if (textoContieneNumeros(concepto)) {
+    marcarCampoInvalido('movimiento-concepto');
+    return 'El concepto del movimiento no puede contener números.';
+  }
+  if (observacion && textoContieneNumeros(observacion)) {
+    marcarCampoInvalido('movimiento-observacion');
+    return 'La observación no puede contener números.';
+  }
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de movimiento mayor que cero.';
   return null;
 }
@@ -2278,11 +2312,18 @@ async function registrarMovimiento() {
 }
 
 function validarGasto() {
+  limpiarCamposInvalidos(['gasto-concepto']);
   const concepto = document.getElementById('gasto-concepto').value.trim();
   const valorRaw = document.getElementById('gasto-valor').value;
   const valor = valorRaw === '' ? 0 : parseNumeroTexto(valorRaw);
-  if (!concepto) return 'Debes ingresar la descripción del gasto.';
-  if (esTextoSoloNumeros(concepto)) return 'La descripción del gasto no puede ser solo números.';
+  if (!concepto) {
+    marcarCampoInvalido('gasto-concepto');
+    return 'Debes ingresar la descripción del gasto.';
+  }
+  if (textoContieneNumeros(concepto)) {
+    marcarCampoInvalido('gasto-concepto');
+    return 'La descripción del gasto no puede contener números.';
+  }
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de gasto mayor que cero.';
   return null;
 }
@@ -3372,6 +3413,11 @@ async function init() {
     el.addEventListener('input', () => formatearInputNumerico(el));
     el.addEventListener('focus', () => limpiarFormatoInputNumerico(el));
     el.addEventListener('blur', () => formatearInputNumerico(el));
+  });
+  ['bono-cliente', 'gasto-concepto', 'prestamo-persona', 'movimiento-concepto', 'movimiento-observacion'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => {
+      document.getElementById(id)?.classList.remove('campo-invalido');
+    });
   });
   document.getElementById('bono-cliente').addEventListener('input', actualizarAcumuladoBonoCliente);
   document.getElementById('prestamo-persona').addEventListener('input', actualizarResumenPersonaPrestamo);

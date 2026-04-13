@@ -165,7 +165,11 @@ def datos_fecha_prestamos(fecha: str):
         d = date.fromisoformat(fecha)
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
-    registros = excel_service.obtener_prestamos_fecha(d, d.year)
+    resumen_activo = excel_service.obtener_resumen_prestamos()
+    registros = [
+        item for item in (resumen_activo.get("items") or [])
+        if item.get("fecha") == d.isoformat()
+    ]
     if not registros:
         raise HTTPException(status_code=404, detail="No hay datos para esa fecha")
     total_prestado = sum(float(item["valor"] or 0) for item in registros if item.get("tipo_movimiento") == "prestamo")

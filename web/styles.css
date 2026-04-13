@@ -119,6 +119,13 @@ h2 {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
 }
 
+.campo-invalido {
+  border-color: #d64b4b !important;
+  outline: 2px solid rgba(214, 75, 75, 0.18);
+  box-shadow: 0 0 0 3px rgba(214, 75, 75, 0.12);
+  background: #fff8f8 !important;
+}
+
 .fecha-estado {
   font-size: 0.88rem;
   font-weight: 500;

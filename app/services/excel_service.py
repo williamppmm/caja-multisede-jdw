@@ -647,7 +647,14 @@ def obtener_items_modulo_fecha(modulo: str, fecha: date, year: int) -> dict | No
                 continue
             concepto = row[2] or ""
             valor = row[6] or 0
-            items.append({"concepto": concepto, "valor": valor})
+            ts = row[7] if len(row) > 7 else None
+            hora_texto = ts.strftime("%I:%M %p") if isinstance(ts, datetime) else ""
+            items.append({
+                "concepto": concepto,
+                "valor": valor,
+                "hora_display": hora_texto,
+                "fecha_hora_registro": ts.isoformat() if isinstance(ts, datetime) else str(ts or ""),
+            })
             total += valor
 
     if not items:
