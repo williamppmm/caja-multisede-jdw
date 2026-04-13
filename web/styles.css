@@ -359,6 +359,10 @@ input[type="number"]::-webkit-outer-spin-button {
   font-size: 0.95rem;
 }
 
+.btn-ir-cuadre {
+  margin-left: auto;
+}
+
 .tabs-modulo {
   display: flex;
   gap: 10px;
@@ -1547,6 +1551,27 @@ body.auth-banner-open::before {
 
 .cuadre-seccion-header h2 {
   margin: 0;
+}
+
+/* Headers navegables */
+.cuadre-seccion-header[data-goto] {
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.12s;
+}
+.cuadre-seccion-header[data-goto]:hover {
+  background: rgba(47, 84, 150, 0.07);
+}
+.cuadre-seccion-header[data-goto] h2::after {
+  content: ' →';
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: #2F5496;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.cuadre-seccion-header[data-goto]:hover h2::after {
+  opacity: 1;
 }
 
 .cuadre-total-badge {

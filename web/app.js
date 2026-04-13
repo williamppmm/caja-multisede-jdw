@@ -1851,6 +1851,7 @@ function actualizarPaneles() {
   document.getElementById('fecha-label').textContent = MODULE_META[currentModule].dateLabel;
   document.getElementById('btn-guardar').classList.toggle('oculto', ['bonos', 'gastos', 'prestamos', 'movimientos', 'cuadre'].includes(currentModule));
   document.getElementById('btn-guardar').textContent = 'Guardar';
+  document.getElementById('btn-ir-cuadre').classList.toggle('oculto', currentModule === 'cuadre' || !enabledModules.includes('cuadre'));
   actualizarBonosVisuales();
   actualizarPrestamosVisuales();
   actualizarMovimientosVisuales();
@@ -3487,6 +3488,7 @@ async function init() {
     await verificarFechaActual();
   });
 
+  document.getElementById('btn-ir-cuadre').addEventListener('click', () => activarModulo('cuadre'));
   document.getElementById('btn-admin').addEventListener('click', abrirAdmin);
   document.getElementById('btn-admin-cancelar').addEventListener('click', cerrarAdmin);
   document.getElementById('btn-admin-cerrar').addEventListener('click', cerrarAdmin);
@@ -3568,6 +3570,11 @@ async function init() {
     if (!obtenerModulosConCambiosSinGuardar().length) return;
     e.preventDefault();
     e.returnValue = '';
+  });
+  document.getElementById('panel-cuadre').addEventListener('click', e => {
+    const header = e.target.closest('.cuadre-seccion-header[data-goto]');
+    if (!header) return;
+    activarModulo(header.dataset.goto);
   });
   document.getElementById('contadores-body').addEventListener('click', e => {
     if (e.target.matches('.btn-confirmar-critica')) {
