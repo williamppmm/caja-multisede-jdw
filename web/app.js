@@ -860,7 +860,15 @@ function obtenerModulosConCambiosSinGuardar() {
 }
 
 function crearInputContador(role, value = '') {
-  const valor = value === 0 || value ? limpiarNumeroTexto(value) : '';
+  const limpio = limpiarNumeroTexto(value);
+  if (limpio === '') {
+    return `<input type="text" inputmode="numeric" class="contador-campo" data-role="${role}" value="" placeholder="0" />`;
+  }
+  const numero = Number(limpio);
+  // Entradas y salidas deben arrancar visualmente vacias cuando su valor es 0.
+  // Jackpot, en cambio, puede venir heredado del ultimo registro y debe mostrarse
+  // siempre que traiga un valor real distinto de 0.
+  const valor = numero === 0 ? '' : limpio;
   return `<input type="text" inputmode="numeric" class="contador-campo" data-role="${role}" value="${valor}" placeholder="0" />`;
 }
 
