@@ -302,23 +302,6 @@ def pausar_contador(item_id: str, body: dict):
     pausado = bool(body.get("pausado", True))
     return contadores_service.pausar_item(item_id, pausado)
 
-
-@router.post("/bonos/ultimo/editar", response_model=BonoRespuesta)
-def editar_ultimo_bono(entrada: BonoEntrada):
-    resultado = bonos_service.actualizar_ultimo_bono(entrada.fecha, entrada.cliente, entrada.valor)
-    return BonoRespuesta(**resultado)
-
-
-@router.post("/bonos/ultimo/eliminar")
-def eliminar_ultimo_bono(body: dict):
-    fecha_raw = body.get("fecha")
-    try:
-        d = date.fromisoformat(str(fecha_raw))
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
-    return bonos_service.eliminar_ultimo_bono(d)
-
-
 @router.get("/gastos/fecha/{fecha}/registros")
 def registros_fecha_gastos(fecha: str):
     try:

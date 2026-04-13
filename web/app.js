@@ -358,9 +358,9 @@ function posicionarTarjetaAuth() {
 }
 
 function esControlEdicionActual(control) {
-  if (!control || control.closest('#banner-edicion, #modal-admin, #modal-editar')) return false;
+  if (!control || control.closest('#banner-edicion, #modal-admin')) return false;
   if (control.id === 'fecha' || control.id === 'btn-admin') return false;
-  if (control.closest('#modal-admin, #modal-editar')) return false;
+  if (control.closest('#modal-admin')) return false;
   const panel = document.getElementById(MODULE_META[currentModule]?.panelId);
   if (currentModule === 'caja' || currentModule === 'plataformas') {
     if (control.id === 'btn-guardar') return true;
@@ -731,7 +731,7 @@ function limpiarFormularioContadores() {
 }
 
 function getContadoresInputs() {
-  return [...document.querySelectorAll('.contador-campo, .contador-critica input, .contador-critica textarea')];
+  return [...document.querySelectorAll('.contador-campo, .contador-critica input')];
 }
 
 function setContadoresEditable(editable) {
@@ -1194,8 +1194,6 @@ function limpiarFormularioMovimientos() {
   if (valor) valor.value = '';
 }
 
-function actualizarAccionesBonos() {}
-
 function obtenerAcumuladoClienteBonos(cliente) {
   const nombre = String(cliente || '').trim().toLocaleLowerCase('es-CO');
   if (!nombre) return 0;
@@ -1372,7 +1370,6 @@ function renderBonosRegistros(items = [], total = 0) {
     });
   }
   document.getElementById('total-bonos').textContent = fmt(total);
-  actualizarAccionesBonos();
   actualizarAcumuladoBonoCliente();
   const detBonos = document.getElementById('bonos-detalle-dia');
   if (detBonos) detBonos.open = bonusDayItems.length > 0;
@@ -1896,6 +1893,10 @@ function setOverride(modulo, fecha) {
   adminOverride[modulo] = fecha || document.getElementById('fecha')?.value || null;
 }
 
+function puedeForzarModulo(modulo, fecha = null) {
+  return esSuperAdminActivo() || isOverrideActive(modulo, fecha);
+}
+
 async function activarModulo(modulo) {
   if (currentModule === 'caja') guardarDraftCaja();
   if (currentModule === 'contadores') guardarDraftContadores();
@@ -1909,7 +1910,6 @@ async function activarModulo(modulo) {
   aplicarFechaModulo(currentModule);
   if (currentModule === 'bonos') {
     limpiarFormularioBonos();
-    actualizarAccionesBonos();
     actualizarBonosVisuales();
   }
   if (currentModule === 'plataformas') {
@@ -2293,7 +2293,7 @@ async function registrarBono() {
   const res = await fetch('/api/modulos/bonos/registrar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, cliente, valor, forzar: isOverrideActive('bonos', fecha) }),
+    body: JSON.stringify({ fecha, cliente, valor, forzar: puedeForzarModulo('bonos', fecha) }),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -2324,7 +2324,7 @@ async function registrarPrestamo() {
   const res = await fetch('/api/modulos/prestamos/registrar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, persona, tipo_movimiento, valor, forzar: isOverrideActive('prestamos', fecha) }),
+    body: JSON.stringify({ fecha, persona, tipo_movimiento, valor, forzar: puedeForzarModulo('prestamos', fecha) }),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -2355,7 +2355,7 @@ async function registrarMovimiento() {
   const res = await fetch('/api/modulos/movimientos/registrar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, tipo_movimiento, concepto, valor, observacion: '', forzar: isOverrideActive('movimientos', fecha) }),
+    body: JSON.stringify({ fecha, tipo_movimiento, concepto, valor, observacion: '', forzar: puedeForzarModulo('movimientos', fecha) }),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -2395,7 +2395,7 @@ async function registrarGasto() {
   const res = await fetch('/api/modulos/gastos/guardar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, items: [{ concepto, valor }], forzar: isOverrideActive('gastos', fecha) }),
+    body: JSON.stringify({ fecha, items: [{ concepto, valor }], forzar: puedeForzarModulo('gastos', fecha) }),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -2485,7 +2485,7 @@ async function guardarContadores() {
   const res = await fetch('/api/modulos/contadores/guardar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, items, forzar: isOverrideActive('contadores', fecha) || items.some(i => i.usar_referencia_critica) }),
+    body: JSON.stringify({ fecha, items, forzar: puedeForzarModulo('contadores', fecha) || items.some(i => i.usar_referencia_critica) }),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -2764,7 +2764,7 @@ async function guardar() {
           billetes,
           total_monedas: parsePositivo('total_monedas'),
           billetes_viejos: parsePositivo('billetes_viejos'),
-          forzar: isOverrideActive('caja', fecha),
+          forzar: puedeForzarModulo('caja', fecha),
         }),
       });
     } else if (currentModule === 'plataformas') {
@@ -2775,7 +2775,7 @@ async function guardar() {
           fecha,
           venta_practisistemas: parsePositivo('venta_practisistemas'),
           venta_deportivas: parseNumeroInput('venta_deportivas', true) || 0,
-          forzar: isOverrideActive('plataformas', fecha),
+          forzar: puedeForzarModulo('plataformas', fecha),
         }),
       });
     } else if (currentModule === 'contadores') {
@@ -2818,8 +2818,6 @@ async function guardar() {
       document.getElementById('fecha').value = fecha;
       await cargarVistaModulo('plataformas', fecha);
       mostrarMensaje(`✓ ${data.mensaje} — Total plataformas: ${fmt(data.total_plataformas)} — ${formatFechaHoraVisual(data.fecha_hora_registro) || `${formatFechaVisual(fecha)} ${hora12}`}`, 'ok');
-    } else if (currentModule === 'bonos' || currentModule === 'prestamos') {
-      return;
     } else {
       setSharedModuleDate(fecha);
       document.getElementById('fecha').value = fecha;
@@ -3165,7 +3163,7 @@ function renderSedesAdminTable() {
 function abrirFormularioSede(site = null) {
   const form = document.getElementById('admin-sede-form');
   form.classList.remove('oculto');
-  document.getElementById('admin-sede-form-titulo').textContent = site ? 'Editar sede' : 'Nueva sede';
+  document.querySelector('.admin-sede-form-titulo').textContent = site ? 'Editar sede' : 'Nueva sede';
   document.getElementById('admin-sede-form-id').value = site?.id || '';
   document.getElementById('admin-sede-form-label').value = site?.label || '';
   document.getElementById('admin-sede-form-sede').value = site?.sede || '';
@@ -3452,7 +3450,6 @@ async function init() {
     if (currentModule === 'bonos') {
       limpiarFormularioBonos();
       actualizarBonosVisuales();
-      actualizarAccionesBonos();
     } else if (currentModule === 'plataformas') {
       limpiarPlataformas();
       calcularPlataformas();
@@ -3592,12 +3589,12 @@ async function init() {
     }
   }, true);
   document.getElementById('contadores-body').addEventListener('input', e => {
-    if (e.target.matches('.contador-campo, .contador-critica input, .contador-critica textarea')) {
+    if (e.target.matches('.contador-campo, .contador-critica input')) {
       manejarEventoContadores(e.target);
     }
   });
   document.getElementById('contadores-body').addEventListener('change', e => {
-    if (e.target.matches('.contador-campo, .contador-critica input, .contador-critica textarea, .contador-critica-check')) {
+    if (e.target.matches('.contador-campo, .contador-critica input, .contador-critica-check')) {
       manejarEventoContadores(e.target);
     }
   });
@@ -3752,9 +3749,6 @@ async function init() {
 
   document.getElementById('modal-admin').addEventListener('click', e => {
     if (e.target === e.currentTarget) cerrarAdmin();
-  });
-  document.getElementById('modal-editar').addEventListener('click', e => {
-    if (e.target === e.currentTarget) cerrarModalEditar();
   });
   window.addEventListener('resize', posicionarTarjetaAuth);
   window.addEventListener('scroll', posicionarTarjetaAuth, true);
@@ -4101,7 +4095,7 @@ async function guardarCuadre() {
   const res = await fetch('/api/modulos/cuadre/guardar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, base_anterior, forzar: isOverrideActive('cuadre', fecha) }),
+    body: JSON.stringify({ fecha, base_anterior, forzar: puedeForzarModulo('cuadre', fecha) }),
   });
   const data = await res.json();
   if (!data.ok) {
