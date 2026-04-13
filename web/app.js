@@ -1486,12 +1486,15 @@ function renderPrestamosRegistros(items = [], resumen = {}) {
   loanItems = Array.isArray(items) ? [...items] : [];
   tbody.innerHTML = '';
   if (!loanItems.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="bonos-vacio">Sin movimientos registrados.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="bonos-vacio">Sin deuda activa para esta fecha.</td></tr>';
   } else {
     [...loanItems].reverse().forEach(item => {
       const tr = document.createElement('tr');
+      const fechaHora = item.fecha
+        ? `${formatFechaVisual(item.fecha)} ${item.hora_display || ''}`.trim()
+        : (item.hora_display || '');
       tr.innerHTML = `
-        <td>${item.hora_display || ''}</td>
+        <td>${fechaHora}</td>
         <td>${item.persona || ''}</td>
         <td>${item.tipo_movimiento === 'pago' ? 'Pago' : 'Préstamo'}</td>
         <td>${fmt(item.valor || 0)}</td>

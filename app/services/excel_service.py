@@ -1054,16 +1054,8 @@ def obtener_movimientos_fecha(fecha: date, year: int) -> list[dict]:
     return registros
 
 
-def obtener_movimientos_prestamos() -> list[dict]:
-    registros = []
-    for path in _obtener_paths_excel_sede():
-        if not path.exists():
-            continue
-        with _abrir_workbook_lectura(path) as wb:
-            hojas = _obtener_hojas_para_lectura(wb, "prestamos")
-            for ws in hojas:
-                registros.extend(_leer_movimientos_prestamos_desde_hoja(ws))
-    registros.sort(key=lambda item: (item["fecha"], item["fecha_hora_registro"] or ""))
+def _construir_ciclo_activo_prestamos(registros: list[dict]) -> list[dict]:
+    registros = sorted(registros, key=lambda item: (item["fecha"], item["fecha_hora_registro"] or ""))
 
     # Calcular saldo corrido completo y registrar dónde cerró cada ciclo (saldo == 0).
     saldos: dict[str, float] = {}
@@ -1088,8 +1080,23 @@ def obtener_movimientos_prestamos() -> list[dict]:
     ]
 
 
-def obtener_resumen_prestamos(persona: str | None = None) -> dict:
-    registros = obtener_movimientos_prestamos()
+def obtener_movimientos_prestamos(fecha_hasta: date | None = None) -> list[dict]:
+    registros = []
+    for path in _obtener_paths_excel_sede():
+        if not path.exists():
+            continue
+        with _abrir_workbook_lectura(path) as wb:
+            hojas = _obtener_hojas_para_lectura(wb, "prestamos")
+            for ws in hojas:
+                registros.extend(_leer_movimientos_prestamos_desde_hoja(ws))
+    if fecha_hasta:
+        fecha_tope = fecha_hasta.isoformat()
+        registros = [item for item in registros if item["fecha"] <= fecha_tope]
+    return _construir_ciclo_activo_prestamos(registros)
+
+
+def obtener_resumen_prestamos(persona: str | None = None, fecha_hasta: date | None = None) -> dict:
+    registros = obtener_movimientos_prestamos(fecha_hasta=fecha_hasta)
     if persona:
         persona_norm = persona.strip().lower()
         registros = [item for item in registros if item["persona"].strip().lower() == persona_norm]
