@@ -590,13 +590,14 @@ function renderGastosRegistros(items = [], total = 0) {
   gastosItems = Array.isArray(items) ? [...items] : [];
   tbody.innerHTML = '';
   if (!gastosItems.length) {
-    tbody.innerHTML = `<tr><td colspan="${esSuperAdminActivo() ? 3 : 2}" class="bonos-vacio">Sin registros para esta fecha.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${esSuperAdminActivo() ? 4 : 3}" class="bonos-vacio">Sin registros para esta fecha.</td></tr>`;
   } else {
     [...gastosItems].reverse().forEach(item => {
       const tr = document.createElement('tr');
       const ts = item.fecha_hora_registro || '';
       if (ts) tr.dataset.ts = ts;
       tr.innerHTML = `
+        <td>${item.hora_display || ''}</td>
         <td>${item.concepto || ''}</td>
         <td>${fmt(item.valor || 0)}</td>
         ${esSuperAdminActivo() ? `
@@ -823,7 +824,16 @@ function applyContadoresDraft(fecha) {
 }
 
 function crearInputContador(role, value = '') {
-  return `<input type="text" inputmode="numeric" class="contador-campo" data-role="${role}" value="${value ?? value === 0 ? limpiarNumeroTexto(value) : ''}" placeholder="0" />`;
+  const limpio = limpiarNumeroTexto(value);
+  if (limpio === '') {
+    return `<input type="text" inputmode="numeric" class="contador-campo" data-role="${role}" value="" placeholder="0" />`;
+  }
+  const numero = Number(limpio);
+  // Entradas y salidas deben arrancar visualmente vacias cuando su valor es 0.
+  // Jackpot, en cambio, puede venir heredado del ultimo registro y debe mostrarse
+  // siempre que traiga un valor real distinto de 0.
+  const valor = numero === 0 ? '' : limpio;
+  return `<input type="text" inputmode="numeric" class="contador-campo" data-role="${role}" value="${valor}" placeholder="0" />`;
 }
 
 function valorTextoContador(row, role) {
@@ -1328,7 +1338,7 @@ function renderBonosRegistros(items = [], total = 0) {
   bonusDayItems = Array.isArray(items) ? [...items] : [];
   tbody.innerHTML = '';
   if (!bonusDayItems.length) {
-    tbody.innerHTML = `<tr><td colspan="${esSuperAdminActivo() ? 6 : 5}" class="bonos-vacio">Sin registros para esta fecha.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${esSuperAdminActivo() ? 5 : 4}" class="bonos-vacio">Sin registros para esta fecha.</td></tr>`;
   } else {
     const acumuladosPorCliente = new Map();
     const itemsAsc = [...bonusDayItems];
@@ -1347,7 +1357,6 @@ function renderBonosRegistros(items = [], total = 0) {
       const tr = document.createElement('tr');
       if (ts) tr.dataset.ts = ts;
       tr.innerHTML = `
-        <td>${item.fecha_display || formatFechaVisual(item.fecha)}</td>
         <td>${item.hora_display || ''}</td>
         <td>${cliente}</td>
         <td>${fmt(valor)}</td>
@@ -1374,19 +1383,17 @@ function renderPrestamosRegistros(items = [], resumen = {}) {
   loanItems = Array.isArray(items) ? [...items] : [];
   tbody.innerHTML = '';
   if (!loanItems.length) {
-    tbody.innerHTML = `<tr><td colspan="${esSuperAdminActivo() ? 7 : 6}" class="bonos-vacio">Sin movimientos registrados.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${esSuperAdminActivo() ? 5 : 4}" class="bonos-vacio">Sin movimientos registrados.</td></tr>`;
   } else {
     [...loanItems].reverse().forEach(item => {
       const ts = item.fecha_hora_registro || '';
       const tr = document.createElement('tr');
       if (ts) tr.dataset.ts = ts;
       tr.innerHTML = `
-        <td>${item.fecha_display || formatFechaVisual(item.fecha)}</td>
         <td>${item.hora_display || ''}</td>
         <td>${item.persona || ''}</td>
         <td>${item.tipo_movimiento === 'pago' ? 'Pago' : 'Préstamo'}</td>
         <td>${fmt(item.valor || 0)}</td>
-        <td>${fmt(item.saldo_pendiente || 0)}</td>
         ${esSuperAdminActivo() ? `
           <td class="td-acciones">
             <button type="button" class="btn-tabla-accion btn-tabla-editar" data-modulo="prestamos" data-ts="${ts}">✎</button>
@@ -1411,14 +1418,13 @@ function renderMovimientosRegistros(items = [], resumen = {}) {
   if (!tbody) return;
   tbody.innerHTML = '';
   if (!movementItems.length) {
-    tbody.innerHTML = `<tr><td colspan="${esSuperAdminActivo() ? 6 : 5}" class="bonos-vacio">Sin registros para esta fecha.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${esSuperAdminActivo() ? 5 : 4}" class="bonos-vacio">Sin registros para esta fecha.</td></tr>`;
   } else {
     [...movementItems].reverse().forEach(item => {
       const ts = item.fecha_hora_registro || '';
       const tr = document.createElement('tr');
       if (ts) tr.dataset.ts = ts;
       tr.innerHTML = `
-        <td>${item.fecha_display || formatFechaVisual(item.fecha)}</td>
         <td>${item.hora_display || ''}</td>
         <td>${item.tipo_movimiento === 'ingreso' ? 'Ingreso' : 'Salida'}</td>
         <td>${item.concepto || ''}</td>
