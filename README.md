@@ -1,5 +1,8 @@
 # CajaJDW — Capturadora Multimódulo
 
+> **Rama `main` — build super admin.**
+> Esta es la versión de supervisión centralizada. Para la versión de operador de sede consulta la rama `version-usuario`; para la versión especial (arranca en ayer) consulta `respaldo-version-especial`.
+
 Aplicación local para capturar información diaria de caja por sede y guardarla en archivos Excel anuales, pensados tanto como respaldo operativo como fuente para análisis posterior en Excel o Power Query.
 
 La app corre localmente en cada equipo, abre una interfaz web en el navegador y escribe sobre libros Excel anuales por sede dentro de una carpeta compartida, por ejemplo Dropbox.
@@ -93,9 +96,19 @@ scripts/install_windows.ps1
 
 ### Construcción del EXE
 
+#### Versión usuario (`CajaJDW.exe`)
+
 1. Ejecutar `Instalar Caja.bat`.
 2. Ejecutar `Construir EXE.bat`.
 3. El ejecutable quedará en `dist\CajaJDW.exe`.
+
+#### Versión super admin (`CajaSuperAdmin.exe`)
+
+1. Ejecutar `Instalar Caja.bat`.
+2. Ejecutar `scripts\build_super_admin_exe.ps1` (o ejecutar PyInstaller manualmente con `CajaSuperAdmin.spec`).
+3. El ejecutable quedará en `dist\CajaSuperAdmin.exe`.
+
+Este build usa `launcher_super_admin.py`, que arranca la app con `is_super_admin_build = True`. Eso habilita el modo super admin sin contraseña desde el primer arranque.
 
 Características del EXE:
 
@@ -129,16 +142,16 @@ La configuración local se reparte entre:
 
 ## Módulos disponibles
 
-| Módulo | Uso principal | Regla de edición |
-|---|---|---|
-| `Caja` | Arqueo físico del día | si la fecha ya existe, requiere admin |
-| `Plataformas` | Ventas de plataformas | fecha actual libre, otra fecha requiere admin |
-| `Gastos` | Egresos del día | fecha actual libre, otra fecha requiere admin |
-| `Bonos` | Bonos por cliente | fecha actual libre, otra fecha requiere admin |
-| `Prestamos` | Préstamos y pagos | fecha actual libre, otra fecha requiere admin |
-| `Movimientos` | Ingresos y salidas extraordinarias | fecha actual libre, otra fecha requiere admin |
-| `Contadores` | Captura por ítem con referencias | si la fecha ya existe, requiere admin |
-| `Cuadre` | Consolidación del período | si ya existe, corregir requiere admin |
+| Módulo | Uso principal | Regla de edición (modo usuario) | Regla de edición (modo super admin) |
+|---|---|---|---|
+| `Caja` | Arqueo físico del día | si la fecha ya existe, requiere admin | cualquier fecha libre; pide confirmación al sobrescribir |
+| `Plataformas` | Ventas de plataformas | fecha actual libre, otra fecha requiere admin | cualquier fecha libre |
+| `Gastos` | Egresos del día | fecha actual libre, otra fecha requiere admin | edición y eliminación por fila en cualquier fecha |
+| `Bonos` | Bonos por cliente | fecha actual libre, otra fecha requiere admin | edición y eliminación por fila en cualquier fecha |
+| `Prestamos` | Préstamos y pagos | fecha actual libre, otra fecha requiere admin | edición y eliminación por fila en cualquier fecha |
+| `Movimientos` | Ingresos y salidas extraordinarias | fecha actual libre, otra fecha requiere admin | edición y eliminación por fila en cualquier fecha |
+| `Contadores` | Captura por ítem con referencias | si la fecha ya existe, requiere admin | cualquier fecha libre |
+| `Cuadre` | Consolidación del período | si ya existe, corregir requiere admin | cualquier fecha libre; pide confirmación al sobrescribir |
 
 ## Catálogos locales
 
@@ -159,6 +172,44 @@ También se pueden administrar desde la interfaz:
 - importar nombres de bonos desde `.txt`
 - editar catálogos de gastos, préstamos, movimientos y contadores
 - pausar ítems de Contadores sin eliminar su historial
+
+## Modo super admin
+
+El modo super admin está pensado para un equipo de supervisión centralizado que necesita operar sobre múltiples sedes remotas sin ingresar contraseña.
+
+### Activación
+
+- **Build dedicado (`CajaSuperAdmin.exe`):** el modo se activa automáticamente al arrancar. No hay toggle ni contraseña.
+- **Build usuario con toggle:** se puede activar desde Administración → Sedes remotas → "Activar modo super admin". Solo para uso administrativo.
+
+### Diferencias de comportamiento
+
+| Aspecto | Modo usuario | Modo super admin |
+|---|---|---|
+| Contraseña admin | requerida para fechas pasadas | nunca requerida |
+| Edición de registros | no disponible o solo en fecha actual | ✎/✕ por fila en cualquier fecha |
+| Sedes | una sola (local) | múltiples sedes remotas configurables |
+| Referencias plataformas | no disponible | compara contra Practisistemas y Bet/Deportivas |
+| Catálogos de módulos | editables | ocultos (no aplica en supervisión) |
+| Banner | sin indicador especial | banner "⚙ SUPER ADMIN" con sede activa |
+
+### Configuración de sedes remotas
+
+Desde Administración → Sedes remotas se configuran las sedes. Cada sede requiere:
+
+| Campo | Descripción |
+|---|---|
+| **Nombre visible** | Etiqueta para el selector de sede en el banner. |
+| **Sede** | Nombre normalizado que aparece en el nombre del Excel (`Contadores_{sede}_{año}.xlsx`). Se detecta automáticamente al verificar la carpeta. |
+| **Carpeta Dropbox** | Ruta local a la carpeta de la sede (normalmente sincronizada por Dropbox). Se puede elegir con selector o verificar acceso. |
+| **Columna Practisistemas** | Nombre exacto de la columna en `Ventas_dia_Practisistemas.xlsx` para comparar referencias. |
+| **Columna Deportivas/Bet** | Nombre exacto de la columna en `Ventas_dia_Bet.xlsm` para comparar referencias. |
+
+Al cambiar de sede activa desde el banner, la app recarga el módulo actual apuntando al Excel de la sede seleccionada.
+
+### Referencias de plataformas
+
+Cuando hay una sede activa con carpeta configurada, el módulo Plataformas compara los valores ingresados contra las columnas correspondientes en los archivos de referencia de la carpeta. Si hay diferencia, se muestra un aviso visual.
 
 ## Uso con varias sedes
 
@@ -231,10 +282,14 @@ Consolidado_*.xlsx
 |---|---|
 | `Instalar Caja.bat` | instalación rápida |
 | `Iniciar Caja.bat` | inicio local |
-| `Construir EXE.bat` | build del ejecutable |
+| `Construir EXE.bat` | build del ejecutable usuario |
 | `scripts/install_windows.ps1` | instalación detallada |
-| `scripts/build_windows_exe.ps1` | build detallado del EXE |
-| `CajaJDW.spec` | configuración de PyInstaller |
+| `scripts/build_windows_exe.ps1` | build detallado del EXE usuario |
+| `scripts/build_super_admin_exe.ps1` | build del EXE super admin |
+| `CajaJDW.spec` | configuración PyInstaller — versión usuario |
+| `CajaSuperAdmin.spec` | configuración PyInstaller — versión super admin |
+| `launcher.py` | launcher para versión usuario |
+| `launcher_super_admin.py` | launcher para versión super admin (activa `is_super_admin_build`) |
 
 ## Estado actual
 
@@ -246,5 +301,7 @@ Puntos auditados en esta versión:
 - configuración administrativa más completa, incluyendo estado inicial del sistema
 - persistencia operativa en `Contadores_{sede}_{año}.xlsx` y cuadre en `Consolidado_{sede}_{año}.xlsx`
 - catálogos locales editables desde la propia app
+- modo super admin con gestión de sedes remotas, edición/eliminación por fila en cualquier fecha y referencias de plataformas
+- build dedicado `CajaSuperAdmin.exe` que arranca en modo super admin sin contraseña
 
 Su siguiente límite natural, si crece la concurrencia o la exigencia de seguridad, será migrar la operación central a una base de datos y dejar Excel como respaldo o salida analítica.

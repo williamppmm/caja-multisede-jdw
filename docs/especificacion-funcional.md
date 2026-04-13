@@ -78,6 +78,35 @@ Los cambios en el catálogo se guardan al pulsar **Guardar catálogo**. El orden
 
 Permite cargar nombres de clientes desde un archivo de texto (uno por línea) directamente al catálogo local de autocompletado de Bonos.
 
+### 2.6 Modo super admin y sedes remotas
+
+Sección exclusiva del build super admin (`CajaSuperAdmin.exe`) y del toggle en Administración → Sedes remotas.
+
+**Activación:** en el build dedicado el modo está activo desde el arranque. En el build usuario puede activarse manualmente con el toggle, pero no es su uso habitual.
+
+**Efecto sobre la interfaz:**
+
+- Aparece el banner superior "⚙ SUPER ADMIN" con un selector de sede activa y la ruta de la carpeta.
+- No se requiere contraseña para ninguna operación.
+- Los catálogos de módulos y la sección de estado inicial quedan ocultos (no aplican en supervisión).
+- La edición de registros pasa a ser por fila (✎/✕) en todos los módulos tabulares, disponible en cualquier fecha.
+- El módulo Plataformas muestra referencias comparativas si la sede tiene carpetas configuradas.
+
+**Configuración de sedes (`data/settings.json` → `remote_sites`):**
+
+Cada sede se define con:
+
+| Campo | Descripción |
+|---|---|
+| `id` | Identificador único generado automáticamente. |
+| `label` | Nombre visible en el selector del banner. |
+| `sede` | Nombre normalizado para los archivos Excel. Se detecta automáticamente al verificar la carpeta. |
+| `data_dir` | Ruta local a la carpeta de la sede (Dropbox u otra nube). |
+| `plataformas_ref.practi_header` | Nombre de la columna en `Ventas_dia_Practisistemas.xlsx`. |
+| `plataformas_ref.bet_header` | Nombre de la columna en `Ventas_dia_Bet.xlsm`. |
+
+Al cambiar de sede activa, la app limpia los borradores de sesión y recarga el módulo actual apuntando al Excel de la sede seleccionada.
+
 ---
 
 ## 3. Comportamientos transversales
@@ -225,15 +254,25 @@ Hoja `Plataformas` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por día:
 - El total diario se acumula con cada nuevo registro.
 - Los conceptos nuevos se agregan automáticamente al catálogo local (`data/gastos_conceptos.json`) para autocompletado en registros futuros.
 
-### 6.3 Reglas de edición
+### 6.3 Edición y eliminación por fila (modo super admin)
 
-| Situación | Comportamiento |
-|---|---|
-| Fecha actual | Guardar libre. |
-| Fecha distinta a hoy | Requiere admin. |
-| Fecha futura | Bloqueado siempre. |
+En modo super admin cada fila del historial diario muestra botones ✎ (editar) y ✕ (eliminar).
 
-### 6.4 Persistencia en Excel
+**Editar:** abre prompts para cambiar concepto y valor del gasto seleccionado. El total se recalcula.
+
+**Eliminar:** pide confirmación y borra la fila. El total se recalcula.
+
+Disponible en cualquier fecha. No requiere contraseña.
+
+### 6.4 Reglas de edición
+
+| Situación | Modo usuario | Modo super admin |
+|---|---|---|
+| Fecha actual | Guardar libre. | Guardar, editar y eliminar libres. |
+| Fecha distinta a hoy | Requiere admin. | Editar y eliminar libres. |
+| Fecha futura | Bloqueado. | Bloqueado. |
+
+### 6.5 Persistencia en Excel
 
 Hoja `Gastos` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por concepto registrado:
 
@@ -260,23 +299,25 @@ Hoja `Gastos` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por concepto r
 - Se muestra el **acumulado por cliente** dentro del día para facilitar el control.
 - El cliente se agrega al catálogo local (`data/bonos_clientes.json`) para autocompletado.
 
-### 7.3 Editar el último bono
+### 7.3 Edición y eliminación por fila (modo super admin)
 
-Permite cambiar cliente y valor del **bono con timestamp más reciente** de la fecha activa. No afecta bonos anteriores. Requiere que exista al menos un bono en la fecha.
+En modo super admin cada fila del historial diario muestra botones ✎ (editar) y ✕ (eliminar).
 
-### 7.4 Eliminar el último bono
+**Editar:** abre prompts en secuencia para cambiar cliente y valor del bono seleccionado. El total se recalcula.
 
-Elimina el **bono con timestamp más reciente** de la fecha activa. El total se recalcula. Si no hay bonos, la operación no hace nada.
+**Eliminar:** pide confirmación y borra la fila. El total se recalcula.
 
-### 7.5 Reglas de edición
+Disponible en cualquier fecha (no solo la actual). No requiere contraseña.
 
-| Situación | Comportamiento |
-|---|---|
-| Fecha actual | Registrar, editar y eliminar libres. |
-| Fecha distinta a hoy | Requiere admin. |
-| Fecha futura | Bloqueado siempre. |
+### 7.4 Reglas de edición
 
-### 7.6 Persistencia en Excel
+| Situación | Modo usuario | Modo super admin |
+|---|---|---|
+| Fecha actual | Registrar libre. | Registrar, editar y eliminar libres. |
+| Fecha distinta a hoy | Requiere admin. | Editar y eliminar libres. |
+| Fecha futura | Bloqueado. | Bloqueado. |
+
+### 7.5 Persistencia en Excel
 
 Hoja `Bonos` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por bono:
 
@@ -318,17 +359,25 @@ La interfaz muestra por persona:
 - Total pagado acumulado
 - Saldo pendiente vigente
 
-### 8.5 Reglas de edición
+### 8.5 Edición y eliminación por fila (modo super admin)
 
-| Situación | Comportamiento |
-|---|---|
-| Fecha actual | Registrar libre. |
-| Fecha distinta a hoy | Requiere admin. |
-| Fecha futura | Bloqueado siempre. |
+En modo super admin cada fila del historial diario muestra botones ✎ (editar) y ✕ (eliminar).
 
-No existe función de editar o eliminar un préstamo individual (a diferencia de Bonos).
+**Editar:** abre prompts para cambiar persona, tipo (`prestamo` / `pago`) y valor. El saldo se recalcula: revierte el efecto del movimiento anterior y aplica el nuevo. Si el nuevo valor excede el saldo disponible, la operación es rechazada.
 
-### 8.6 Persistencia en Excel
+**Eliminar:** pide confirmación y borra la fila. El saldo se recalcula.
+
+Disponible en cualquier fecha. No requiere contraseña.
+
+### 8.6 Reglas de edición
+
+| Situación | Modo usuario | Modo super admin |
+|---|---|---|
+| Fecha actual | Registrar libre. | Registrar, editar y eliminar libres. |
+| Fecha distinta a hoy | Requiere admin. | Editar y eliminar libres. |
+| Fecha futura | Bloqueado. | Bloqueado. |
+
+### 8.7 Persistencia en Excel
 
 Hoja `Prestamos` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por movimiento:
 
@@ -356,15 +405,25 @@ Hoja `Prestamos` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por movimie
 - Los conceptos se agregan al catálogo local (`data/movimientos_conceptos.json`) para autocompletado.
 - El resumen del día muestra: Total ingresos, Total salidas, Neto (ingresos − salidas).
 
-### 9.3 Reglas de edición
+### 9.3 Edición y eliminación por fila (modo super admin)
 
-| Situación | Comportamiento |
-|---|---|
-| Fecha actual | Registrar libre. |
-| Fecha distinta a hoy | Requiere admin. |
-| Fecha futura | Bloqueado siempre. |
+En modo super admin cada fila del historial diario muestra botones ✎ (editar) y ✕ (eliminar).
 
-### 9.4 Persistencia en Excel
+**Editar:** abre prompts para cambiar tipo, concepto, valor y observación del movimiento seleccionado. El resumen (ingresos, salidas, neto) se recalcula.
+
+**Eliminar:** pide confirmación y borra la fila. El resumen se recalcula.
+
+Disponible en cualquier fecha. No requiere contraseña.
+
+### 9.4 Reglas de edición
+
+| Situación | Modo usuario | Modo super admin |
+|---|---|---|
+| Fecha actual | Registrar libre. | Registrar, editar y eliminar libres. |
+| Fecha distinta a hoy | Requiere admin. | Editar y eliminar libres. |
+| Fecha futura | Bloqueado. | Bloqueado. |
+
+### 9.5 Persistencia en Excel
 
 Hoja `Movimientos` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por movimiento:
 
