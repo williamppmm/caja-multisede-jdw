@@ -612,8 +612,7 @@ table.contadores-tabla th {
   font-size: 0.88rem;
 }
 
-.contador-campo:focus,
-.contador-critica textarea:focus {
+.contador-campo:focus {
   outline: 2px solid #2F5496;
   border-color: #2F5496;
 }
@@ -768,18 +767,6 @@ table.contadores-tabla th {
   background: #fffdf0;
   text-align: right;
   font-size: 0.9rem;
-}
-
-.contador-critica textarea {
-  width: 100%;
-  min-height: 62px;
-  padding: 8px 10px;
-  border: 1px solid #bbb;
-  border-radius: 6px;
-  resize: vertical;
-  font-family: inherit;
-  font-size: 0.9rem;
-  margin-top: 8px;
 }
 
 .contador-resultado.negativo {
@@ -1235,18 +1222,6 @@ body.auth-banner-open::before {
 }
 
 
-/* Fecha estado con botón inline */
-.fecha-estado .btn-inline-editar {
-  background: none;
-  border: none;
-  color: #2F5496;
-  cursor: pointer;
-  font-size: 0.88rem;
-  font-weight: 600;
-  padding: 0;
-  text-decoration: underline;
-}
-
 /* Modales */
 .modal-overlay {
   position: fixed;
@@ -1539,36 +1514,6 @@ body.auth-banner-open::before {
   margin: 0 0 12px 2px;
 }
 
-table.cuadre-tabla {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.92rem;
-  margin-bottom: 4px;
-}
-
-table.cuadre-tabla th {
-  background: #edf1f7;
-  color: #2f3f5a;
-  font-weight: 600;
-  padding: 7px 10px;
-  text-align: left;
-}
-
-table.cuadre-tabla td {
-  padding: 6px 10px;
-  border-bottom: 1px solid #f0f2f6;
-  color: #2f3f5a;
-}
-
-table.cuadre-tabla tr:last-child td {
-  border-bottom: none;
-}
-
-table.cuadre-tabla td.num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
 .cuadre-positivo {
   color: #1a7a2e;
   font-weight: 600;
@@ -1608,45 +1553,6 @@ table.cuadre-tabla td.num {
 }
 
 
-.cuadre-balance-item {
-  background: #fff;
-  border-radius: 8px;
-  padding: 10px 14px;
-  border: 1px solid #dce3ef;
-}
-
-.cuadre-balance-item .label {
-  font-size: 0.8rem;
-  color: #6b7a99;
-  margin-bottom: 4px;
-}
-
-.cuadre-balance-item .valor {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #2f3f5a;
-  font-variant-numeric: tabular-nums;
-}
-
-.cuadre-diferencia-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #fff;
-  border-radius: 8px;
-  padding: 12px 16px;
-  border: 1px solid #dce3ef;
-  font-size: 1rem;
-  font-weight: 700;
-  color: #2f3f5a;
-  margin-top: 6px;
-}
-
-.cuadre-diferencia-row .valor {
-  font-size: 1.15rem;
-  font-variant-numeric: tabular-nums;
-}
-
 .cuadre-resumen-guardado {
   background: #f0fff4;
   border: 1px solid #a8d5b5;
@@ -1662,26 +1568,6 @@ table.cuadre-tabla td.num {
   margin: 0 0 12px;
 }
 
-
-.cuadre-resumen-item {
-  background: #fff;
-  border-radius: 8px;
-  padding: 10px 14px;
-  border: 1px solid #c2e0cc;
-}
-
-.cuadre-resumen-item .label {
-  font-size: 0.8rem;
-  color: #3a7a52;
-  margin-bottom: 4px;
-}
-
-.cuadre-resumen-item .valor {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #1a5c30;
-  font-variant-numeric: tabular-nums;
-}
 
 @media (min-width: 920px) {
   .cuadre-grid {
@@ -1704,7 +1590,6 @@ table.cuadre-tabla td.num {
 
 @media (max-width: 600px) {
   .cuadre-caja-extras { flex-direction: column; }
-  .cuadre-diferencia-row { flex-direction: column; gap: 6px; text-align: center; }
 }
 
 /* ── Admin grids (catálogo y referencias) ─────────────────────── */
@@ -1862,9 +1747,7 @@ table.cuadre-tabla td.num {
 }
 
 .modulo-panel .bonos-tabla th,
-.modulo-panel .bonos-tabla td,
-.modulo-panel table.cuadre-tabla th,
-.modulo-panel table.cuadre-tabla td {
+.modulo-panel .bonos-tabla td {
   padding-top: 6px;
   padding-bottom: 6px;
 }
@@ -1957,10 +1840,7 @@ h2,
 .bonos-meta-label,
 .modulo-panel .card details > summary,
 .admin-grid-tabla th,
-.bonos-tabla th,
-table.cuadre-tabla th,
-.cuadre-balance-item .label,
-.cuadre-resumen-item .label {
+.bonos-tabla th {
   font-size: 0.85rem;
   letter-spacing: 0.04em;
 }

@@ -369,9 +369,9 @@ function posicionarTarjetaAuth() {
 }
 
 function esControlEdicionActual(control) {
-  if (!control || control.closest('#banner-edicion, #modal-admin, #modal-editar')) return false;
+  if (!control || control.closest('#banner-edicion, #modal-admin')) return false;
   if (control.id === 'fecha' || control.id === 'btn-admin') return false;
-  if (control.closest('#modal-admin, #modal-editar')) return false;
+  if (control.closest('#modal-admin')) return false;
   const panel = document.getElementById(MODULE_META[currentModule]?.panelId);
   if (currentModule === 'caja' || currentModule === 'plataformas') {
     if (control.id === 'btn-guardar') return true;
@@ -735,7 +735,7 @@ function limpiarFormularioContadores() {
 }
 
 function getContadoresInputs() {
-  return [...document.querySelectorAll('.contador-campo, .contador-critica input, .contador-critica textarea')];
+  return [...document.querySelectorAll('.contador-campo, .contador-critica input')];
 }
 
 function setContadoresEditable(editable) {
@@ -860,7 +860,8 @@ function obtenerModulosConCambiosSinGuardar() {
 }
 
 function crearInputContador(role, value = '') {
-  return `<input type="text" inputmode="numeric" class="contador-campo" data-role="${role}" value="${value ?? value === 0 ? limpiarNumeroTexto(value) : ''}" placeholder="0" />`;
+  const valor = value === 0 || value ? limpiarNumeroTexto(value) : '';
+  return `<input type="text" inputmode="numeric" class="contador-campo" data-role="${role}" value="${valor}" placeholder="0" />`;
 }
 
 function valorTextoContador(row, role) {
@@ -1015,7 +1016,6 @@ function recalcularFilaContador(row) {
     || salidas < fila.refSalidas
     || jackpot < fila.refJackpot
   );
-  row.classList.remove('contador-alerta');
   if (detalleCritica) {
     // Mostrar cuando: hay alerta, está autorizado, o el panel ya está abierto (el usuario lo expandió para editar).
     detalleCritica.classList.toggle('oculto', !(alerta || usaCritica || detalleCritica.open));
@@ -1608,9 +1608,8 @@ function validarPrestamo() {
 }
 
 function validarMovimiento() {
-  limpiarCamposInvalidos(['movimiento-concepto', 'movimiento-observacion']);
+  limpiarCamposInvalidos(['movimiento-concepto']);
   const concepto = document.getElementById('movimiento-concepto').value.trim();
-  const observacion = document.getElementById('movimiento-observacion')?.value.trim() || '';
   const valor = parseNumeroInput('movimiento-valor');
   if (!concepto) {
     marcarCampoInvalido('movimiento-concepto');
@@ -1619,10 +1618,6 @@ function validarMovimiento() {
   if (textoContieneNumeros(concepto)) {
     marcarCampoInvalido('movimiento-concepto');
     return 'El concepto del movimiento no puede contener números.';
-  }
-  if (observacion && textoContieneNumeros(observacion)) {
-    marcarCampoInvalido('movimiento-observacion');
-    return 'La observación no puede contener números.';
   }
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de movimiento mayor que cero.';
   return null;
@@ -2913,8 +2908,6 @@ async function guardar() {
       document.getElementById('fecha').value = fecha;
       await cargarVistaModulo('plataformas', fecha);
       mostrarMensaje(`✓ ${data.mensaje} — Total plataformas: ${fmt(data.total_plataformas)} — ${formatFechaHoraVisual(data.fecha_hora_registro) || `${formatFechaVisual(fecha)} ${hora12}`}`, 'ok');
-    } else if (currentModule === 'bonos' || currentModule === 'prestamos') {
-      return;
     } else {
       setSharedModuleDate(fecha);
       document.getElementById('fecha').value = fecha;
@@ -3355,12 +3348,12 @@ async function init() {
     }
   }, true);
   document.getElementById('contadores-body').addEventListener('input', e => {
-    if (e.target.matches('.contador-campo, .contador-critica input, .contador-critica textarea')) {
+    if (e.target.matches('.contador-campo, .contador-critica input')) {
       manejarEventoContadores(e.target);
     }
   });
   document.getElementById('contadores-body').addEventListener('change', e => {
-    if (e.target.matches('.contador-campo, .contador-critica input, .contador-critica textarea, .contador-critica-check')) {
+    if (e.target.matches('.contador-campo, .contador-critica input, .contador-critica-check')) {
       manejarEventoContadores(e.target);
     }
   });
@@ -3414,7 +3407,7 @@ async function init() {
     el.addEventListener('focus', () => limpiarFormatoInputNumerico(el));
     el.addEventListener('blur', () => formatearInputNumerico(el));
   });
-  ['bono-cliente', 'gasto-concepto', 'prestamo-persona', 'movimiento-concepto', 'movimiento-observacion'].forEach(id => {
+  ['bono-cliente', 'gasto-concepto', 'prestamo-persona', 'movimiento-concepto'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', () => {
       document.getElementById(id)?.classList.remove('campo-invalido');
     });
@@ -3520,9 +3513,6 @@ async function init() {
 
   document.getElementById('modal-admin').addEventListener('click', e => {
     if (e.target === e.currentTarget) cerrarAdmin();
-  });
-  document.getElementById('modal-editar').addEventListener('click', e => {
-    if (e.target === e.currentTarget) cerrarModalEditar();
   });
   window.addEventListener('beforeunload', e => {
     if (!obtenerModulosConCambiosSinGuardar().length) return;
