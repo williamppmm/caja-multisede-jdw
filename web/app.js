@@ -3829,10 +3829,31 @@ async function cargarDatosCuadre(fecha) {
 function renderCuadre(datos) {
   // Período
   const periodo = datos.periodo || [];
-  const txtPeriodo = periodo.length > 1
-    ? `Período: ${formatFechaVisual(periodo[0])} → ${formatFechaVisual(periodo[periodo.length - 1])} (${periodo.length} días del período)`
-    : periodo.length === 1 ? `Fecha: ${periodo[0]}` : 'Sin días en el período';
+  const diasAcum = datos.dias_acumulados || [];
+  const diasIncons = datos.dias_inconsistentes || [];
+
+  let txtPeriodo;
+  if (periodo.length > 1) {
+    const extra = diasAcum.length
+      ? ` — incluye ${diasAcum.length} día${diasAcum.length > 1 ? 's' : ''} acumulado${diasAcum.length > 1 ? 's' : ''}`
+      : '';
+    txtPeriodo = `Período: ${formatFechaVisual(periodo[0])} → ${formatFechaVisual(periodo[periodo.length - 1])} (${periodo.length} días${extra})`;
+  } else if (periodo.length === 1) {
+    txtPeriodo = `Fecha: ${formatFechaVisual(periodo[0])}`;
+  } else {
+    txtPeriodo = 'Sin días en el período';
+  }
   document.getElementById('cuadre-periodo-texto').textContent = txtPeriodo;
+
+  // Aviso días acumulados (informativo)
+  const avisoAcum = document.getElementById('cuadre-aviso-acumulados');
+  avisoAcum.textContent = datos.mensaje_info || '';
+  avisoAcum.classList.toggle('oculto', !datos.mensaje_info);
+
+  // Aviso inconsistencias (bloqueante)
+  const avisoIncons = document.getElementById('cuadre-aviso-inconsistencias');
+  avisoIncons.textContent = datos.mensaje_error || '';
+  avisoIncons.classList.toggle('oculto', !datos.mensaje_error);
 
   // Base anterior
   const tieneBase = datos.tiene_base_anterior;
@@ -3941,16 +3962,23 @@ function renderCuadre(datos) {
   document.getElementById('cuadre-caja-total-badge').textContent = fmt(datos.caja_fisica ?? 0);
 
   // Balance
+  const tieneCierreDia = Boolean(datos.tiene_caja_dia && datos.tiene_contadores_dia);
   document.getElementById('cuadre-balance-base').textContent = fmt(datos.base_anterior ?? 0);
   document.getElementById('cuadre-teorica').textContent = fmt(datos.caja_teorica ?? 0);
-  document.getElementById('cuadre-fisica').textContent = fmt(datos.caja_fisica ?? 0);
-  document.getElementById('cuadre-base-nueva').textContent = fmt(datos.base_nueva ?? 0);
+  document.getElementById('cuadre-fisica').textContent = tieneCierreDia ? fmt(datos.caja_fisica ?? 0) : 'Pendiente';
+  document.getElementById('cuadre-base-nueva').textContent = tieneCierreDia ? fmt(datos.base_nueva ?? 0) : 'Pendiente de cierre';
   const dif = datos.diferencia ?? 0;
   const difEl = document.getElementById('cuadre-diferencia');
-  difEl.textContent = fmt(dif);
-  difEl.className = 'resumen-valor ' + (dif === 0 ? '' : dif > 0 ? 'cuadre-positivo' : 'cuadre-negativo');
-  document.getElementById('cuadre-diferencia-label').textContent =
-    dif === 0 ? 'CUADRE EXACTO' : dif > 0 ? 'SOBRANTE' : 'FALTANTE';
+  if (tieneCierreDia) {
+    difEl.textContent = fmt(dif);
+    difEl.className = 'resumen-valor ' + (dif === 0 ? '' : dif > 0 ? 'cuadre-positivo' : 'cuadre-negativo');
+    document.getElementById('cuadre-diferencia-label').textContent =
+      dif === 0 ? 'CUADRE EXACTO' : dif > 0 ? 'SOBRANTE' : 'FALTANTE';
+  } else {
+    difEl.textContent = 'No disponible';
+    difEl.className = 'resumen-valor';
+    document.getElementById('cuadre-diferencia-label').textContent = 'CIERRE PENDIENTE';
+  }
 
   const acciones = document.getElementById('cuadre-acciones');
   const info = document.getElementById('cuadre-guardado-info');
@@ -3959,9 +3987,17 @@ function renderCuadre(datos) {
     info.classList.add('oculto');
   } else {
     acciones.classList.add('oculto');
-    info.textContent = datos.mensaje || 'Resumen parcial disponible. El guardado del cuadre se habilita cuando existan Caja y Contadores del día.';
-    info.classList.remove('oculto');
+    // Solo mostrar info genérica si no hay mensaje_error dedicado ya visible
+    const msgGenerico = !datos.mensaje_error
+      ? (datos.mensaje || 'Vista previa parcial. El guardado se habilita cuando existan Caja y Contadores del día sin inconsistencias.')
+      : '';
+    info.textContent = msgGenerico;
+    info.classList.toggle('oculto', !msgGenerico);
   }
+
+  // Limpiar avisos al entrar al modo guardado
+  document.getElementById('cuadre-aviso-acumulados').classList.toggle('oculto', !datos.mensaje_info);
+  document.getElementById('cuadre-aviso-inconsistencias').classList.toggle('oculto', !datos.mensaje_error);
 }
 
 function renderCuadreGuardado(datos, fecha, calculado = null) {

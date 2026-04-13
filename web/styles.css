@@ -1599,6 +1599,23 @@ body.auth-banner-open::before {
   font-weight: 600;
 }
 
+.cuadre-aviso {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.93rem;
+  line-height: 1.45;
+}
+.cuadre-aviso-info {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.cuadre-aviso-error {
+  background: #ffebee;
+  color: #c62828;
+  font-weight: 500;
+}
+
 .cuadre-negativo {
   color: #c62828;
   font-weight: 600;
