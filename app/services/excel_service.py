@@ -104,9 +104,9 @@ CONTADORES_HEADERS = [
 
 def _path_modulo(modulo: str, year: int) -> Path:
     """Devuelve la ruta del Excel según el módulo.
-    Cuadre va a Consolidado_{sede}_{año}.xlsx; el resto a Contadores_{sede}_{año}.xlsx.
+    Cuadre y Contadores van a Consolidado_{sede}_{año}.xlsx; el resto a Contadores_{sede}_{año}.xlsx.
     """
-    if modulo == "cuadre":
+    if modulo in {"cuadre", "contadores"}:
         return get_consolidado_path(year)
     return get_excel_path(year)
 
@@ -699,7 +699,7 @@ def obtener_ultima_fecha_modulo_global(modulo: str, years_back: int = 5):
 
 def obtener_datos_contadores_fecha(fecha: date, year: int) -> dict:
     """Devuelve {item_id: {...}} con los valores guardados para la fecha dada."""
-    path = get_excel_path(year)
+    path = get_consolidado_path(year)
     if not path.exists():
         return {}
     result = {}
@@ -737,7 +737,7 @@ def obtener_historial_contadores(hasta_fecha: date) -> list[dict]:
     lo use como referencia vigente.
     """
     eventos = []
-    for path in _obtener_paths_excel_sede():
+    for path in _obtener_paths_consolidado_sede():
         if not path.exists():
             continue
         with _abrir_workbook_lectura(path) as wb:
@@ -793,6 +793,18 @@ def _obtener_paths_excel_sede() -> list[Path]:
     patron = f"Contadores_{sede}_*.xlsx"
     paths = sorted(data_dir.glob(patron))
     actual = get_excel_path(date.today().year)
+    if actual not in paths:
+        paths.append(actual)
+    return paths
+
+
+def _obtener_paths_consolidado_sede() -> list[Path]:
+    settings = get_settings()
+    data_dir = Path(settings.get("data_dir") or ".")
+    sede = normalizar_sede_archivo(settings.get("sede"))
+    patron = f"Consolidado_{sede}_*.xlsx"
+    paths = sorted(data_dir.glob(patron))
+    actual = get_consolidado_path(date.today().year)
     if actual not in paths:
         paths.append(actual)
     return paths
