@@ -44,6 +44,7 @@ let loanItems = [];
 let loanSaldos = {};
 let movementItems = [];
 let cajaLocked = false;
+let _cerrando = false;
 let cajaDrafts = {};
 let contadorCatalog = [];
 let contadoresDrafts = {};
@@ -1864,7 +1865,7 @@ function actualizarPaneles() {
   actualizarBotonAbrirXlsx();
 }
 
-function sugerirFechaModulo(modulo) {
+function sugerirFechaModulo() {
   return hoyStr();
 }
 
@@ -3257,7 +3258,6 @@ async function guardarSedeForm() {
   }
   const practi_header = document.getElementById('admin-sede-form-practi-header').value.trim();
   const bet_header = document.getElementById('admin-sede-form-bet-header').value.trim();
-  const siteActual = id ? configRemoteSites.find(s => s.id === id) : null;
   const sitesActualizados = configRemoteSites.filter(s => s.id !== id);
   sitesActualizados.push({
     id: id || undefined,
@@ -3360,20 +3360,18 @@ function mostrarMensajeAdmin(texto, tipo) {
 
 async function cerrarAplicacion() {
   const modulosPendientes = obtenerModulosConCambiosSinGuardar();
-  if (modulosPendientes.length) {
-    const confirmarPendientes = window.confirm(
-      `Tienes datos sin guardar en ${modulosPendientes.join(' y ')}.\n\nSelecciona Aceptar para cerrar sin guardar o Cancelar para volver.`
-    );
-    if (!confirmarPendientes) return;
-  }
-  const confirmar = window.confirm('La capturadora se cerrará en este equipo. ¿Desea finalizar ahora?');
-  if (!confirmar) return;
+  const mensaje = modulosPendientes.length
+    ? `Tienes datos sin guardar en ${modulosPendientes.join(' y ')}.\n\n¿Cerrar sin guardar?`
+    : 'La capturadora se cerrará en este equipo. ¿Desea finalizar ahora?';
+  if (!window.confirm(mensaje)) return;
 
+  _cerrando = true;
   try {
     await fetch('/api/app/shutdown', { method: 'POST' });
     mostrarMensaje('La aplicación se está cerrando...', 'ok');
     setTimeout(() => window.close(), 300);
   } catch {
+    _cerrando = false;
     mostrarMensaje('No se pudo cerrar la aplicación desde la interfaz.', 'error');
   }
 }
@@ -3627,9 +3625,10 @@ async function init() {
     }
   });
   window.addEventListener('beforeunload', e => {
+    if (_cerrando) return;
     if (!obtenerModulosConCambiosSinGuardar().length) return;
     e.preventDefault();
-    e.returnValue = '';
+    e.returnValue = ''; // requerido por Chromium para mostrar el diálogo nativo
   });
   document.getElementById('panel-cuadre').addEventListener('click', e => {
     const header = e.target.closest('.cuadre-seccion-header[data-goto]');
@@ -3890,8 +3889,6 @@ function renderCuadre(datos) {
   // Período
   const periodo = datos.periodo || [];
   const diasAcum = datos.dias_acumulados || [];
-  const diasIncons = datos.dias_inconsistentes || [];
-
   let txtPeriodo;
   if (periodo.length > 1) {
     const extra = diasAcum.length
