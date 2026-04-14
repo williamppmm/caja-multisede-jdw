@@ -338,6 +338,65 @@ def _powershell_startupinfo():
     return startupinfo
 
 
+def abrir_xlsx_en_hoja(path: Path, nombre_hoja: str) -> dict:
+    if os.name != "nt":
+        return {"ok": False, "mensaje": "Abrir Excel desde la app solo está disponible en Windows."}
+    if not path.exists():
+        return {"ok": False, "mensaje": f"No se encontró el archivo {path.name}."}
+
+    powershell_exe = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+    path_ps = str(path).replace("'", "''")
+    hoja_ps = str(nombre_hoja or "").replace("'", "''")
+    script = f"""
+$ErrorActionPreference = 'Stop'
+$xl = $null
+$wb = $null
+try {{
+    $xl = New-Object -ComObject Excel.Application
+    $xl.Visible = $true
+    $xl.DisplayAlerts = $false
+    $wb = $xl.Workbooks.Open('{path_ps}')
+    $sheet = $wb.Worksheets.Item('{hoja_ps}')
+    $sheet.Activate() | Out-Null
+    if ($xl.ActiveWindow -ne $null) {{
+        $xl.ActiveWindow.ScrollRow = 1
+        $xl.ActiveWindow.ScrollColumn = 1
+    }}
+}} catch {{
+    Write-Error $_
+    exit 1
+}}
+"""
+    try:
+        process = subprocess.Popen(
+            [
+                powershell_exe,
+                "-NoProfile",
+                "-STA",
+                "-Command",
+                script,
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            startupinfo=_powershell_startupinfo(),
+        )
+        try:
+            _, stderr = process.communicate(timeout=2)
+            if process.returncode not in (0, None):
+                detalle = (stderr or "").strip()
+                if "Worksheets.Item" in detalle or "subscript out of range" in detalle.lower():
+                    return {"ok": False, "mensaje": f"No se encontró la hoja '{nombre_hoja}' en {path.name}."}
+                if "activex component" in detalle.lower() or "comobject" in detalle.lower():
+                    return {"ok": False, "mensaje": "No se pudo abrir Excel. Verifica que Microsoft Excel esté instalado."}
+                return {"ok": False, "mensaje": f"No se pudo abrir {path.name} en Excel."}
+        except subprocess.TimeoutExpired:
+            pass  # sigue corriendo = Excel está cargando, es el caso normal
+        return {"ok": True, "mensaje": f"Abriendo {path.name} en la hoja '{nombre_hoja}'.", "path": str(path), "sheet": nombre_hoja}
+    except Exception:
+        return {"ok": False, "mensaje": f"No se pudo abrir {path.name} en Excel."}
+
+
 def _select_excel_file_with_powershell(initial_dir: str | None = None) -> str | None:
     if os.name != "nt":
         return None

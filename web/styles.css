@@ -363,6 +363,10 @@ input[type="number"]::-webkit-outer-spin-button {
   margin-left: auto;
 }
 
+.btn-abrir-xlsx {
+  min-width: 122px;
+}
+
 .tabs-modulo {
   display: flex;
   gap: 10px;

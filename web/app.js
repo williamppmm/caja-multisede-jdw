@@ -1861,6 +1861,7 @@ function actualizarPaneles() {
   actualizarBonosVisuales();
   actualizarPrestamosVisuales();
   actualizarMovimientosVisuales();
+  actualizarBotonAbrirXlsx();
 }
 
 function sugerirFechaModulo(modulo) {
@@ -1884,6 +1885,57 @@ function aplicarFechaModulo(modulo, usarDefault = false) {
     setSharedModuleDate(sugerirFechaModulo(modulo));
   }
   document.getElementById('fecha').value = moduleDates[modulo];
+  actualizarBotonAbrirXlsx();
+}
+
+function obtenerFechaModuloActual() {
+  return document.getElementById('fecha')?.value || moduleDates[currentModule] || hoyStr();
+}
+
+function obtenerAnioModuloActual() {
+  const fecha = obtenerFechaModuloActual();
+  const match = String(fecha || '').match(/^(\d{4})-/);
+  return Number(match?.[1] || new Date().getFullYear());
+}
+
+function actualizarBotonAbrirXlsx() {
+  const btn = document.getElementById('btn-abrir-xlsx');
+  if (!btn) return;
+  const visible = esSuperAdminActivo() && Boolean(MODULE_META[currentModule]);
+  btn.classList.toggle('oculto', !visible);
+  if (!visible) return;
+  const anio = obtenerAnioModuloActual();
+  const sedeLibro = configActiveSite?.sede || configSede || 'Principal';
+  const usaConsolidado = currentModule === 'contadores' || currentModule === 'cuadre';
+  const libro = usaConsolidado
+    ? `Consolidado_${sedeLibro}_${anio}.xlsx`
+    : `Contadores_${sedeLibro}_${anio}.xlsx`;
+  btn.title = `Abrir ${libro} en la hoja de ${MODULE_META[currentModule].label}`;
+}
+
+async function abrirXlsxModuloActual() {
+  if (!esSuperAdminActivo()) {
+    mostrarMensaje('Esta acción solo está disponible en super admin.', 'advertencia');
+    return;
+  }
+  try {
+    const res = await fetch('/api/settings/open-module-xlsx', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        modulo: currentModule,
+        year: obtenerAnioModuloActual(),
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      mostrarMensaje(data.mensaje || 'No se pudo abrir el Excel del módulo.', 'error');
+      return;
+    }
+    mostrarMensaje(data.mensaje || 'Abriendo Excel...', 'ok');
+  } catch {
+    mostrarMensaje('No se pudo abrir el Excel del módulo.', 'error');
+  }
 }
 
 function resetOverride(modulo) {
@@ -3119,6 +3171,7 @@ async function cambiarSedeActiva(siteId) {
     configActiveSite = data.active_site;
     const pathEl = document.getElementById('super-admin-sede-path');
     if (pathEl) pathEl.textContent = configActiveSite ? configActiveSite.data_dir : '';
+    actualizarBotonAbrirXlsx();
     // Limpiar borradores para que no se inyecten datos de la sede anterior
     cajaDrafts = {};
     contadoresDrafts = {};
@@ -3482,6 +3535,7 @@ async function init() {
   document.getElementById('btn-limpiar').addEventListener('click', limpiarModuloActual);
   document.getElementById('btn-ultima').addEventListener('click', ultimoRegistro);
   document.getElementById('btn-finalizar').addEventListener('click', cerrarAplicacion);
+  document.getElementById('btn-abrir-xlsx').addEventListener('click', abrirXlsxModuloActual);
   document.getElementById('btn-fecha-anterior')?.addEventListener('click', () => cambiarFechaPorDelta(-1));
   document.getElementById('btn-fecha-siguiente')?.addEventListener('click', () => cambiarFechaPorDelta(1));
   document.getElementById('btn-cancelar-edicion').addEventListener('click', async () => {

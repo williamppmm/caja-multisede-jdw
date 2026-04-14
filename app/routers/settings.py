@@ -1,6 +1,7 @@
 import os
 import threading
 import time
+from datetime import date
 
 from fastapi import APIRouter
 
@@ -108,6 +109,22 @@ def browse_directory():
     if not selected:
         return {"ok": False, "cancelled": True}
     return {"ok": True, "data_dir": selected}
+
+
+@router.post("/api/settings/open-module-xlsx")
+def open_module_xlsx(body: dict):
+    modulo = str(body.get("modulo", "caja") or "caja").strip().lower()
+    try:
+        year = int(body.get("year") or date.today().year)
+    except Exception:
+        year = date.today().year
+
+    if modulo not in excel_service.SECTION_PREFIXES:
+        return {"ok": False, "mensaje": "Módulo no válido."}
+
+    path = excel_service._path_modulo(modulo, year)
+    hoja = excel_service._obtener_nombre_hoja_seccion(modulo)
+    return settings_service.abrir_xlsx_en_hoja(path, hoja)
 
 
 @router.post("/api/app/heartbeat")
