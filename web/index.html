@@ -597,6 +597,123 @@
       </div>
     </section>
 
+    <section id="panel-resumen" class="modulo-panel oculto">
+      <div class="cuadre-grid">
+        <div class="card cuadre-periodo-card modulo-span-2">
+          <span id="resumen-periodo-texto" class="cuadre-periodo-texto"></span>
+        </div>
+        <p id="resumen-aviso-acumulados" class="cuadre-aviso cuadre-aviso-info oculto modulo-span-2"></p>
+
+        <section class="card">
+          <div class="cuadre-seccion-header">
+            <h2>Plataformas</h2>
+            <span id="resumen-plataformas-total" class="cuadre-total-badge"></span>
+          </div>
+          <div class="resumen-grid resumen-grid-simple">
+            <div class="resumen-item">
+              <span class="resumen-label">Practisistemas</span>
+              <span id="resumen-plataformas-practi" class="resumen-valor"></span>
+            </div>
+            <div class="resumen-item">
+              <span class="resumen-label">Deportivas</span>
+              <span id="resumen-plataformas-deport" class="resumen-valor"></span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="cuadre-seccion-header">
+            <h2>Bonos <span class="cuadre-seccion-sub">(top 5 clientes)</span></h2>
+            <span id="resumen-bonos-total" class="cuadre-total-badge cuadre-badge-negativo"></span>
+          </div>
+          <div class="bonos-listado-wrap">
+            <table class="bonos-tabla">
+              <thead><tr><th>Cliente</th><th>Total bonos</th></tr></thead>
+              <tbody id="resumen-bonos-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="cuadre-seccion-header">
+            <h2>Gastos</h2>
+            <span id="resumen-gastos-total" class="cuadre-total-badge cuadre-badge-negativo"></span>
+          </div>
+          <div class="bonos-listado-wrap">
+            <table class="bonos-tabla">
+              <thead><tr><th>Concepto</th><th>Valor</th></tr></thead>
+              <tbody id="resumen-gastos-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="cuadre-seccion-header">
+            <h2>Préstamos</h2>
+            <span id="resumen-prestamos-total" class="cuadre-total-badge"></span>
+          </div>
+          <div class="resumen-grid resumen-grid-simple">
+            <div class="resumen-item">
+              <span class="resumen-label">Salidas (prestado)</span>
+              <span id="resumen-prestamos-salida" class="resumen-valor"></span>
+            </div>
+            <div class="resumen-item">
+              <span class="resumen-label">Entradas (pagos recibidos)</span>
+              <span id="resumen-prestamos-entrada" class="resumen-valor"></span>
+            </div>
+          </div>
+          <div id="resumen-prestamos-detalle-wrap" class="oculto">
+            <div class="bonos-listado-wrap" style="margin-top:12px">
+              <table class="bonos-tabla">
+                <thead><tr><th>Persona</th><th>Prestado</th><th>Pagado</th><th>Neto</th></tr></thead>
+                <tbody id="resumen-prestamos-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="cuadre-seccion-header">
+            <h2>Movimientos</h2>
+            <span id="resumen-mov-total" class="cuadre-total-badge"></span>
+          </div>
+          <div class="resumen-grid resumen-grid-simple resumen-movimientos">
+            <div class="resumen-item">
+              <span class="resumen-label">Ingresos</span>
+              <span id="resumen-mov-ingresos" class="resumen-valor"></span>
+            </div>
+            <div class="resumen-item">
+              <span class="resumen-label">Salidas</span>
+              <span id="resumen-mov-salidas" class="resumen-valor"></span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card modulo-span-2">
+          <div class="cuadre-seccion-header">
+            <h2>Caja física</h2>
+            <span id="resumen-caja-total-badge" class="cuadre-total-badge"></span>
+          </div>
+          <div class="bonos-listado-wrap">
+            <table class="bonos-tabla">
+              <thead><tr><th>Denominación</th><th>Total</th></tr></thead>
+              <tbody id="resumen-caja-body"></tbody>
+            </table>
+          </div>
+          <div class="resumen-grid resumen-grid-simple cuadre-caja-extras">
+            <div class="resumen-item">
+              <span class="resumen-label">Monedas</span>
+              <span id="resumen-caja-monedas" class="resumen-valor"></span>
+            </div>
+            <div class="resumen-item">
+              <span class="resumen-label">Billetes viejos</span>
+              <span id="resumen-caja-viejos" class="resumen-valor"></span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
     <section class="card card-acciones">
       <button id="btn-guardar" class="btn btn-primary">Guardar</button>
       <button id="btn-limpiar" class="btn btn-secondary">Limpiar</button>
@@ -647,6 +764,7 @@
               <label><input type="checkbox" name="enabled_modules" value="movimientos" /> Movimientos</label>
               <label><input type="checkbox" name="enabled_modules" value="contadores" /> Contadores</label>
               <label><input type="checkbox" name="enabled_modules" value="cuadre" /> Cuadre</label>
+              <label><input type="checkbox" name="enabled_modules" value="resumen" /> Resumen</label>
             </div>
           </div>
           <div class="campo-config">

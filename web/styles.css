@@ -1785,7 +1785,8 @@ body.auth-banner-open::before {
   padding: 10px 12px;
 }
 
-#panel-cuadre .card {
+#panel-cuadre .card,
+#panel-resumen .card {
   padding: 16px 18px;
   margin-bottom: 12px;
 }
@@ -1793,20 +1794,24 @@ body.auth-banner-open::before {
 #panel-cuadre .cuadre-periodo-card,
 #panel-cuadre .cuadre-base-row,
 #panel-cuadre .cuadre-balance-card,
-#panel-cuadre .cuadre-resumen-guardado {
+#panel-cuadre .cuadre-resumen-guardado,
+#panel-resumen .cuadre-periodo-card {
   padding-top: 14px;
   padding-bottom: 14px;
 }
 
-#panel-cuadre .cuadre-seccion-header {
+#panel-cuadre .cuadre-seccion-header,
+#panel-resumen .cuadre-seccion-header {
   margin-bottom: 8px;
 }
 
-#panel-cuadre .cuadre-seccion-sub {
+#panel-cuadre .cuadre-seccion-sub,
+#panel-resumen .cuadre-seccion-sub {
   margin-bottom: 8px;
 }
 
-#panel-cuadre .bonos-listado-wrap {
+#panel-cuadre .bonos-listado-wrap,
+#panel-resumen .bonos-listado-wrap {
   margin-top: 6px;
 }
 

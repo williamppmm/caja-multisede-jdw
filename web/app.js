@@ -11,6 +11,7 @@ const MODULE_META = {
   movimientos: { label: 'Movimientos', panelId: 'panel-movimientos', dateLabel: 'Fecha de movimientos' },
   contadores: { label: 'Contadores', panelId: 'panel-contadores', dateLabel: 'Fecha de contadores' },
   cuadre: { label: 'Cuadre', panelId: 'panel-cuadre', dateLabel: 'Fecha del cuadre' },
+  resumen: { label: 'Resumen', panelId: 'panel-resumen', dateLabel: 'Fecha del resumen' },
 };
 
 let configModoEntrada = 'cantidad';
@@ -21,7 +22,7 @@ let defaultModule = 'caja';
 let currentModule = 'caja';
 const cajaInputSessionToken = `caja_${Date.now().toString(36)}`;
 let moduleDates = {};
-let adminOverride = { caja: null, plataformas: null, gastos: null, bonos: null, prestamos: null, movimientos: null, contadores: null, cuadre: null };
+let adminOverride = { caja: null, plataformas: null, gastos: null, bonos: null, prestamos: null, movimientos: null, contadores: null, cuadre: null, resumen: null };
 let cuadreDatos = null;
 let debounceTimer = null;
 let pendingAdminAction = null;
@@ -1765,7 +1766,7 @@ function actualizarPaneles() {
     document.getElementById(meta.panelId).classList.toggle('oculto', modulo !== currentModule);
   });
   document.getElementById('fecha-label').textContent = MODULE_META[currentModule].dateLabel;
-  document.getElementById('btn-guardar').classList.toggle('oculto', ['bonos', 'gastos', 'prestamos', 'movimientos', 'cuadre'].includes(currentModule));
+  document.getElementById('btn-guardar').classList.toggle('oculto', ['bonos', 'gastos', 'prestamos', 'movimientos', 'cuadre', 'resumen'].includes(currentModule));
   document.getElementById('btn-guardar').textContent = 'Guardar';
   actualizarBonosVisuales();
   actualizarPrestamosVisuales();
@@ -1871,6 +1872,14 @@ async function verificarFechaActual() {
     estado.className = 'fecha-estado futura';
     btnGuardar.disabled = true;
     guardarEstadoModulo(currentModule, fecha, { existe: false, futura: true });
+    return;
+  }
+
+  if (currentModule === 'resumen') {
+    estado.textContent = 'Resumen listo para revisar.';
+    estado.className = 'fecha-estado libre';
+    btnGuardar.disabled = true;
+    guardarEstadoModulo(currentModule, fecha, { existe: true });
     return;
   }
 
@@ -2113,6 +2122,46 @@ async function cargarDatosContadores(fecha) {
   }
 }
 
+function limpiarResumen() {
+  document.getElementById('resumen-periodo-texto').textContent = 'Sin datos para la fecha seleccionada.';
+  const aviso = document.getElementById('resumen-aviso-acumulados');
+  aviso.textContent = '';
+  aviso.classList.add('oculto');
+  document.getElementById('resumen-plataformas-practi').textContent = fmt(0);
+  document.getElementById('resumen-plataformas-deport').textContent = fmt(0);
+  document.getElementById('resumen-plataformas-total').textContent = fmt(0);
+  document.getElementById('resumen-bonos-total').textContent = fmt(0);
+  document.getElementById('resumen-gastos-total').textContent = fmt(0);
+  document.getElementById('resumen-prestamos-total').textContent = fmt(0);
+  document.getElementById('resumen-prestamos-salida').textContent = fmt(0);
+  document.getElementById('resumen-prestamos-entrada').textContent = fmt(0);
+  document.getElementById('resumen-mov-total').textContent = fmt(0);
+  document.getElementById('resumen-mov-ingresos').textContent = fmt(0);
+  document.getElementById('resumen-mov-salidas').textContent = fmt(0);
+  document.getElementById('resumen-caja-total-badge').textContent = fmt(0);
+  document.getElementById('resumen-caja-monedas').textContent = fmt(0);
+  document.getElementById('resumen-caja-viejos').textContent = fmt(0);
+  document.getElementById('resumen-bonos-body').innerHTML = '<tr><td colspan="2" class="bonos-vacio">Sin bonos en el período.</td></tr>';
+  document.getElementById('resumen-gastos-body').innerHTML = '<tr><td colspan="2" class="bonos-vacio">Sin gastos en el período.</td></tr>';
+  document.getElementById('resumen-prestamos-body').innerHTML = '';
+  document.getElementById('resumen-prestamos-detalle-wrap').classList.add('oculto');
+  document.getElementById('resumen-caja-body').innerHTML = '<tr><td colspan="2" class="bonos-vacio">Sin caja registrada.</td></tr>';
+}
+
+async function cargarDatosResumen(fecha) {
+  try {
+    const res = await fetch(`/api/modulos/resumen/calcular/${fecha}`);
+    if (!res.ok) {
+      limpiarResumen();
+      return;
+    }
+    const data = await res.json();
+    renderResumen(data);
+  } catch {
+    limpiarResumen();
+  }
+}
+
 async function cargarVistaModulo(modulo, fecha) {
   if (!fecha) return;
   if (modulo === 'caja') {
@@ -2121,6 +2170,10 @@ async function cargarVistaModulo(modulo, fecha) {
   }
   if (modulo === 'plataformas') {
     await cargarDatosPlataformas(fecha);
+    return;
+  }
+  if (modulo === 'resumen') {
+    await cargarDatosResumen(fecha);
     return;
   }
   if (modulo === 'cuadre') {
@@ -3597,6 +3650,113 @@ async function cargarDatosCuadre(fecha) {
     document.getElementById('cuadre-bloqueado-msg').textContent = 'Error al cargar los datos del cuadre.';
     bloqueado.classList.remove('oculto');
   }
+}
+
+function renderResumen(datos) {
+  const periodo = datos.periodo || [];
+  const diasAcum = datos.dias_acumulados || [];
+
+  let txtPeriodo;
+  if (periodo.length > 1) {
+    const extra = diasAcum.length
+      ? ` — incluye ${diasAcum.length} día${diasAcum.length > 1 ? 's' : ''} acumulado${diasAcum.length > 1 ? 's' : ''}`
+      : '';
+    txtPeriodo = `Período: ${formatFechaVisual(periodo[0])} → ${formatFechaVisual(periodo[periodo.length - 1])} (${periodo.length} días${extra})`;
+  } else if (periodo.length === 1) {
+    txtPeriodo = `Fecha: ${formatFechaVisual(periodo[0])}`;
+  } else {
+    txtPeriodo = 'Sin días en el período';
+  }
+  document.getElementById('resumen-periodo-texto').textContent = txtPeriodo;
+
+  const aviso = document.getElementById('resumen-aviso-acumulados');
+  aviso.textContent = datos.mensaje_info || '';
+  aviso.classList.toggle('oculto', !datos.mensaje_info);
+
+  // Plataformas
+  document.getElementById('resumen-plataformas-practi').textContent = fmt(datos.plataformas?.total_practisistemas ?? 0);
+  const resumenPlatDeport = document.getElementById('resumen-plataformas-deport');
+  const totalDeportivas = datos.plataformas?.total_deportivas ?? 0;
+  resumenPlatDeport.textContent = fmt(totalDeportivas);
+  resumenPlatDeport.className = 'resumen-valor' + (totalDeportivas < 0 ? ' cuadre-negativo' : '');
+  document.getElementById('resumen-plataformas-total').textContent = fmt(datos.plataformas?.total ?? 0);
+
+  // Bonos
+  const bonosBody = document.getElementById('resumen-bonos-body');
+  bonosBody.innerHTML = '';
+  const top5 = datos.bonos?.top5 || [];
+  top5.forEach(b => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${b.cliente}</td><td>${fmt(b.total)}</td>`;
+    bonosBody.appendChild(tr);
+  });
+  if (!top5.length) {
+    bonosBody.innerHTML = '<tr><td colspan="2" class="bonos-vacio">Sin bonos en el período.</td></tr>';
+  }
+  document.getElementById('resumen-bonos-total').textContent = fmt(datos.bonos?.total ?? 0);
+
+  // Gastos
+  const gastosBody = document.getElementById('resumen-gastos-body');
+  gastosBody.innerHTML = '';
+  const gastos = datos.gastos?.items || [];
+  gastos.forEach(g => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${g.concepto}</td><td>${fmt(g.valor)}</td>`;
+    gastosBody.appendChild(tr);
+  });
+  if (!gastos.length) {
+    gastosBody.innerHTML = '<tr><td colspan="2" class="bonos-vacio">Sin gastos en el período.</td></tr>';
+  }
+  document.getElementById('resumen-gastos-total').textContent = fmt(datos.gastos?.total ?? 0);
+
+  // Préstamos
+  document.getElementById('resumen-prestamos-salida').textContent = fmt(datos.prestamos?.total_salida ?? 0);
+  document.getElementById('resumen-prestamos-entrada').textContent = fmt(datos.prestamos?.total_entrada ?? 0);
+  const netoPrest = datos.prestamos?.neto ?? 0;
+  const netoPrestBadge = document.getElementById('resumen-prestamos-total');
+  netoPrestBadge.textContent = fmt(netoPrest);
+  netoPrestBadge.className = 'cuadre-total-badge' + (netoPrest < 0 ? ' cuadre-badge-negativo' : '');
+  const resumenPrest = datos.prestamos?.resumen || [];
+  const prestBody = document.getElementById('resumen-prestamos-body');
+  const prestDetWrap = document.getElementById('resumen-prestamos-detalle-wrap');
+  prestBody.innerHTML = '';
+  if (resumenPrest.length) {
+    resumenPrest.forEach(p => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${p.persona}</td><td>${fmt(p.prestamos)}</td><td>${fmt(p.pagos)}</td><td>${fmt(p.neto)}</td>`;
+      prestBody.appendChild(tr);
+    });
+    prestDetWrap.classList.remove('oculto');
+  } else {
+    prestDetWrap.classList.add('oculto');
+  }
+
+  // Movimientos
+  document.getElementById('resumen-mov-ingresos').textContent = fmt(datos.movimientos?.total_ingresos ?? 0);
+  document.getElementById('resumen-mov-salidas').textContent = fmt(datos.movimientos?.total_salidas ?? 0);
+  const netoMov = (datos.movimientos?.neto ?? 0);
+  const netoMovBadge = document.getElementById('resumen-mov-total');
+  netoMovBadge.textContent = fmt(netoMov);
+  netoMovBadge.className = 'cuadre-total-badge' + (netoMov < 0 ? ' cuadre-badge-negativo' : '');
+
+  // Caja física
+  const desg = datos.caja_desglose || {};
+  const cajaBody = document.getElementById('resumen-caja-body');
+  cajaBody.innerHTML = '';
+  const billetes = desg.billetes || {};
+  [100000, 50000, 20000, 10000, 5000, 2000].forEach(d => {
+    const b = billetes[String(d)];
+    if (!b || b.subtotal === 0) return;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>$ ${d.toLocaleString('es-CO')}</td><td>${fmt(b.subtotal)}</td>`;
+    cajaBody.appendChild(tr);
+  });
+  if (!cajaBody.children.length) {
+    cajaBody.innerHTML = '<tr><td colspan="2" class="bonos-vacio">Sin caja registrada.</td></tr>';
+  }
+  document.getElementById('resumen-caja-monedas').textContent = fmt(desg.total_monedas ?? 0);
+  document.getElementById('resumen-caja-viejos').textContent = fmt(desg.billetes_viejos ?? 0);
+  document.getElementById('resumen-caja-total-badge').textContent = fmt(datos.caja_fisica ?? 0);
 }
 
 function renderCuadre(datos) {

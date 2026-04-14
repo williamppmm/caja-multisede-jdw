@@ -18,7 +18,7 @@ from app.models.caja_models import (
 )
 from app.models.contadores_models import ContadoresEntrada, ContadoresRespuesta
 from app.models.cuadre_models import CuadreEntrada, CuadreRespuesta
-from app.services import bonos_service, caja_service, contadores_service, cuadre_service, excel_service, gastos_service, movimientos_service, nombres_service, prestamos_service, settings_service
+from app.services import bonos_service, caja_service, contadores_service, cuadre_service, excel_service, gastos_service, movimientos_service, nombres_service, prestamos_service, resumen_service, settings_service
 
 router = APIRouter(prefix="/api/modulos")
 
@@ -135,6 +135,17 @@ def calcular_cuadre_fecha(fecha: str):
     preconds = cuadre_service.verificar_precondiciones(d)
     base = preconds["base_anterior"] if preconds["tiene_base_anterior"] else 0.0
     datos = cuadre_service.calcular_cuadre(d, base)
+    return {"ok": True, **preconds, **datos}
+
+
+@router.get("/resumen/calcular/{fecha}")
+def calcular_resumen_fecha(fecha: str):
+    try:
+        d = date.fromisoformat(fecha)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+    preconds = resumen_service.resolver_periodo_resumen(d)
+    datos = resumen_service.calcular_resumen(d)
     return {"ok": True, **preconds, **datos}
 
 
