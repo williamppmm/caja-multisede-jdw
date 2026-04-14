@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -6,7 +8,16 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.runtime_paths import get_web_dir
 from app.routers import modules, settings as settings_router
 
-app = FastAPI(title="ContabilidadJDW")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from app.services import backup_service, settings_service
+    if settings_service.is_super_admin_build():
+        backup_service.programar_backup()
+    yield
+
+
+app = FastAPI(title="ContabilidadJDW", lifespan=lifespan)
 
 WEB_DIR = get_web_dir()
 app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")

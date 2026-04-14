@@ -55,6 +55,13 @@ def get_settings():
 @router.post("/api/settings")
 def post_settings(body: dict):
     settings_service.save_settings(body)
+    # Si backup quedó habilitado con carpeta configurada, disparar un intento inmediato
+    # en background para no esperar la siguiente pasada del loop (hasta 4 h).
+    if settings_service.is_super_admin_build():
+        s = settings_service.get_settings()
+        if s.get("backup_enabled") and s.get("backup_root"):
+            from app.services import backup_service
+            threading.Thread(target=backup_service._run_con_lock, daemon=True).start()
     return {"ok": True, "active_site": settings_service.get_active_site()}
 
 
@@ -125,6 +132,40 @@ def open_module_xlsx(body: dict):
     path = excel_service._path_modulo(modulo, year)
     hoja = excel_service._obtener_nombre_hoja_seccion(modulo)
     return settings_service.abrir_xlsx_en_hoja(path, hoja)
+
+
+# ── Respaldos automáticos (solo super admin) ─────────────────────────────────
+
+@router.get("/api/backup/status")
+def backup_status():
+    from app.services import backup_service
+    s = settings_service.get_settings()
+    backup_root = str(s.get("backup_root") or "").strip()
+    if not backup_root:
+        return {"ok": True, "log": [], "backup_root": ""}
+    return {
+        "ok": True,
+        "backup_root": backup_root,
+        "log": backup_service.leer_ultimo_log(backup_root),
+    }
+
+
+@router.post("/api/backup/run-now")
+def backup_run_now():
+    from app.services import backup_service
+    if not settings_service.is_super_admin_build():
+        return {"ok": False, "mensaje": "Solo disponible en super admin."}
+    resultados = backup_service.ejecutar_backup()
+    if not resultados:
+        return {"ok": False, "mensaje": "Backup no ejecutado. Verifica que esté habilitado y tenga carpeta destino configurada."}
+    validos = sum(1 for r in resultados if r.get("valido"))
+    return {"ok": True, "resultados": resultados, "resumen": f"{validos}/{len(resultados)} sedes respaldadas correctamente."}
+
+
+@router.post("/api/backup/validate-root")
+def backup_validate_root(body: dict):
+    from app.services import backup_service
+    return backup_service.validar_backup_root(str(body.get("ruta", "")))
 
 
 @router.post("/api/app/heartbeat")

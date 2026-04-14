@@ -28,6 +28,9 @@ _DEFAULTS = {
     "plataformas_ref_practi_path": "",
     "plataformas_ref_bet_path": "",
     "plataformas_ref": {"practi_header": "", "bet_header": ""},
+    # Respaldos automáticos (solo super admin)
+    "backup_enabled": False,
+    "backup_root": "",
 }
 
 _settings_cache: dict | None = None
@@ -112,6 +115,8 @@ def _resolver_settings() -> dict:
     data["plataformas_ref_practi_path"] = str(data.get("plataformas_ref_practi_path") or "").strip()
     data["plataformas_ref_bet_path"] = str(data.get("plataformas_ref_bet_path") or "").strip()
     data["plataformas_ref"] = _normalizar_plataformas_ref(data.get("plataformas_ref"))
+    data["backup_enabled"] = bool(data.get("backup_enabled", False))
+    data["backup_root"] = _normalizar_data_dir(data.get("backup_root")) if data.get("backup_root") else ""
     # El build dedicado siempre opera en super admin, independiente de lo que diga settings.json
     if is_super_admin_build():
         data["super_admin_mode"] = True
@@ -151,7 +156,8 @@ def _invalidar_cache() -> None:
 def save_settings(data: dict) -> None:
     allowed = {"modo_entrada", "sede", "data_dir", "enabled_modules", "default_module",
                "super_admin_mode", "remote_sites", "active_site_id",
-               "plataformas_ref_practi_path", "plataformas_ref_bet_path", "plataformas_ref"}
+               "plataformas_ref_practi_path", "plataformas_ref_bet_path", "plataformas_ref",
+               "backup_enabled", "backup_root"}
     cleaned = {k: v for k, v in data.items() if k in allowed}
     if "sede" in cleaned:
         cleaned["sede"] = str(cleaned["sede"]).strip()
@@ -169,6 +175,10 @@ def save_settings(data: dict) -> None:
         cleaned["plataformas_ref_bet_path"] = str(cleaned["plataformas_ref_bet_path"] or "").strip()
     if "plataformas_ref" in cleaned:
         cleaned["plataformas_ref"] = _normalizar_plataformas_ref(cleaned["plataformas_ref"])
+    if "backup_enabled" in cleaned:
+        cleaned["backup_enabled"] = bool(cleaned["backup_enabled"])
+    if "backup_root" in cleaned:
+        cleaned["backup_root"] = _normalizar_data_dir(cleaned["backup_root"]) if cleaned.get("backup_root") else ""
     enabled_modules = _normalizar_modulos(cleaned.get("enabled_modules"))
     cleaned["enabled_modules"] = enabled_modules
     cleaned["default_module"] = _normalizar_modulo_default(cleaned.get("default_module"), enabled_modules)

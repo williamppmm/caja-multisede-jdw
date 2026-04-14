@@ -2969,6 +2969,9 @@ async function ingresarAdmin() {
     toggleSedesPanel(!!settings.super_admin_mode);
     document.getElementById('admin-practi-path').value = settings.plataformas_ref_practi_path || '';
     document.getElementById('admin-bet-path').value = settings.plataformas_ref_bet_path || '';
+    document.getElementById('admin-backup-enabled').checked = !!settings.backup_enabled;
+    document.getElementById('admin-backup-root').value = settings.backup_root || '';
+    toggleBackupRootCampo(!!settings.backup_enabled);
   } catch { /* defaults */ }
 
   // En el build dedicado: ocultar secciones irrelevantes y el toggle de activación
@@ -2977,6 +2980,8 @@ async function ingresarAdmin() {
   document.getElementById('admin-section-startup').classList.toggle('oculto', configSuperAdminMode);
   document.getElementById('admin-super-admin-toggle').classList.toggle('oculto', esBuildSA);
   document.getElementById('admin-section-plataformas-ref').classList.toggle('oculto', !configSuperAdminMode);
+  document.getElementById('admin-section-backup').classList.toggle('oculto', !configSuperAdminMode);
+  if (configSuperAdminMode) cargarBackupStatus();
   // Módulos habilitados no aplica en build SA (siempre todos); catálogos locales tampoco
   document.getElementById('admin-enabled-modules').classList.toggle('oculto', esBuildSA);
   ['admin-cat-bonos', 'admin-cat-gastos', 'admin-cat-prestamos', 'admin-cat-movimientos', 'admin-cat-contadores']
@@ -3010,6 +3015,8 @@ async function guardarAdmin() {
     super_admin_mode: document.getElementById('admin-super-admin-mode')?.checked || false,
     plataformas_ref_practi_path: document.getElementById('admin-practi-path').value.trim(),
     plataformas_ref_bet_path: document.getElementById('admin-bet-path').value.trim(),
+    backup_enabled: document.getElementById('admin-backup-enabled')?.checked || false,
+    backup_root: document.getElementById('admin-backup-root')?.value.trim() || '',
   };
 
   try {
@@ -3189,6 +3196,68 @@ async function cambiarSedeActiva(siteId) {
 function toggleSedesPanel(visible) {
   const panel = document.getElementById('admin-sedes-panel');
   if (panel) panel.classList.toggle('oculto', !visible);
+}
+
+function toggleBackupRootCampo(visible) {
+  document.getElementById('admin-backup-root-campo')?.classList.toggle('oculto', !visible);
+}
+
+async function validarRutaBackup() {
+  const ruta = document.getElementById('admin-backup-root').value.trim();
+  const msg = document.getElementById('admin-backup-validate-msg');
+  msg.classList.remove('oculto');
+  msg.textContent = 'Verificando…';
+  try {
+    const res = await fetch('/api/backup/validate-root', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ruta }),
+    });
+    const data = await res.json();
+    msg.textContent = data.mensaje || (data.ok ? 'Carpeta válida.' : 'Error al verificar.');
+    msg.className = `modal-desc ${data.ok ? '' : 'config-msg error'}`;
+    msg.classList.remove('oculto');
+  } catch {
+    msg.textContent = 'No se pudo verificar la carpeta.';
+    msg.classList.remove('oculto');
+  }
+}
+
+async function ejecutarBackupAhora() {
+  const btn = document.getElementById('btn-admin-backup-now');
+  btn.disabled = true;
+  btn.textContent = 'Respaldando…';
+  try {
+    const res = await fetch('/api/backup/run-now', { method: 'POST' });
+    const data = await res.json();
+    mostrarMensajeAdmin(data.resumen || data.mensaje || 'Respaldo completado.', data.ok ? 'ok' : 'error');
+    if (data.ok) cargarBackupStatus();
+  } catch {
+    mostrarMensajeAdmin('No se pudo ejecutar el respaldo.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Respaldar ahora';
+  }
+}
+
+async function cargarBackupStatus() {
+  try {
+    const res = await fetch('/api/backup/status');
+    const data = await res.json();
+    const contenedor = document.getElementById('admin-backup-status');
+    const log = document.getElementById('admin-backup-log');
+    if (!data.log?.length) {
+      contenedor.classList.add('oculto');
+      return;
+    }
+    contenedor.classList.remove('oculto');
+    const ultima = data.log[0];
+    log.innerHTML = (ultima.resultados || []).map(r => {
+      const icono = r.omitido ? '⊙' : r.valido ? '✓' : '✗';
+      const clase = r.valido ? 'backup-ok' : 'backup-fallo';
+      return `<span class="backup-sede-estado ${clase}">${icono} ${r.sede}: ${r.mensaje}</span>`;
+    }).join('');
+  } catch { /* no mostrar error */ }
 }
 
 async function cargarSedesAdmin() {
@@ -3565,6 +3634,14 @@ async function init() {
 
   // Super admin — sedes remotas
   document.getElementById('admin-super-admin-mode').addEventListener('change', e => toggleSedesPanel(e.target.checked));
+  document.getElementById('admin-backup-enabled').addEventListener('change', e => toggleBackupRootCampo(e.target.checked));
+  document.getElementById('btn-admin-backup-browse').addEventListener('click', async () => {
+    const res = await fetch('/api/settings/browse-directory', { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) document.getElementById('admin-backup-root').value = data.data_dir;
+  });
+  document.getElementById('btn-admin-backup-validate').addEventListener('click', validarRutaBackup);
+  document.getElementById('btn-admin-backup-now').addEventListener('click', ejecutarBackupAhora);
   document.getElementById('btn-admin-sedes-add').addEventListener('click', () => abrirFormularioSede());
   document.getElementById('btn-admin-sede-form-save').addEventListener('click', guardarSedeForm);
   document.getElementById('btn-admin-sede-form-cancel').addEventListener('click', cerrarFormularioSede);

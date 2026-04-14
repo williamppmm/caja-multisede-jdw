@@ -838,6 +838,28 @@
             </div>
           </div>
         </section>
+        <section class="admin-section admin-section-super-admin" id="admin-section-backup">
+          <h4 class="admin-section-title admin-section-title-super">Respaldos automáticos</h4>
+          <div class="campo-config">
+            <label><input type="checkbox" id="admin-backup-enabled" /> Activar respaldo automático</label>
+            <p class="modal-desc">Se ejecuta 10 minutos después del arranque, una vez al día por sede. Respalda <em>Contadores</em>, <em>Consolidado</em>, <em>contadores_items.json</em> y <em>startup_state.json</em>.</p>
+          </div>
+          <div class="campo-config" id="admin-backup-root-campo">
+            <span class="campo-config-label">Carpeta de respaldos</span>
+            <input type="text" id="admin-backup-root" placeholder="Ej: C:\Respaldos_Cajas" />
+            <div class="acciones-modal acciones-modal-config">
+              <button type="button" id="btn-admin-backup-browse" class="btn btn-secondary">Elegir carpeta</button>
+              <button type="button" id="btn-admin-backup-validate" class="btn btn-secondary">Verificar acceso</button>
+              <button type="button" id="btn-admin-backup-now" class="btn btn-secondary">Respaldar ahora</button>
+            </div>
+            <p id="admin-backup-validate-msg" class="modal-desc oculto"></p>
+          </div>
+          <div id="admin-backup-status" class="oculto">
+            <span class="campo-config-label">Último respaldo</span>
+            <div id="admin-backup-log"></div>
+          </div>
+        </section>
+
         <p id="admin-config-msg" class="config-msg oculto"></p>
         <div class="acciones-modal">
           <button id="btn-admin-guardar" class="btn btn-primary">Guardar</button>
