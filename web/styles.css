@@ -1524,16 +1524,6 @@ body.auth-banner-open::before {
   font-weight: 600;
 }
 
-.cuadre-caja-extras {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-}
-
-.cuadre-caja-extras .resumen-item {
-  flex: 1 1 160px;
-}
 
 .cuadre-balance-card {
   background: #f0f4ff;
@@ -1609,7 +1599,6 @@ body.auth-banner-open::before {
 }
 
 @media (max-width: 600px) {
-  .cuadre-caja-extras { flex-direction: column; }
 }
 
 /* ── Admin grids (catálogo y referencias) ─────────────────────── */
@@ -1813,6 +1802,80 @@ body.auth-banner-open::before {
 #panel-cuadre .bonos-listado-wrap,
 #panel-resumen .bonos-listado-wrap {
   margin-top: 6px;
+}
+
+/* ── Cuadre y Resumen: compactación 3 columnas ────────────────── */
+
+#panel-cuadre .card,
+#panel-resumen .card {
+  padding: 10px 12px;
+}
+
+#panel-cuadre .cuadre-periodo-card,
+#panel-resumen .cuadre-periodo-card {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+#panel-cuadre .cuadre-seccion-header,
+#panel-resumen .cuadre-seccion-header {
+  margin-bottom: 4px;
+}
+
+#panel-cuadre .cuadre-seccion-header h2,
+#panel-resumen .cuadre-seccion-header h2 {
+  font-size: 0.88rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+#panel-cuadre .cuadre-total-badge,
+#panel-resumen .cuadre-total-badge {
+  font-size: 0.88rem;
+  padding: 2px 8px;
+}
+
+#panel-cuadre .resumen-item,
+#panel-resumen .resumen-item {
+  padding: 3px 8px;
+  min-height: 24px;
+}
+
+#panel-cuadre .resumen-label,
+#panel-resumen .resumen-label {
+  font-size: 0.8rem;
+}
+
+#panel-cuadre .resumen-valor,
+#panel-resumen .resumen-valor {
+  font-size: 0.82rem;
+}
+
+#panel-cuadre .bonos-tabla th,
+#panel-cuadre .bonos-tabla td,
+#panel-resumen .bonos-tabla th,
+#panel-resumen .bonos-tabla td {
+  padding-top: 2px;
+  padding-bottom: 2px;
+  font-size: 0.8rem;
+  line-height: 1.1;
+}
+
+#panel-cuadre .bonos-tabla tbody tr,
+#panel-resumen .bonos-tabla tbody tr {
+  height: 26px;
+}
+
+@media (min-width: 920px) {
+  #panel-cuadre .cuadre-grid,
+  #panel-resumen .cuadre-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  #panel-cuadre .cuadre-grid > .resumen-span-2,
+  #panel-resumen .cuadre-grid > .resumen-span-2 {
+    grid-column: span 2;
+  }
 }
 
 @media (min-width: 920px) {
