@@ -478,7 +478,7 @@
           </div>
         </section>
 
-        <section class="card">
+        <section class="card" id="cuadre-card-bonos">
           <div class="cuadre-seccion-header">
             <h2>Bonos <span class="cuadre-seccion-sub">(top 5 clientes)</span></h2>
             <span id="cuadre-bonos-total" class="cuadre-total-badge cuadre-badge-negativo"></span>
@@ -491,7 +491,7 @@
           </div>
         </section>
 
-        <section class="card">
+        <section class="card" id="cuadre-card-gastos">
           <div class="cuadre-seccion-header">
             <h2>Gastos</h2>
             <span id="cuadre-gastos-total" class="cuadre-total-badge cuadre-badge-negativo"></span>
@@ -504,7 +504,7 @@
           </div>
         </section>
 
-        <section class="card">
+        <section class="card" id="cuadre-card-movimientos">
           <div class="cuadre-seccion-header">
             <h2>Movimientos</h2>
             <span id="cuadre-mov-total" class="cuadre-total-badge"></span>
@@ -521,7 +521,7 @@
           </div>
         </section>
 
-        <section class="card">
+        <section class="card" id="cuadre-card-plataformas">
           <div class="cuadre-seccion-header">
             <h2>Plataformas</h2>
             <span id="cuadre-plataformas-total" class="cuadre-total-badge"></span>
@@ -538,7 +538,7 @@
           </div>
         </section>
 
-        <section class="card resumen-span-2">
+        <section class="card" id="cuadre-card-prestamos">
           <div class="cuadre-seccion-header">
             <h2>Préstamos</h2>
             <span id="cuadre-prestamos-total" class="cuadre-total-badge"></span>
@@ -606,22 +606,28 @@
 
         <section class="card">
           <div class="cuadre-seccion-header">
-            <h2>Plataformas</h2>
-            <span id="resumen-plataformas-total" class="cuadre-total-badge"></span>
+            <h2>Caja física</h2>
+            <span id="resumen-caja-total-badge" class="cuadre-total-badge"></span>
+          </div>
+          <div class="bonos-listado-wrap">
+            <table class="bonos-tabla">
+              <thead><tr><th>Denominación</th><th>Total</th></tr></thead>
+              <tbody id="resumen-caja-body"></tbody>
+            </table>
           </div>
           <div class="resumen-grid resumen-grid-simple">
             <div class="resumen-item">
-              <span class="resumen-label">Practisistemas</span>
-              <span id="resumen-plataformas-practi" class="resumen-valor"></span>
+              <span class="resumen-label">Monedas</span>
+              <span id="resumen-caja-monedas" class="resumen-valor"></span>
             </div>
             <div class="resumen-item">
-              <span class="resumen-label">Deportivas</span>
-              <span id="resumen-plataformas-deport" class="resumen-valor"></span>
+              <span class="resumen-label">Billetes viejos</span>
+              <span id="resumen-caja-viejos" class="resumen-valor"></span>
             </div>
           </div>
         </section>
 
-        <section class="card">
+        <section class="card" id="resumen-card-bonos">
           <div class="cuadre-seccion-header">
             <h2>Bonos <span class="cuadre-seccion-sub">(top 5 clientes)</span></h2>
             <span id="resumen-bonos-total" class="cuadre-total-badge cuadre-badge-negativo"></span>
@@ -634,7 +640,7 @@
           </div>
         </section>
 
-        <section class="card">
+        <section class="card" id="resumen-card-gastos">
           <div class="cuadre-seccion-header">
             <h2>Gastos</h2>
             <span id="resumen-gastos-total" class="cuadre-total-badge cuadre-badge-negativo"></span>
@@ -647,7 +653,7 @@
           </div>
         </section>
 
-        <section class="card">
+        <section class="card" id="resumen-card-prestamos">
           <div class="cuadre-seccion-header">
             <h2>Préstamos</h2>
             <span id="resumen-prestamos-total" class="cuadre-total-badge"></span>
@@ -672,7 +678,7 @@
           </div>
         </section>
 
-        <section class="card">
+        <section class="card" id="resumen-card-movimientos">
           <div class="cuadre-seccion-header">
             <h2>Movimientos</h2>
             <span id="resumen-mov-total" class="cuadre-total-badge"></span>
@@ -689,25 +695,19 @@
           </div>
         </section>
 
-        <section class="card">
+        <section class="card" id="resumen-card-plataformas">
           <div class="cuadre-seccion-header">
-            <h2>Caja física</h2>
-            <span id="resumen-caja-total-badge" class="cuadre-total-badge"></span>
-          </div>
-          <div class="bonos-listado-wrap">
-            <table class="bonos-tabla">
-              <thead><tr><th>Denominación</th><th>Total</th></tr></thead>
-              <tbody id="resumen-caja-body"></tbody>
-            </table>
+            <h2>Plataformas</h2>
+            <span id="resumen-plataformas-total" class="cuadre-total-badge"></span>
           </div>
           <div class="resumen-grid resumen-grid-simple">
             <div class="resumen-item">
-              <span class="resumen-label">Monedas</span>
-              <span id="resumen-caja-monedas" class="resumen-valor"></span>
+              <span class="resumen-label">Practisistemas</span>
+              <span id="resumen-plataformas-practi" class="resumen-valor"></span>
             </div>
             <div class="resumen-item">
-              <span class="resumen-label">Billetes viejos</span>
-              <span id="resumen-caja-viejos" class="resumen-valor"></span>
+              <span class="resumen-label">Deportivas</span>
+              <span id="resumen-plataformas-deport" class="resumen-valor"></span>
             </div>
           </div>
         </section>

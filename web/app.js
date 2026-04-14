@@ -50,6 +50,15 @@ function fmt(n) {
   return '$ ' + Math.round(n).toLocaleString('es-CO');
 }
 
+const MODULOS_PANEL = ['plataformas', 'bonos', 'gastos', 'prestamos', 'movimientos'];
+
+function aplicarVisibilidadPanel(prefijo) {
+  MODULOS_PANEL.forEach(mod => {
+    const card = document.getElementById(`${prefijo}-card-${mod}`);
+    if (card) card.classList.toggle('oculto', !enabledModules.includes(mod));
+  });
+}
+
 function limpiarNumeroTexto(valor, allowNegative = false) {
   const texto = String(valor ?? '').trim();
   if (!texto) return '';
@@ -2146,6 +2155,7 @@ function limpiarResumen() {
   document.getElementById('resumen-prestamos-body').innerHTML = '';
   document.getElementById('resumen-prestamos-detalle-wrap').classList.add('oculto');
   document.getElementById('resumen-caja-body').innerHTML = '<tr><td colspan="2" class="bonos-vacio">Sin caja registrada.</td></tr>';
+  aplicarVisibilidadPanel('resumen');
 }
 
 async function cargarDatosResumen(fecha) {
@@ -3757,6 +3767,7 @@ function renderResumen(datos) {
   document.getElementById('resumen-caja-monedas').textContent = fmt(desg.total_monedas ?? 0);
   document.getElementById('resumen-caja-viejos').textContent = fmt(desg.billetes_viejos ?? 0);
   document.getElementById('resumen-caja-total-badge').textContent = fmt(datos.caja_fisica ?? 0);
+  aplicarVisibilidadPanel('resumen');
 }
 
 function renderCuadre(datos) {
@@ -3923,6 +3934,7 @@ function renderCuadre(datos) {
     info.textContent = msgGenerico;
     info.classList.toggle('oculto', !msgGenerico);
   }
+  aplicarVisibilidadPanel('cuadre');
 }
 
 function renderCuadreGuardado(datos, fecha, calculado = null) {
@@ -4057,6 +4069,7 @@ function renderCuadreGuardado(datos, fecha, calculado = null) {
   const info = document.getElementById('cuadre-guardado-info');
   info.textContent = `Cuadre guardado. Para corregir usa el botón admin.`;
   info.classList.remove('oculto');
+  aplicarVisibilidadPanel('cuadre');
 }
 
 async function guardarCuadre() {
