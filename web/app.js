@@ -4285,7 +4285,7 @@ function renderCuadreGuardado(datos, fecha, calculado = null) {
 
   document.getElementById('cuadre-acciones').classList.add('oculto');
   const info = document.getElementById('cuadre-guardado-info');
-  info.textContent = `Cuadre guardado. Para corregir usa el botón admin.`;
+  info.textContent = `Cuadre guardado. Si necesitas corregir edita el módulo correspondiente, luego guarda nuevamente Caja o Contadores.`;
   info.classList.remove('oculto');
 }
 
