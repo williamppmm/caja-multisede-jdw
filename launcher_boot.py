@@ -45,7 +45,10 @@ def _state_path(app_id: str) -> Path:
 def _guardar_state(app_id: str, url: str) -> None:
     path = _state_path(app_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"url": url}, ensure_ascii=False), encoding="utf-8")
+    path.write_text(
+        json.dumps({"url": url}, ensure_ascii=False),
+        encoding="utf-8",
+    )
 
 
 def _leer_state(app_id: str) -> str | None:
@@ -97,6 +100,7 @@ class StartupSplash:
 
 
 def _esperar_url_instancia(app_id: str, fallback_url: str, timeout_s: float = 10.0) -> str:
+    """Espera hasta que la instancia primaria escriba su URL en el state file."""
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         url = _leer_state(app_id)
@@ -106,7 +110,11 @@ def _esperar_url_instancia(app_id: str, fallback_url: str, timeout_s: float = 10
     return fallback_url
 
 
-def _esperar_servidor_y_abrir(url: str, splash: StartupSplash | None = None, timeout_s: float = 30.0) -> None:
+def _esperar_servidor_y_abrir(
+    url: str,
+    splash: StartupSplash | None = None,
+    timeout_s: float = 30.0,
+) -> None:
     port = int(url.rsplit(":", 1)[-1])
     deadline = time.time() + timeout_s
     while time.time() < deadline:
@@ -135,8 +143,8 @@ def launch_app(
     fallback_url = f"http://{HOST}:{default_port}"
 
     if already_running:
-        url = _esperar_url_instancia(app_id, fallback_url)
-        _esperar_servidor_y_abrir(url)
+        # Ya hay una instancia corriendo o arrancando — ignorar este click.
+        # La instancia primaria se encarga de abrir el navegador cuando esté lista.
         return
 
     port = _encontrar_puerto_libre(default_port)
@@ -145,7 +153,11 @@ def launch_app(
 
     splash = StartupSplash(splash_title, splash_subtitle)
     splash.start()
-    threading.Thread(target=_esperar_servidor_y_abrir, args=(url, splash), daemon=True).start()
+    threading.Thread(
+        target=_esperar_servidor_y_abrir,
+        args=(url, splash),
+        daemon=True,
+    ).start()
 
     try:
         uvicorn.run(app, host=HOST, port=port)
