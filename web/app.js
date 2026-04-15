@@ -2336,13 +2336,9 @@ async function cargarDatosContadores(fecha) {
     }
     const data = await res.json();
     renderContadores(data.items || [], data.total_resultado || 0);
-    if (!data.existe && !isOverrideActive('contadores', fecha)) {
-      setContadoresEditable(true);
-      applyContadoresDraft(fecha);
-    } else {
-      setContadoresEditable(Boolean(isOverrideActive('contadores', fecha)) || !data.existe);
-      if (!data.existe) applyContadoresDraft(fecha);
-    }
+    const editable = esSuperAdminActivo() || Boolean(isOverrideActive('contadores', fecha)) || !data.existe;
+    setContadoresEditable(editable);
+    if (!data.existe) applyContadoresDraft(fecha);
   } catch {
     limpiarFormularioContadores();
     setContadoresEditable(true);
