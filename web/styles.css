@@ -698,6 +698,16 @@ table.contadores-tabla th {
   width: 104px;
 }
 
+#panel-contadores .contador-campo[data-role="entradas"]::placeholder,
+#panel-contadores .contador-campo[data-role="salidas"]::placeholder {
+  color: #b8b8b8;
+}
+
+#panel-contadores .contador-campo[data-role="entradas"]:focus::placeholder,
+#panel-contadores .contador-campo[data-role="salidas"]:focus::placeholder {
+  color: transparent;
+}
+
 .contador-campo:focus {
   outline: 2px solid #2F5496;
   border-color: #2F5496;

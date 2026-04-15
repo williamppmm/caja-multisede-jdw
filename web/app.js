@@ -825,17 +825,21 @@ function applyContadoresDraft(fecha) {
   return true;
 }
 
-function crearInputContador(role, value = '') {
+function crearInputContador(role, value = '', refPlaceholder = null) {
   const limpio = limpiarNumeroTexto(value);
+  const usaReferenciaVisual = (role === 'entradas' || role === 'salidas');
+  const placeholder = usaReferenciaVisual && refPlaceholder != null && Number(refPlaceholder) > 0
+    ? limpiarNumeroTexto(refPlaceholder)
+    : '0';
   if (limpio === '') {
-    return `<input type="text" inputmode="numeric" class="contador-campo" data-role="${role}" value="" placeholder="0" />`;
+    return `<input type="text" inputmode="numeric" class="contador-campo" data-role="${role}" value="" placeholder="${placeholder}" />`;
   }
   const numero = Number(limpio);
   // Entradas y salidas deben arrancar visualmente vacias cuando su valor es 0.
   // Jackpot, en cambio, puede venir heredado del ultimo registro y debe mostrarse
   // siempre que traiga un valor real distinto de 0.
   const valor = numero === 0 ? '' : limpio;
-  return `<input type="text" inputmode="numeric" class="contador-campo" data-role="${role}" value="${valor}" placeholder="0" />`;
+  return `<input type="text" inputmode="numeric" class="contador-campo" data-role="${role}" value="${valor}" placeholder="${placeholder}" />`;
 }
 
 function valorTextoContador(row, role) {
@@ -951,8 +955,8 @@ function renderContadores(items = [], total = 0) {
           </div>
         </td>
         <td>${fmt(fila.denominacion || 0)}</td>
-        <td>${crearInputContador('entradas', fila.entradas)}</td>
-        <td>${crearInputContador('salidas', fila.salidas)}</td>
+        <td>${crearInputContador('entradas', fila.entradas, fila.referencia?.entradas)}</td>
+        <td>${crearInputContador('salidas', fila.salidas, fila.referencia?.salidas)}</td>
         <td>${crearInputContador('jackpot', fila.jackpot)}</td>
         <td class="contador-yield" data-role="yield-actual">${limpiarNumeroTexto(fila.yield_actual || 0, true)}</td>
         <td data-role="yield-ref">${limpiarNumeroTexto(fila.referencia?.yield || 0, true)}<span class="yield-ref-fecha" title="${refFechaTitle}">·</span></td>
