@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from app.models.caja_models import BonoEntrada
-from app.services import nombres_service, excel_service
+from app.services import cuadre_service, nombres_service, excel_service
 
 
 def guardar_bono(entrada: BonoEntrada) -> dict:
@@ -25,9 +25,11 @@ def guardar_bono(entrada: BonoEntrada) -> dict:
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
+    sync_result = cuadre_service.sincronizar_cuadre_afectado(entrada.fecha)
+
     return {
         "ok": True,
-        "mensaje": "Bono registrado correctamente",
+        "mensaje": cuadre_service.anexar_mensaje_sync("Bono registrado correctamente", sync_result),
         "fecha": str(entrada.fecha),
         "hora": timestamp.strftime("%I:%M %p"),
         "cliente": entrada.cliente.strip(),
@@ -52,9 +54,11 @@ def actualizar_bono_por_ts(fecha: date, ts_str: str, cliente: str, valor: float)
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
 
+    sync_result = cuadre_service.sincronizar_cuadre_afectado(fecha)
+
     return {
         "ok": True,
-        "mensaje": "Bono actualizado correctamente",
+        "mensaje": cuadre_service.anexar_mensaje_sync("Bono actualizado correctamente", sync_result),
         "fecha": str(fecha),
         "hora": timestamp.strftime("%I:%M %p"),
         "cliente": cliente.strip(),
@@ -72,9 +76,11 @@ def eliminar_bono_por_ts(fecha: date, ts_str: str) -> dict:
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
 
+    sync_result = cuadre_service.sincronizar_cuadre_afectado(fecha)
+
     return {
         "ok": True,
-        "mensaje": "Bono eliminado correctamente",
+        "mensaje": cuadre_service.anexar_mensaje_sync("Bono eliminado correctamente", sync_result),
         "fecha": str(fecha),
         "hora": "",
         "cliente": "",

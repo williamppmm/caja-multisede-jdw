@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from app.services import excel_service, nombres_service
+from app.services import cuadre_service, excel_service, nombres_service
 
 
 def obtener_registros_completos(fecha: date) -> dict:
@@ -18,9 +18,11 @@ def actualizar_gasto_por_ts(fecha: date, ts_str: str, concepto: str, valor: floa
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
 
+    sync_result = cuadre_service.sincronizar_cuadre_afectado(fecha)
+
     return {
         "ok": True,
-        "mensaje": "Gasto actualizado correctamente",
+        "mensaje": cuadre_service.anexar_mensaje_sync("Gasto actualizado correctamente", sync_result),
         "fecha": str(fecha),
         "concepto": concepto.strip(),
         "valor": valor,
@@ -37,9 +39,11 @@ def eliminar_gasto_por_ts(fecha: date, ts_str: str) -> dict:
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
 
+    sync_result = cuadre_service.sincronizar_cuadre_afectado(fecha)
+
     return {
         "ok": True,
-        "mensaje": "Gasto eliminado correctamente",
+        "mensaje": cuadre_service.anexar_mensaje_sync("Gasto eliminado correctamente", sync_result),
         "fecha": str(fecha),
         "total": result["total_dia"],
         "fecha_hora_registro": datetime.now().replace(microsecond=0).isoformat(),

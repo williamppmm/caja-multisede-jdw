@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from app.models.caja_models import MovimientoEntrada
-from app.services import excel_service, nombres_service
+from app.services import cuadre_service, excel_service, nombres_service
 
 
 def guardar_movimiento(entrada: MovimientoEntrada) -> dict:
@@ -26,9 +26,11 @@ def guardar_movimiento(entrada: MovimientoEntrada) -> dict:
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
+    sync_result = cuadre_service.sincronizar_cuadre_afectado(entrada.fecha)
+
     return {
         "ok": True,
-        "mensaje": "Movimiento guardado correctamente",
+        "mensaje": cuadre_service.anexar_mensaje_sync("Movimiento guardado correctamente", sync_result),
         "fecha": str(entrada.fecha),
         "tipo_movimiento": entrada.tipo_movimiento,
         "concepto": entrada.concepto,
@@ -64,9 +66,11 @@ def actualizar_movimiento_por_ts(fecha: date, ts_str: str, tipo_movimiento: str,
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
 
+    sync_result = cuadre_service.sincronizar_cuadre_afectado(fecha)
+
     return {
         "ok": True,
-        "mensaje": "Movimiento actualizado correctamente",
+        "mensaje": cuadre_service.anexar_mensaje_sync("Movimiento actualizado correctamente", sync_result),
         "fecha": str(fecha),
         "tipo_movimiento": tipo_movimiento,
         "concepto": concepto.strip(),
@@ -87,9 +91,11 @@ def eliminar_movimiento_por_ts(fecha: date, ts_str: str) -> dict:
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
 
+    sync_result = cuadre_service.sincronizar_cuadre_afectado(fecha)
+
     return {
         "ok": True,
-        "mensaje": "Movimiento eliminado correctamente",
+        "mensaje": cuadre_service.anexar_mensaje_sync("Movimiento eliminado correctamente", sync_result),
         "fecha": str(fecha),
         "tipo_movimiento": "",
         "concepto": "",

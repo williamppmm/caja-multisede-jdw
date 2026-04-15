@@ -4,7 +4,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from app.models.contadores_models import ContadorCatalogoItem, ContadoresEntrada
-from app.services import excel_service, startup_state_service
+from app.services import cuadre_service, excel_service, startup_state_service
 from app.services.local_data_service import get_local_data_path
 
 
@@ -379,12 +379,15 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
         return {"ok": False, "mensaje": str(exc), "fecha": fecha_str}
 
     total = sum(float(item["resultado_monetario"]) for item in filas_guardadas)
-    from app.services import cuadre_service
-
     sync_result = cuadre_service.autoguardar_cuadre_si_listo(entrada.fecha)
     mensaje = "Contadores guardados correctamente"
     if sync_result and sync_result.get("ok"):
         mensaje += " y Cuadre sincronizado automaticamente"
+    if entrada.forzar:
+        mensaje = cuadre_service.anexar_mensaje_sync(
+            mensaje,
+            cuadre_service.sincronizar_cuadre_afectado(entrada.fecha),
+        )
     return {
         "ok": True,
         "mensaje": mensaje,

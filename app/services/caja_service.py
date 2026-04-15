@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from app.config import DENOMINACIONES
 from app.models.caja_models import CajaEntrada, ModuloItemsEntrada, PlataformasEntrada
-from app.services import excel_service, nombres_service
+from app.services import cuadre_service, excel_service, nombres_service
 
 
 ROW_TYPES = {
@@ -76,12 +76,15 @@ def guardar_caja(entrada: CajaEntrada) -> dict:
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
-    from app.services import cuadre_service
-
     sync_result = cuadre_service.autoguardar_cuadre_si_listo(entrada.fecha)
     mensaje = "Caja guardada correctamente"
     if sync_result and sync_result.get("ok"):
         mensaje += " y Cuadre sincronizado automaticamente"
+    if entrada.forzar:
+        mensaje = cuadre_service.anexar_mensaje_sync(
+            mensaje,
+            cuadre_service.sincronizar_cuadre_afectado(entrada.fecha),
+        )
 
     return {
         "ok": True,
@@ -119,9 +122,11 @@ def guardar_plataformas(entrada: PlataformasEntrada) -> dict:
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
+    sync_result = cuadre_service.sincronizar_cuadre_afectado(entrada.fecha)
+
     return {
         "ok": True,
-        "mensaje": "Plataformas guardadas correctamente",
+        "mensaje": cuadre_service.anexar_mensaje_sync("Plataformas guardadas correctamente", sync_result),
         "fecha": str(entrada.fecha),
         "venta_practisistemas": float(entrada.venta_practisistemas or 0),
         "venta_deportivas": float(entrada.venta_deportivas or 0),
@@ -157,9 +162,10 @@ def guardar_items_modulo(modulo: str, entrada: ModuloItemsEntrada) -> dict:
         "bonos": "Bonos",
         "movimientos": "Movimientos",
     }.get(modulo, modulo.title())
+    sync_result = cuadre_service.sincronizar_cuadre_afectado(entrada.fecha)
     return {
         "ok": True,
-        "mensaje": f"{nombre} guardados correctamente",
+        "mensaje": cuadre_service.anexar_mensaje_sync(f"{nombre} guardados correctamente", sync_result),
         "fecha": str(entrada.fecha),
         "total": total,
         "cantidad_items": cantidad,

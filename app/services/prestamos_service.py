@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from app.models.caja_models import PrestamoEntrada
-from app.services import excel_service, nombres_service
+from app.services import cuadre_service, excel_service, nombres_service
 
 
 def guardar_prestamo(entrada: PrestamoEntrada) -> dict:
@@ -52,9 +52,10 @@ def guardar_prestamo(entrada: PrestamoEntrada) -> dict:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
     mensaje = "Préstamo registrado correctamente" if tipo == "prestamo" else "Pago registrado correctamente"
+    sync_result = cuadre_service.sincronizar_cuadre_afectado(entrada.fecha)
     return {
         "ok": True,
-        "mensaje": mensaje,
+        "mensaje": cuadre_service.anexar_mensaje_sync(mensaje, sync_result),
         "fecha": str(entrada.fecha),
         "persona": persona,
         "tipo_movimiento": tipo,
@@ -89,9 +90,10 @@ def actualizar_prestamo_por_ts(fecha: date, ts_str: str, persona: str, tipo_movi
         return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
 
     mensaje = "Préstamo actualizado correctamente" if tipo_movimiento == "prestamo" else "Pago actualizado correctamente"
+    sync_result = cuadre_service.sincronizar_cuadre_afectado(fecha)
     return {
         "ok": True,
-        "mensaje": mensaje,
+        "mensaje": cuadre_service.anexar_mensaje_sync(mensaje, sync_result),
         "fecha": str(fecha),
         "persona": persona.strip(),
         "tipo_movimiento": tipo_movimiento,
@@ -111,9 +113,11 @@ def eliminar_prestamo_por_ts(fecha: date, ts_str: str) -> dict:
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
 
+    sync_result = cuadre_service.sincronizar_cuadre_afectado(fecha)
+
     return {
         "ok": True,
-        "mensaje": "Movimiento de préstamo eliminado correctamente",
+        "mensaje": cuadre_service.anexar_mensaje_sync("Movimiento de préstamo eliminado correctamente", sync_result),
         "fecha": str(fecha),
         "persona": "",
         "tipo_movimiento": "",

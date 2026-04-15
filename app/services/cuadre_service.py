@@ -593,6 +593,59 @@ def guardar_cuadre(entrada, base_anterior: float) -> dict:
     }
 
 
+def buscar_fecha_cuadre_afectado(fecha_operacion: date) -> date | None:
+    cuadre = excel_service.obtener_cuadre_que_contiene_fecha(fecha_operacion)
+    if not cuadre:
+        return None
+    try:
+        return date.fromisoformat(cuadre["fecha"])
+    except ValueError:
+        return None
+
+
+def sincronizar_cuadre_guardado(fecha_cierre: date) -> dict:
+    preconds = verificar_precondiciones(fecha_cierre)
+    if not preconds["ok"] or not preconds["tiene_base_anterior"]:
+        return {
+            "ok": False,
+            "recalculado": False,
+            "fecha_cuadre": str(fecha_cierre),
+            "mensaje": (
+                f"La corrección afecta el Cuadre de {_fmt(fecha_cierre)}, "
+                "pero ya no cumple precondiciones y requiere revisión manual."
+            ),
+        }
+
+    entrada = SimpleNamespace(fecha=fecha_cierre, forzar=True)
+    resultado = guardar_cuadre(entrada, float(preconds["base_anterior"] or 0))
+    if resultado.get("ok"):
+        return {
+            "ok": True,
+            "recalculado": True,
+            "fecha_cuadre": str(fecha_cierre),
+            "mensaje": f"Cuadre de {_fmt(fecha_cierre)} recalculado automáticamente.",
+        }
+    return {
+        "ok": False,
+        "recalculado": False,
+        "fecha_cuadre": str(fecha_cierre),
+        "mensaje": resultado.get("mensaje") or f"No se pudo resincronizar el Cuadre de {_fmt(fecha_cierre)}.",
+    }
+
+
+def sincronizar_cuadre_afectado(fecha_operacion: date) -> dict | None:
+    fecha_cierre = buscar_fecha_cuadre_afectado(fecha_operacion)
+    if fecha_cierre is None:
+        return None
+    return sincronizar_cuadre_guardado(fecha_cierre)
+
+
+def anexar_mensaje_sync(mensaje_base: str, sync_result: dict | None) -> str:
+    if not sync_result or not sync_result.get("mensaje"):
+        return mensaje_base
+    return f"{mensaje_base}. {sync_result['mensaje']}"
+
+
 def autoguardar_cuadre_si_listo(fecha: date) -> dict | None:
     """Sincroniza el Cuadre derivado cuando ya existen Caja y Contadores del día.
 
