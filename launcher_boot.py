@@ -8,8 +8,12 @@ from pathlib import Path
 
 import uvicorn
 
-from app.runtime_paths import get_web_dir
 from app.services.local_data_service import get_local_data_path
+
+try:
+    import pyi_splash
+except Exception:
+    pyi_splash = None
 
 
 HOST = "127.0.0.1"
@@ -80,90 +84,14 @@ class StartupSplash:
     def __init__(self, titulo: str, subtitulo: str):
         self.titulo = titulo
         self.subtitulo = subtitulo
-        self._cerrar = threading.Event()
-        self._listo = threading.Event()
-        self._thread = None
 
     def start(self) -> None:
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
-        self._listo.wait(2)
+        return None
 
     def close(self) -> None:
-        self._cerrar.set()
-
-    def _run(self) -> None:
         try:
-            import tkinter as tk
-        except Exception:
-            self._listo.set()
-            return
-
-        root = tk.Tk()
-        root.title(self.titulo)
-        root.resizable(False, False)
-        root.configure(bg="#f4f7fb")
-        root.geometry("360x170")
-        root.attributes("-topmost", True)
-
-        icon_path = get_web_dir() / "assets" / "favicon.ico"
-        try:
-            if icon_path.exists():
-                root.iconbitmap(default=str(icon_path))
-        except Exception:
-            pass
-
-        root.update_idletasks()
-        w = root.winfo_width()
-        h = root.winfo_height()
-        x = (root.winfo_screenwidth() - w) // 2
-        y = (root.winfo_screenheight() - h) // 2
-        root.geometry(f"{w}x{h}+{x}+{y}")
-
-        frame = tk.Frame(root, bg="#f4f7fb", padx=24, pady=22)
-        frame.pack(fill="both", expand=True)
-
-        badge = tk.Label(
-            frame,
-            text="W",
-            font=("Segoe UI Semibold", 34),
-            fg="#1e73d1",
-            bg="#f4f7fb",
-        )
-        badge.pack(pady=(0, 6))
-
-        title = tk.Label(
-            frame,
-            text=self.titulo,
-            font=("Segoe UI Semibold", 14),
-            fg="#16345f",
-            bg="#f4f7fb",
-        )
-        title.pack()
-
-        subtitle = tk.Label(
-            frame,
-            text=self.subtitulo,
-            font=("Segoe UI", 9),
-            fg="#5f6f86",
-            bg="#f4f7fb",
-        )
-        subtitle.pack(pady=(6, 0))
-
-        self._listo.set()
-
-        def poll():
-            if self._cerrar.is_set():
-                try:
-                    root.destroy()
-                except Exception:
-                    pass
-                return
-            root.after(120, poll)
-
-        root.after(120, poll)
-        try:
-            root.mainloop()
+            if pyi_splash is not None:
+                pyi_splash.close()
         except Exception:
             pass
 

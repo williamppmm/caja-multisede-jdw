@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.building.splash import Splash
 
 hiddenimports = []
 hiddenimports += collect_submodules('uvicorn')
@@ -46,12 +47,22 @@ a = Analysis(
     optimize=1,
 )
 pyz = PYZ(a.pure)
+splash = Splash(
+    'web/assets/launcher_splash.png',
+    binaries=a.binaries,
+    datas=a.datas,
+    text_pos=None,
+    minify_script=True,
+    always_on_top=True,
+)
 
 exe = EXE(
     pyz,
     a.scripts,
+    splash,
     a.binaries,
     a.datas,
+    splash.binaries,
     [],
     name='CajaSuperAdmin',
     debug=False,
