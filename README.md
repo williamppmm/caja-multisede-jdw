@@ -28,8 +28,8 @@ La app corre localmente en cada equipo, abre una interfaz web en el navegador y 
 
 Archivos que genera por sede y año:
 
-- `Contadores_{sede}_{año}.xlsx` — módulos operativos (Caja, Plataformas, Gastos, Bonos, Préstamos, Movimientos, Contadores)
-- `Consolidado_{sede}_{año}.xlsx` — cuadres del período
+- `Contadores_{sede}_{año}.xlsx` — módulos operativos (Caja, Plataformas, Gastos, Bonos, Préstamos, Movimientos)
+- `Consolidado_{sede}_{año}.xlsx` — consolidación del período (Contadores, Cuadre)
 
 ## Tecnologías
 
@@ -138,7 +138,7 @@ Después de abrir la app:
 La configuración local se reparte entre:
 
 - `data/settings.json`
-- `data/startup_state.json`
+- `startup_state.json` en la carpeta activa de la sede
 
 ## Módulos disponibles
 
@@ -153,7 +153,7 @@ La configuración local se reparte entre:
 | `Contadores` | Captura por ítem con referencias | si la fecha ya existe, requiere admin | cualquier fecha libre |
 | `Cuadre` | Consolidación del período | si ya existe, corregir requiere admin | cualquier fecha libre; pide confirmación al sobrescribir |
 
-## Catálogos locales
+## Catálogos locales y auxiliares
 
 La app mantiene JSON locales por equipo dentro de `data/`:
 
@@ -161,11 +161,14 @@ La app mantiene JSON locales por equipo dentro de `data/`:
 - `data/gastos_conceptos.json`
 - `data/prestamos_personas.json`
 - `data/movimientos_conceptos.json`
-- `data/contadores_items.json`
 - `data/settings.json`
-- `data/startup_state.json`
 
-Estos archivos son locales y no se comparten por Dropbox.
+Además, por cada sede activa existen dos archivos auxiliares que viven junto a los `.xlsx` en `data_dir`:
+
+- `contadores_items.json`
+- `startup_state.json`
+
+Los catálogos de bonos, gastos, préstamos y movimientos son locales al equipo. En cambio, `contadores_items.json` y `startup_state.json` siguen la sede activa y se comparten operativamente con sus libros Excel.
 
 También se pueden administrar desde la interfaz:
 
@@ -247,6 +250,7 @@ Eso significa:
 
 | Documento | Contenido |
 |---|---|
+| [docs/contexto-proyecto.md](docs/contexto-proyecto.md) | Documento maestro del contexto real del proyecto, ramas, arquitectura de datos, decisiones operativas y estado actual |
 | [docs/especificacion-funcional.md](docs/especificacion-funcional.md) | Descripción exhaustiva de cada módulo, regla de negocio, validación y comportamiento |
 | [docs/analisis-tecnico.md](docs/analisis-tecnico.md) | Arquitectura, capas del sistema, riesgos y escenarios de evolución |
 | [docs/plan-pruebas.md](docs/plan-pruebas.md) | Plan de pruebas funcionales y operativas |
@@ -298,10 +302,13 @@ El proyecto ya es usable como herramienta operativa diaria si se trabaja por sed
 Puntos auditados en esta versión:
 
 - flujo local estable con launcher, instancia única y cierre automático por heartbeat
+- comportamiento de cierre mejorado: un solo diálogo contextual (avisa sobre datos sin guardar si los hay), sin dobles confirmaciones; el evento `beforeunload` solo se activa si hay cambios pendientes y el cierre no fue iniciado desde el botón Finalizar
 - configuración administrativa más completa, incluyendo estado inicial del sistema
-- persistencia operativa en `Contadores_{sede}_{año}.xlsx` y cuadre en `Consolidado_{sede}_{año}.xlsx`
+- persistencia operativa en `Contadores_{sede}_{año}.xlsx` y consolidado en `Consolidado_{sede}_{año}.xlsx` (contiene Contadores y Cuadre)
 - catálogos locales editables desde la propia app
 - modo super admin con gestión de sedes remotas, edición/eliminación por fila en cualquier fecha y referencias de plataformas
 - build dedicado `CajaSuperAdmin.exe` que arranca en modo super admin sin contraseña
+- apertura de libros Excel directamente desde la interfaz (botón por módulo, abre en la hoja correspondiente)
+- respaldos automáticos en super admin: copia periódica de los libros de cada sede a una carpeta central configurable, con rotación de los últimos 3 días, validación de integridad y log de resultados
 
 Su siguiente límite natural, si crece la concurrencia o la exigencia de seguridad, será migrar la operación central a una base de datos y dejar Excel como respaldo o salida analítica.

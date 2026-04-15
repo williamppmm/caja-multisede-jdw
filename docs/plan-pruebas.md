@@ -126,8 +126,8 @@ Pasos:
 
 Resultado esperado:
 
-- se crea `Contadores_<SEDE>_<AÑO>.xlsx` con los módulos operativos
-- se crea `Consolidado_<SEDE>_<AÑO>.xlsx` con el Cuadre
+- se crea `Contadores_<SEDE>_<AÑO>.xlsx` con los módulos operativos (Caja, Plataformas, Gastos, Bonos, Prestamos, Movimientos)
+- se crea `Consolidado_<SEDE>_<AÑO>.xlsx` con las hojas Contadores y Cuadre
 - ambos archivos corresponden a la sede configurada
 
 ## PG-04 — Separación entre sedes
@@ -573,8 +573,8 @@ Pasos:
 
 Resultado esperado:
 
-- existe `Consolidado_<SEDE>_<AÑO>.xlsx` con una hoja Cuadre
-- el archivo operativo `Contadores_<SEDE>_<AÑO>.xlsx` no tiene hoja Cuadre
+- existe `Consolidado_<SEDE>_<AÑO>.xlsx` con hojas Contadores y Cuadre
+- el archivo operativo `Contadores_<SEDE>_<AÑO>.xlsx` no tiene hoja Cuadre ni Contadores
 
 ## CQ-01 — Cuadre sin base previa
 
@@ -738,6 +738,78 @@ Resultado esperado:
 
 - no debe haber conflicto entre archivos separados
 
+## Pruebas de respaldo automático (solo super admin)
+
+## BK-01 — Configuración de backup
+
+Prioridad: Alta
+
+Pasos:
+
+1. Abrir Administración en el build super admin.
+2. Activar la casilla "Activar respaldo automático".
+3. Introducir una ruta de carpeta destino y pulsar "Verificar acceso".
+4. Guardar configuración.
+
+Resultado esperado:
+
+- el botón "Verificar acceso" responde con mensaje de confirmación o error claro
+- al guardar, se dispara un respaldo inmediato en background (sin esperar el próximo ciclo de 4 horas)
+- la carpeta destino contiene subcarpetas por sede con los archivos copiados y un `manifest.json` con `valido: true`
+
+## BK-02 — Idempotencia del respaldo
+
+Prioridad: Media
+
+Pasos:
+
+1. Con backup ya ejecutado para hoy, ejecutar "Respaldar ahora" nuevamente.
+
+Resultado esperado:
+
+- el sistema detecta el `manifest.json` del día y omite la copia (mensaje: "Respaldo del día ya existe y está completo")
+- no se sobreescriben archivos existentes válidos
+
+## BK-03 — Rotación de respaldos
+
+Prioridad: Media
+
+Pasos:
+
+1. Forzar respaldos en días distintos hasta superar 3 días de retención (modificando fechas o ajustando `RETENTION_DAYS` en prueba).
+
+Resultado esperado:
+
+- las carpetas con fecha más antigua se eliminan automáticamente
+- quedan solo las últimas 3 fechas
+
+## BK-04 — Carpeta no accesible
+
+Prioridad: Alta
+
+Pasos:
+
+1. Configurar una carpeta destino que no exista y no pueda crearse (ruta de red no disponible o sin permisos).
+2. Ejecutar "Respaldar ahora".
+
+Resultado esperado:
+
+- el sistema responde con error claro
+- no deja archivos corruptos ni carpetas parciales
+
+## BK-05 — Log de respaldos
+
+Prioridad: Media
+
+Pasos:
+
+1. Ejecutar al menos un respaldo completo.
+2. Revisar la sección de estado de respaldo en Administración.
+
+Resultado esperado:
+
+- se muestran las últimas entradas del log con sede, fecha, archivos copiados y estado
+
 ## Pruebas de regresión recomendadas después de cambios
 
 Después de tocar código, ejecutar al menos:
@@ -755,6 +827,12 @@ Después de tocar código, ejecutar al menos:
 11. CQ-05
 12. DR-01
 13. EX-01
+
+Si se toca el sistema de respaldos, agregar también:
+
+14. BK-01
+15. BK-02
+16. BK-04
 
 ## Registro de resultados
 

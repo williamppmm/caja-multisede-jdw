@@ -548,7 +548,7 @@ El guardado envía todos los ítems activos (no pausados). Las reglas:
 
 ### 10.11 Persistencia en Excel
 
-Hoja `Contadores` del libro `Contadores_{sede}_{año}.xlsx`. Una fila por ítem por día:
+Hoja `Contadores` del libro `Consolidado_{sede}_{año}.xlsx`. Una fila por ítem por día:
 
 | Fecha | item_id | nombre | denominacion | entradas | salidas | jackpot | yield_actual | ref_entradas | ref_salidas | ref_jackpot | yield_referencia | produccion_pre_reset | observacion | resultado_monetario | Timestamp |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -646,8 +646,8 @@ La interfaz muestra:
 
 | Archivo | Contenido |
 |---|---|
-| `Contadores_{sede}_{año}.xlsx` | Módulos operativos: Caja, Plataformas, Gastos, Bonos, Prestamos, Movimientos, Contadores |
-| `Consolidado_{sede}_{año}.xlsx` | Cuadre |
+| `Contadores_{sede}_{año}.xlsx` | Módulos operativos: Caja, Plataformas, Gastos, Bonos, Prestamos, Movimientos |
+| `Consolidado_{sede}_{año}.xlsx` | Contadores, Cuadre |
 
 Un par de archivos por sede y por año. La normalización del nombre de sede elimina tildes, espacios y caracteres especiales.
 

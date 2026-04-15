@@ -47,10 +47,20 @@ Observaciones:
 
 Responsabilidades:
 
-- crear la app
+- crear la app con lifespan (startup hook)
 - montar `/static`
 - incluir routers
 - servir `index.html`
+
+El lifespan arranca el loop de respaldos automáticos si la build es super admin:
+
+```python
+@asynccontextmanager
+async def lifespan(app):
+    if is_super_admin_build():
+        backup_service.programar_backup()
+    yield
+```
 
 ### Configuración y rutas
 
@@ -99,10 +109,10 @@ Dos libros por sede y año:
 - Bonos
 - Prestamos
 - Movimientos
+
+**`Consolidado_{sede}_{año}.xlsx`** — consolidación del período:
+
 - Contadores
-
-**`Consolidado_{sede}_{año}.xlsx`** — cierre de período:
-
 - Cuadre
 
 Ventajas del diseño:
@@ -167,16 +177,22 @@ Observación:
 
 Responsabilidades:
 
-- leer settings
-- guardar settings
+- leer y guardar settings
+- gestionar sedes remotas (`/api/settings/remote-sites`, `/api/settings/active-site`)
 - abrir selector de carpeta
+- abrir un libro Excel en su hoja correspondiente (`/api/settings/open-module-xlsx`): usa PowerShell COM para abrir Excel en la hoja del módulo indicado; `communicate(timeout=2)` con `TimeoutExpired` tratado como éxito (Excel sigue cargando = caso normal)
 - apagar la app (`/api/app/shutdown`)
 - recibir heartbeat del navegador (`/api/app/heartbeat`)
+- endpoints de respaldo automático (solo super admin):
+  - `GET /api/backup/status` — estado y últimas entradas del log
+  - `POST /api/backup/run-now` — dispara un respaldo inmediato
+  - `POST /api/backup/validate-root` — verifica que la carpeta destino exista y admita escritura
 
 Observación:
 
 - el heartbeat activa un watchdog: si no llega ninguno en 75 s el proceso termina solo
 - esto cubre el caso de cierre de navegador sin usar el botón Finalizar
+- guardar settings dispara automáticamente un respaldo inmediato en background si `backup_enabled` y `backup_root` están configurados
 
 ## Servicios por módulo
 
@@ -283,6 +299,28 @@ Riesgo:
 
 - cualquier inconsistencia previa en módulos origen afecta el cuadre completo
 
+## Respaldos automáticos (super admin)
+
+[app/services/backup_service.py](../app/services/backup_service.py)
+
+Solo activo en el build super admin (`is_super_admin_build() == True`).
+
+Responsabilidades:
+
+- recorrer las sedes remotas configuradas y copiar sus archivos críticos a una carpeta central
+- archivos respaldados por sede: `Contadores_*.xlsx`, `Consolidado_*.xlsx`, `contadores_items.json`, `startup_state.json`
+- verificar integridad antes de copiar: xlsx con openpyxl (read-only), json con `json.load`
+- copia atómica: `tempfile.NamedTemporaryFile` → `Path.replace(dst)` para evitar archivos parcialmente escritos
+- criterio de omisión: si ya existe `manifest.json` con `valido: true` en la carpeta del día, se salta (idempotente)
+- rotación: conserva los últimos 3 días por sede, elimina los anteriores
+- log: `backup_root/backup_log.jsonl` en formato JSONL, una entrada por ejecución con resultados por sede
+
+Scheduling:
+
+- se lanza un loop daemon en el lifespan de FastAPI: espera 10 minutos tras el arranque y luego repite cada 4 horas
+- al guardar la configuración con backup habilitado se dispara un intento inmediato en background, sin esperar la siguiente vuelta del loop
+- un lock (`_backup_lock`) previene ejecuciones solapadas
+
 ## Frontend
 
 [web/index.html](../web/index.html)
@@ -372,6 +410,7 @@ Lo menos portable:
 4. `web/app.js` demasiado grande y acoplado.
 5. Ausencia de pruebas automatizadas.
 6. Dependencia fuerte de Windows para distribución cómoda.
+7. ~~Ausencia de respaldos automáticos~~ — **mitigado**: el build super admin incluye respaldo periódico configurable con rotación de 3 días y log de resultados.
 
 ## Prioridades de prueba
 
