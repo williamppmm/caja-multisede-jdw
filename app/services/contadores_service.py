@@ -9,6 +9,7 @@ from app.services.local_data_service import get_local_data_path
 
 
 _CATALOGO_FILENAME = "contadores_items.json"
+_PAUSAS_FILENAME = "contadores_pausas.json"
 
 
 def _get_catalogo_path() -> Path:
@@ -75,19 +76,61 @@ def guardar_catalogo(items: list[dict]) -> list[dict]:
     return obtener_catalogo()
 
 
-def pausar_item(item_id: str, pausado: bool) -> dict:
-    """Pausa o despausa un ítem del catálogo. Devuelve el catálogo actualizado."""
-    data = _leer_json(_get_catalogo_path(), [])
-    encontrado = False
-    for raw in data:
-        if raw.get("item_id") == item_id:
-            raw["pausado"] = pausado
-            encontrado = True
-            break
-    if not encontrado:
+def _get_pausas_path() -> Path:
+    from app.config import get_excel_folder
+    return get_excel_folder() / _PAUSAS_FILENAME
+
+
+def _leer_pausas() -> dict:
+    """Devuelve el historial de pausas: {item_id: [{tipo, fecha}, ...]}"""
+    return _leer_json(_get_pausas_path(), {})
+
+
+def _guardar_pausas(pausas: dict) -> None:
+    _guardar_json(_get_pausas_path(), pausas)
+
+
+def esta_pausado_en_fecha(item_id: str, fecha: date, pausas: dict | None = None) -> bool:
+    """Devuelve True si el ítem está pausado en la fecha dada.
+    Regla: el último evento con fecha <= fecha_dada es 'pausa'."""
+    if pausas is None:
+        pausas = _leer_pausas()
+    eventos = pausas.get(str(item_id), [])
+    fecha_str = str(fecha)
+    ultimo = None
+    for evento in eventos:
+        if evento.get("fecha", "") <= fecha_str:
+            ultimo = evento
+    return ultimo is not None and ultimo.get("tipo") == "pausa"
+
+
+def toggle_pausa_en_fecha(item_id: str, fecha: date, pausado: bool) -> dict:
+    """Registra un evento de pausa o reactivación para item_id en la fecha dada.
+    Upsert: si ya existe un evento del mismo tipo en esa fecha, no duplica."""
+    catalogo = {item["item_id"]: item for item in obtener_catalogo()}
+    if str(item_id) not in catalogo:
         return {"ok": False, "mensaje": f"Item '{item_id}' no encontrado en el catálogo."}
-    _guardar_json(_get_catalogo_path(), data)
-    return {"ok": True, "item_id": item_id, "pausado": pausado}
+
+    pausas = _leer_pausas()
+    key = str(item_id)
+    fecha_str = str(fecha)
+    tipo_nuevo = "pausa" if pausado else "reactivacion"
+
+    eventos = pausas.get(key, [])
+    # Upsert: reemplazar evento existente para la misma fecha, si lo hay
+    reemplazado = False
+    for ev in eventos:
+        if ev.get("fecha") == fecha_str:
+            ev["tipo"] = tipo_nuevo
+            reemplazado = True
+            break
+    if not reemplazado:
+        eventos.append({"tipo": tipo_nuevo, "fecha": fecha_str})
+    # Mantener orden cronológico
+    eventos.sort(key=lambda e: e.get("fecha", ""))
+    pausas[key] = eventos
+    _guardar_pausas(pausas)
+    return {"ok": True, "item_id": item_id, "pausado": pausado, "fecha": fecha_str}
 
 
 def fecha_existe(fecha: date) -> bool:
@@ -166,14 +209,16 @@ def construir_base_fecha(fecha: date) -> dict:
     catalogo = obtener_catalogo()
     eventos_por_item = _construir_eventos_por_item(fecha, catalogo)
     guardados = excel_service.obtener_datos_contadores_fecha(fecha, fecha.year)
+    pausas = _leer_pausas()
     existe = bool(guardados)
     filas = []
     fecha_hora_registro = ""
 
     for item in catalogo:
-        ultimo_registro = obtener_ultimo_registro_real(item["item_id"], fecha, eventos_por_item)
-        guardado = guardados.get(item["item_id"], {})
-        ref = obtener_referencia_vigente(item["item_id"], fecha, eventos_por_item)
+        item_id = item["item_id"]
+        ultimo_registro = obtener_ultimo_registro_real(item_id, fecha, eventos_por_item)
+        guardado = guardados.get(item_id, {})
+        ref = obtener_referencia_vigente(item_id, fecha, eventos_por_item)
 
         if guardado.get("ref_entradas") is not None:
             ref = {
@@ -186,8 +231,20 @@ def construir_base_fecha(fecha: date) -> dict:
                 "observacion": guardado.get("observacion", ""),
             }
 
-        actual_entradas = int(guardado.get("entradas", 0))
-        actual_salidas = int(guardado.get("salidas", 0))
+        pausado = esta_pausado_en_fecha(item_id, fecha, pausas)
+
+        # Si el día ya fue guardado, usar los valores del Excel
+        # Si no fue guardado y el ítem está pausado con referencia válida, autocompletar entradas/salidas
+        if guardado:
+            actual_entradas = int(guardado.get("entradas", 0))
+            actual_salidas = int(guardado.get("salidas", 0))
+        elif pausado and ref is not None:
+            actual_entradas = int(ref.get("entradas", 0))
+            actual_salidas = int(ref.get("salidas", 0))
+        else:
+            actual_entradas = 0
+            actual_salidas = 0
+
         actual_jackpot = int(guardado.get(
             "jackpot",
             ultimo_registro.get("jackpot", ref.get("jackpot", 0) if ref else 0) if ultimo_registro else (ref.get("jackpot", 0) if ref else 0),
@@ -208,7 +265,7 @@ def construir_base_fecha(fecha: date) -> dict:
         observacion_guardada = guardado.get("observacion", "")
 
         filas.append({
-            "item_id": item["item_id"],
+            "item_id": item_id,
             "nombre": item["nombre"],
             "denominacion": int(item["denominacion"]),
             "activo": bool(item.get("activo", True)),
@@ -235,10 +292,10 @@ def construir_base_fecha(fecha: date) -> dict:
             "ref_salidas_guardada": guardado.get("ref_salidas"),
             "ref_jackpot_guardada": guardado.get("ref_jackpot"),
             "fecha_hora_registro": fhr,
-            "pausado": bool(item.get("pausado", False)),
+            "pausado": pausado,
         })
 
-    total = sum(float(f["resultado_monetario"]) for f in filas if f.get("activo", True) and not f.get("pausado", False))
+    total = sum(float(f["resultado_monetario"]) for f in filas if f.get("activo", True))
     return {
         "fecha": str(fecha),
         "existe": existe,
@@ -276,9 +333,6 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
             continue
 
         meta = catalogo[fila.item_id]
-        if meta.get("pausado", False):
-            continue  # Máquina en pausa — omitir silenciosamente
-
         ref = obtener_referencia_vigente(fila.item_id, entrada.fecha, eventos_por_item)
         alerta = bool(ref) and (
             fila.entradas < int(ref.get("entradas", 0))

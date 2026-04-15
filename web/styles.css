@@ -868,15 +868,21 @@ table.contadores-tabla th {
 }
 
 .contador-pausado td {
-  background: #f5f5f5;
-  color: #aaa;
+  background: #fafafa;
 }
 
-.contador-pausa-celdas {
-  text-align: center;
-  color: #bbb;
-  font-style: italic;
-  font-size: 0.85rem;
+.input-pausa-readonly {
+  background: #f0f2f6 !important;
+  color: #9aa !important;
+  cursor: default;
+}
+
+.pausa-sin-ref-aviso {
+  font-size: 0.72rem;
+  color: #e67e22;
+  margin-left: 2px;
+  vertical-align: super;
+  cursor: help;
 }
 
 /* Nombre + microcontroles en una sola línea */
@@ -2046,8 +2052,6 @@ h2,
 .movimientos-form .campo-manual input,
 #panel-contadores .contador-campo,
 #panel-contadores .contador-critica input,
-#panel-contadores .contador-pausa-accion input[type="password"],
-#panel-contadores .contador-critica-confirm input[type="password"],
 #cuadre-base-input-wrap input {
   font-size: 0.95rem;
 }

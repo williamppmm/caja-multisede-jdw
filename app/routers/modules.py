@@ -307,7 +307,11 @@ def guardar_catalogo(tipo: str, body: dict):
 @router.post("/contadores/catalogo/{item_id}/pausar")
 def pausar_contador(item_id: str, body: dict):
     pausado = bool(body.get("pausado", True))
-    return contadores_service.pausar_item(item_id, pausado)
+    try:
+        fecha = date.fromisoformat(body["fecha"])
+    except (KeyError, ValueError):
+        raise HTTPException(status_code=400, detail="Se requiere 'fecha' en formato YYYY-MM-DD")
+    return contadores_service.toggle_pausa_en_fecha(item_id, fecha, pausado)
 
 @router.get("/gastos/fecha/{fecha}/registros")
 def registros_fecha_gastos(fecha: str):

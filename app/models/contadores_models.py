@@ -74,7 +74,6 @@ class ContadorCatalogoItem(BaseModel):
     nombre: str
     denominacion: int
     activo: bool = True
-    pausado: bool = False
 
     @field_validator("item_id", "nombre")
     @classmethod
