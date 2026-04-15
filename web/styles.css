@@ -803,14 +803,6 @@ table.contadores-tabla th {
   margin-top: 10px;
 }
 
-.contador-critica-confirm input[type="password"] {
-  flex: 1;
-  padding: 6px 10px;
-  border: 1px solid #bbb;
-  border-radius: 5px;
-  font-size: 0.9rem;
-}
-
 .btn-confirmar-critica {
   padding: 6px 14px;
   background: #2F5496;
@@ -825,14 +817,6 @@ table.contadores-tabla th {
 
 .btn-confirmar-critica:hover { background: #1e3c7a; }
 .btn-confirmar-critica:disabled { background: #aaa; cursor: default; }
-
-.critica-pass-error {
-  display: block;
-  margin-top: 4px;
-  font-size: 0.8rem;
-  color: #c0392b;
-  font-weight: 600;
-}
 
 .contador-critica-grid {
   display: grid;
@@ -970,15 +954,6 @@ table.contadores-tabla th {
   box-shadow: 0 4px 16px rgba(0,0,0,0.13);
 }
 
-.contador-pausa-accion input[type="password"] {
-  flex: 1;
-  min-width: 110px;
-  padding: 5px 8px;
-  border: 1px solid #bbb;
-  border-radius: 5px;
-  font-size: 0.85rem;
-}
-
 .btn-toggle-pausa {
   padding: 5px 11px;
   background: #7b8798;
@@ -993,14 +968,6 @@ table.contadores-tabla th {
 
 .contador-pausado .btn-toggle-pausa {
   background: #2e7d32;
-}
-
-.pausa-pass-error {
-  display: block;
-  width: 100%;
-  font-size: 0.78rem;
-  color: #c0392b;
-  font-weight: 600;
 }
 
 .contadores-resumen-top {

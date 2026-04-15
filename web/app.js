@@ -931,9 +931,8 @@ function renderContadores(items = [], total = 0) {
             <details class="contador-pausa-detalle">
               <summary title="Reactivar máquina">▶</summary>
               <div class="contador-pausa-accion">
-                <input type="password" data-role="pausa-password" placeholder="Clave" autocomplete="off" tabindex="-1" />
+                <span class="pausa-aviso">¿Reactivar esta máquina?</span>
                 <button type="button" class="btn-toggle-pausa" data-pausado="1" tabindex="-1">OK</button>
-                <span class="pausa-pass-error oculto"></span>
               </div>
             </details>
           </div>
@@ -960,18 +959,16 @@ function renderContadores(items = [], total = 0) {
                   <input type="text" inputmode="numeric" data-role="critica-pre-reset" placeholder="0" value="${limpiarNumeroTexto(fila.produccion_pre_reset_guardada || 0)}" />
                 </div>
                 <div class="contador-critica-confirm">
-                  <input type="password" data-role="critica-password" placeholder="Clave" autocomplete="off" />
+                  <span class="critica-aviso">Los valores ingresados se usarán como referencia de corrección.</span>
                   <button type="button" class="btn-confirmar-critica">OK</button>
                 </div>
-                <span class="critica-pass-error oculto"></span>
               </div>
             </details>
             <details class="contador-pausa-detalle">
               <summary title="Pausar máquina">⏸</summary>
               <div class="contador-pausa-accion">
-                <input type="password" data-role="pausa-password" placeholder="Clave" autocomplete="off" tabindex="-1" />
+                <span class="pausa-aviso">¿Pausar esta máquina?</span>
                 <button type="button" class="btn-toggle-pausa" data-pausado="0" tabindex="-1">OK</button>
-                <span class="pausa-pass-error oculto"></span>
               </div>
             </details>
           </div>
@@ -1133,17 +1130,6 @@ function actualizarSummaryCritica(row) {
 }
 
 function confirmarReferenciaCritica(row) {
-  const passField = row.querySelector('[data-role="critica-password"]');
-  const passError = row.querySelector('.critica-pass-error');
-  const pass = (passField?.value || '').trim();
-  const ok = (configSuperAdminMode && !!configActiveSite) || isOverrideActive('contadores') || pass === CONTRASENA;
-  if (!ok) {
-    if (passError) { passError.textContent = 'Contraseña incorrecta.'; passError.classList.remove('oculto'); }
-    if (passField) { passField.value = ''; passField.focus(); }
-    return;
-  }
-  if (passError) { passError.textContent = ''; passError.classList.add('oculto'); }
-  if (passField) passField.value = '';
   const defaults = {
     'critica-entradas': row.dataset.refEntradas || '0',
     'critica-salidas': row.dataset.refSalidas || '0',
@@ -1165,16 +1151,6 @@ async function togglePausaContador(btn) {
   const row = btn.closest('tr');
   if (!row) return;
   const pausado = btn.dataset.pausado === '1';
-  const detalle = btn.closest('.contador-pausa-detalle');
-  const passField = detalle?.querySelector('[data-role="pausa-password"]');
-  const passError = detalle?.querySelector('.pausa-pass-error');
-  const pass = (passField?.value || '').trim();
-  const ok = (configSuperAdminMode && !!configActiveSite) || isOverrideActive('contadores') || pass === CONTRASENA;
-  if (!ok) {
-    if (passError) { passError.textContent = 'Contraseña incorrecta.'; passError.classList.remove('oculto'); }
-    if (passField) { passField.value = ''; passField.focus(); }
-    return;
-  }
   const itemId = row.dataset.itemId;
   try {
     const res = await fetch(`/api/modulos/contadores/catalogo/${encodeURIComponent(itemId)}/pausar`, {
@@ -2528,7 +2504,7 @@ function validarContadores() {
     const usaCritica = row.dataset.criticaAutorizada === '1';
 
     if (alerta && !usaCritica) {
-      return `${row.dataset.nombre}: hay valores menores a la referencia en Entradas, Salidas o Jackpot. Abre "Referencia crítica", ajusta los valores y confirma con la contraseña.`;
+      return `${row.dataset.nombre}: hay valores menores a la referencia en Entradas, Salidas o Jackpot. Abre "Referencia crítica", ajusta los valores y confirma con OK.`;
     }
 
   }
@@ -3772,14 +3748,7 @@ async function init() {
     }
   }, true);
   document.getElementById('contadores-body').addEventListener('keydown', e => {
-    const ROLES_CRITICA = ['critica-entradas', 'critica-salidas', 'critica-jackpot', 'critica-pre-reset', 'critica-password'];
-
-    // Enter en contraseña: confirmar directamente
-    if (e.key === 'Enter' && e.target.matches('[data-role="critica-password"]')) {
-      e.preventDefault();
-      confirmarReferenciaCritica(e.target.closest('tr'));
-      return;
-    }
+    const ROLES_CRITICA = ['critica-entradas', 'critica-salidas', 'critica-jackpot', 'critica-pre-reset'];
 
     // Tab / Enter dentro del sub-módulo de referencia crítica
     if ((e.key === 'Tab' || e.key === 'Enter') && ROLES_CRITICA.includes(e.target.dataset.role)) {
@@ -3795,7 +3764,7 @@ async function init() {
         orden[idx + 1].focus();
         orden[idx + 1].select?.();
       } else {
-        // Último campo (contraseña) + Tab → botón Confirmar
+        // Último campo + Tab/Enter → botón Confirmar
         row.querySelector('.btn-confirmar-critica')?.focus();
       }
       return;
