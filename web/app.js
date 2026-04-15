@@ -176,6 +176,28 @@ function formatFechaVisual(fechaIso) {
   return fechaIso;
 }
 
+function obtenerNombreDia(fechaIso) {
+  const match = String(fechaIso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '';
+  const [, year, month, day] = match;
+  const fecha = new Date(Number(year), Number(month) - 1, Number(day));
+  if (Number.isNaN(fecha.getTime())) return '';
+  return fecha.toLocaleDateString('es-CO', { weekday: 'long' });
+}
+
+function capitalizarTexto(texto) {
+  const valor = String(texto || '').trim();
+  return valor ? valor.charAt(0).toUpperCase() + valor.slice(1) : '';
+}
+
+function actualizarDiaFecha(fechaIso) {
+  const el = document.getElementById('fecha-dia');
+  if (!el) return;
+  const nombreDia = capitalizarTexto(obtenerNombreDia(fechaIso));
+  el.textContent = nombreDia || 'Sin fecha';
+  el.classList.toggle('oculto', !nombreDia);
+}
+
 function formatFechaHoraVisual(valor) {
   if (!valor) return '';
   const texto = String(valor);
@@ -1890,6 +1912,7 @@ function aplicarFechaModulo(modulo, usarDefault = false) {
     setSharedModuleDate(sugerirFechaModulo(modulo));
   }
   document.getElementById('fecha').value = moduleDates[modulo];
+  actualizarDiaFecha(moduleDates[modulo]);
   actualizarBotonAbrirXlsx();
 }
 
@@ -3576,6 +3599,7 @@ async function init() {
     if (currentModule === 'caja') guardarDraftCaja(fechaAnterior);
     if (currentModule === 'contadores') guardarDraftContadores(fechaAnterior);
     setSharedModuleDate(e.target.value);
+    actualizarDiaFecha(e.target.value);
     if (currentModule !== 'caja') resetOverride(currentModule);
     if (currentModule === 'caja') resetOverride('caja');
     if (currentModule === 'bonos') {

@@ -124,6 +124,20 @@ h2 {
   font-weight: 500;
 }
 
+.fecha-dia {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border-soft);
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
 .fecha-estado.existe {
   color: #c0392b;
 }
