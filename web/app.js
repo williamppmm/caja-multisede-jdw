@@ -41,6 +41,7 @@ let loanItems = [];
 let movementItems = [];
 let quickEditMode = { bonos: false, gastos: false, prestamos: false, movimientos: false };
 let cajaLocked = false;
+let _cerrando = false;
 let cajaDrafts = {};
 let contadorCatalog = [];
 let contadoresDrafts = {};
@@ -194,6 +195,28 @@ function formatFechaVisual(fechaIso) {
     return `${day}-${month}-${year}`;
   }
   return fechaIso;
+}
+
+function obtenerNombreDia(fechaIso) {
+  const match = String(fechaIso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '';
+  const [, year, month, day] = match;
+  const fecha = new Date(Number(year), Number(month) - 1, Number(day));
+  if (Number.isNaN(fecha.getTime())) return '';
+  return fecha.toLocaleDateString('es-CO', { weekday: 'long' });
+}
+
+function capitalizarTexto(texto) {
+  const valor = String(texto || '').trim();
+  return valor ? valor.charAt(0).toUpperCase() + valor.slice(1) : '';
+}
+
+function actualizarDiaFecha(fechaIso) {
+  const el = document.getElementById('fecha-dia');
+  if (!el) return;
+  const nombreDia = capitalizarTexto(obtenerNombreDia(fechaIso));
+  el.textContent = nombreDia || 'Sin fecha';
+  el.classList.toggle('oculto', !nombreDia);
 }
 
 function formatFechaHoraVisual(valor) {
@@ -869,17 +892,17 @@ function obtenerModulosConCambiosSinGuardar() {
   return pendientes;
 }
 
-function crearInputContador(role, value = '') {
+function crearInputContador(role, value = '', refPlaceholder = null) {
   const limpio = limpiarNumeroTexto(value);
-  if (limpio === '') {
-    return `<input type="text" inputmode="numeric" class="contador-campo" data-role="${role}" value="" placeholder="0" />`;
-  }
-  const numero = Number(limpio);
+  const numero = limpio === '' ? 0 : Number(limpio);
+  const placeholder = refPlaceholder != null && Number(refPlaceholder) > 0
+    ? limpiarNumeroTexto(refPlaceholder)
+    : '0';
   // Entradas y salidas deben arrancar visualmente vacias cuando su valor es 0.
   // Jackpot, en cambio, puede venir heredado del ultimo registro y debe mostrarse
   // siempre que traiga un valor real distinto de 0.
   const valor = numero === 0 ? '' : limpio;
-  return `<input type="text" inputmode="numeric" class="contador-campo" data-role="${role}" value="${valor}" placeholder="0" />`;
+  return `<input type="text" inputmode="numeric" class="contador-campo" data-role="${role}" value="${valor}" placeholder="${placeholder}" />`;
 }
 
 function valorTextoContador(row, role) {
@@ -995,8 +1018,8 @@ function renderContadores(items = [], total = 0) {
           </div>
         </td>
         <td>${fmt(fila.denominacion || 0)}</td>
-        <td>${crearInputContador('entradas', fila.entradas)}</td>
-        <td>${crearInputContador('salidas', fila.salidas)}</td>
+        <td>${crearInputContador('entradas', fila.entradas, fila.referencia?.entradas)}</td>
+        <td>${crearInputContador('salidas', fila.salidas, fila.referencia?.salidas)}</td>
         <td>${crearInputContador('jackpot', fila.jackpot)}</td>
         <td class="contador-yield" data-role="yield-actual">${limpiarNumeroTexto(fila.yield_actual || 0, true)}</td>
         <td data-role="yield-ref">${limpiarNumeroTexto(fila.referencia?.yield || 0, true)}<span class="yield-ref-fecha" title="${refFechaTitle}">·</span></td>
@@ -1807,6 +1830,7 @@ function aplicarFechaModulo(modulo, usarDefault = false) {
     setSharedModuleDate(sugerirFechaModulo(modulo));
   }
   document.getElementById('fecha').value = moduleDates[modulo];
+  actualizarDiaFecha(moduleDates[modulo]);
 }
 
 function resetOverride(modulo) {
@@ -3181,6 +3205,7 @@ async function buscarCarpetaDatos() {
 }
 
 async function cerrarAplicacion() {
+  if (_cerrando) return;
   const pendientes = obtenerModulosConCambiosSinGuardar();
   const mensaje = pendientes.length
     ? `Hay datos sin guardar en ${pendientes.join(' y ')}.\n\nSi finalizas ahora, esa captura se perderá.\n\n¿Desea cerrar de todos modos?`
@@ -3188,11 +3213,13 @@ async function cerrarAplicacion() {
   const confirmar = window.confirm(mensaje);
   if (!confirmar) return;
 
+  _cerrando = true;
   try {
     await fetch('/api/app/shutdown', { method: 'POST' });
     mostrarMensaje('La aplicación se está cerrando...', 'ok');
     setTimeout(() => window.close(), 300);
   } catch {
+    _cerrando = false;
     mostrarMensaje('No se pudo cerrar la aplicación desde la interfaz.', 'error');
   }
 }
@@ -3309,6 +3336,7 @@ async function init() {
     if (currentModule === 'caja') guardarDraftCaja(fechaAnterior);
     if (currentModule === 'contadores') guardarDraftContadores(fechaAnterior);
     setSharedModuleDate(e.target.value);
+    actualizarDiaFecha(e.target.value);
     if (currentModule !== 'caja') resetOverride(currentModule);
     if (currentModule === 'caja') resetOverride('caja');
     if (currentModule === 'bonos') {
@@ -3589,6 +3617,7 @@ async function init() {
     if (e.target === e.currentTarget) cerrarAdmin();
   });
   window.addEventListener('beforeunload', e => {
+    if (_cerrando) return;
     if (!obtenerModulosConCambiosSinGuardar().length) return;
     e.preventDefault();
     e.returnValue = '';
