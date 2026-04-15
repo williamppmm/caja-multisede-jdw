@@ -3750,6 +3750,13 @@ async function init() {
   document.getElementById('contadores-body').addEventListener('keydown', e => {
     const ROLES_CRITICA = ['critica-entradas', 'critica-salidas', 'critica-jackpot', 'critica-pre-reset'];
 
+    // Enter sobre el botón OK de referencia crítica → confirmar
+    if (e.key === 'Enter' && e.target.matches('.btn-confirmar-critica')) {
+      e.preventDefault();
+      confirmarReferenciaCritica(e.target.closest('tr'));
+      return;
+    }
+
     // Tab / Enter dentro del sub-módulo de referencia crítica
     if ((e.key === 'Tab' || e.key === 'Enter') && ROLES_CRITICA.includes(e.target.dataset.role)) {
       e.preventDefault();
