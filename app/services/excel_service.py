@@ -608,31 +608,6 @@ def obtener_datos_plataformas_fecha(fecha: date, year: int) -> dict | None:
 
 
 def obtener_items_modulo_fecha(modulo: str, fecha: date, year: int) -> dict | None:
-    if modulo == "bonos":
-        registros = obtener_bonos_fecha(fecha, year)
-        if not registros:
-            return None
-        return {
-            "items": [{"concepto": item["cliente"], "valor": item["valor"]} for item in registros],
-            "total": sum(item["valor"] for item in registros),
-        }
-    if modulo == "prestamos":
-        registros = obtener_prestamos_fecha(fecha, year)
-        if not registros:
-            return None
-        return {
-            "items": [{"concepto": item["persona"], "valor": item["valor"]} for item in registros],
-            "total": sum(item["valor"] for item in registros),
-        }
-    if modulo == "movimientos":
-        registros = obtener_movimientos_fecha(fecha, year)
-        if not registros:
-            return None
-        return {
-            "items": [{"concepto": item["concepto"], "valor": item["valor"]} for item in registros],
-            "total": sum(item["valor"] for item in registros),
-        }
-
     path = get_excel_path(year)
     if not path.exists():
         return None
@@ -831,7 +806,12 @@ def _parsear_fila_contadores(row) -> dict:
     }
 
 
-def _leer_movimientos_prestamos_desde_hoja(ws) -> list[dict]:
+def _leer_movimientos_prestamos_desde_hoja(
+    ws,
+    *,
+    persona_norm: str | None = None,
+    fecha_objetivo: date | None = None,
+) -> list[dict]:
     headers = [str(cell.value or "").strip().lower() for cell in ws[1]]
     schema_nuevo = headers[:6] == PRESTAMOS_HEADERS
     registros = []
@@ -842,6 +822,8 @@ def _leer_movimientos_prestamos_desde_hoja(ws) -> list[dict]:
         if isinstance(cell_date, datetime):
             cell_date = cell_date.date()
         if not isinstance(cell_date, date):
+            continue
+        if fecha_objetivo and cell_date != fecha_objetivo:
             continue
 
         if schema_nuevo:
@@ -858,6 +840,8 @@ def _leer_movimientos_prestamos_desde_hoja(ws) -> list[dict]:
             timestamp = row[3]
 
         if not persona:
+            continue
+        if persona_norm and persona.strip().lower() != persona_norm:
             continue
         if isinstance(hora, datetime):
             hora_texto = hora.strftime("%I:%M %p")
@@ -879,6 +863,18 @@ def _leer_movimientos_prestamos_desde_hoja(ws) -> list[dict]:
             "fecha_hora_registro": timestamp.isoformat() if isinstance(timestamp, datetime) else str(timestamp or ""),
         })
     return registros
+
+
+def _resumen_prestamos_desde_registros(registros: list[dict]) -> dict:
+    total_prestado = sum(float(item["valor"] or 0) for item in registros if item["tipo_movimiento"] == "prestamo")
+    total_pagado = sum(float(item["valor"] or 0) for item in registros if item["tipo_movimiento"] == "pago")
+    saldo_pendiente = total_prestado - total_pagado
+    return {
+        "items": registros,
+        "total_prestado": total_prestado,
+        "total_pagado": total_pagado,
+        "saldo_pendiente": saldo_pendiente,
+    }
 
 def guardar_bono_registro(fecha: date, cliente: str, valor: float, timestamp: datetime) -> float:
     fila = [fecha, timestamp, cliente, valor, timestamp]
@@ -913,7 +909,7 @@ def guardar_prestamo_registro(
     tipo_movimiento: str,
     valor: float,
     timestamp: datetime,
-) -> dict:
+) -> None:
     fila = [fecha, timestamp, persona, tipo_movimiento, valor, timestamp]
     path = get_excel_path(fecha.year)
     with _bloqueo_escritura(path):
@@ -930,8 +926,6 @@ def guardar_prestamo_registro(
             ) from exc
         finally:
             wb.close()
-    resumen = obtener_resumen_prestamos(persona=persona)
-    return resumen
 
 
 def guardar_movimiento_registro(
@@ -1017,8 +1011,8 @@ def obtener_prestamos_fecha(fecha: date, year: int) -> list[dict]:
         if not hojas:
             return []
         for ws in hojas:
-            registros.extend(_leer_movimientos_prestamos_desde_hoja(ws))
-    return [item for item in registros if item["fecha"] == fecha.isoformat()]
+            registros.extend(_leer_movimientos_prestamos_desde_hoja(ws, fecha_objetivo=fecha))
+    return registros
 
 
 def obtener_movimientos_fecha(fecha: date, year: int) -> list[dict]:
@@ -1061,7 +1055,8 @@ def obtener_movimientos_fecha(fecha: date, year: int) -> list[dict]:
     return registros
 
 
-def obtener_movimientos_prestamos() -> list[dict]:
+def obtener_movimientos_prestamos(persona: str | None = None) -> list[dict]:
+    persona_norm = persona.strip().lower() if persona else None
     registros = []
     for path in _obtener_paths_excel_sede():
         if not path.exists():
@@ -1069,7 +1064,7 @@ def obtener_movimientos_prestamos() -> list[dict]:
         with _abrir_workbook_lectura(path) as wb:
             hojas = _obtener_hojas_para_lectura(wb, "prestamos")
             for ws in hojas:
-                registros.extend(_leer_movimientos_prestamos_desde_hoja(ws))
+                registros.extend(_leer_movimientos_prestamos_desde_hoja(ws, persona_norm=persona_norm))
     registros.sort(key=lambda item: (item["fecha"], item["fecha_hora_registro"] or ""))
 
     # Calcular saldo corrido completo y registrar dónde cerró cada ciclo (saldo == 0).
@@ -1096,19 +1091,7 @@ def obtener_movimientos_prestamos() -> list[dict]:
 
 
 def obtener_resumen_prestamos(persona: str | None = None) -> dict:
-    registros = obtener_movimientos_prestamos()
-    if persona:
-        persona_norm = persona.strip().lower()
-        registros = [item for item in registros if item["persona"].strip().lower() == persona_norm]
-    total_prestado = sum(float(item["valor"] or 0) for item in registros if item["tipo_movimiento"] == "prestamo")
-    total_pagado = sum(float(item["valor"] or 0) for item in registros if item["tipo_movimiento"] == "pago")
-    saldo_pendiente = total_prestado - total_pagado
-    return {
-        "items": registros,
-        "total_prestado": total_prestado,
-        "total_pagado": total_pagado,
-        "saldo_pendiente": saldo_pendiente,
-    }
+    return _resumen_prestamos_desde_registros(obtener_movimientos_prestamos(persona=persona))
 
 
 def obtener_movimientos_prestamos_super_admin(fecha_objetivo: date) -> dict:
@@ -1150,94 +1133,6 @@ def obtener_movimientos_prestamos_super_admin(fecha_objetivo: date) -> dict:
         "saldos_por_persona": {k: round(v, 2) for k, v in saldos_por_persona.items()},
         "deuda_total_activa": deuda_total_activa,
     }
-
-
-def obtener_ultimo_bono(fecha: date, year: int) -> dict | None:
-    registros = obtener_bonos_fecha(fecha, year)
-    return registros[-1] if registros else None
-
-
-def actualizar_ultimo_bono(fecha: date, year: int, cliente: str, valor: float, timestamp: datetime) -> dict | None:
-    path = get_excel_path(year)
-    if not path.exists():
-        return None
-
-    with _bloqueo_escritura(path):
-        wb = _abrir_o_crear_workbook(path)
-        ws = _asegurar_hoja(wb, "bonos")
-        ultimo_row = None
-        ultimo_ts = None
-        for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
-            cell_date = row[0].value
-            if isinstance(cell_date, datetime):
-                cell_date = cell_date.date()
-            if not (isinstance(cell_date, date) and cell_date == fecha):
-                continue
-            ts = row[4].value
-            if isinstance(ts, datetime) and (ultimo_ts is None or ts >= ultimo_ts):
-                ultimo_ts = ts
-                ultimo_row = idx
-        if ultimo_row is None:
-            wb.close()
-            return None
-        valor_anterior = float(ws.cell(ultimo_row, 4).value or 0)
-        ws.cell(ultimo_row, 3).value = cliente
-        ws.cell(ultimo_row, 4).value = valor
-        ws.cell(ultimo_row, 5).value = timestamp
-        _formatear_filas_recientes_bonos(ws, 1)
-        total_dia = 0.0
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            cell_date = row[0]
-            if isinstance(cell_date, datetime):
-                cell_date = cell_date.date()
-            if isinstance(cell_date, date) and cell_date == fecha:
-                total_dia += float(row[3] or 0)
-        wb.save(path)
-        wb.close()
-    return {
-        "hora_display": timestamp.strftime("%I:%M %p"),
-        "cliente": cliente,
-        "valor": float(valor),
-        "valor_anterior": valor_anterior,
-        "total_dia": total_dia,
-    }
-
-
-def eliminar_ultimo_bono(fecha: date, year: int) -> float | None:
-    path = get_excel_path(year)
-    if not path.exists():
-        return None
-
-    with _bloqueo_escritura(path):
-        wb = _abrir_o_crear_workbook(path)
-        ws = _asegurar_hoja(wb, "bonos")
-        ultimo_row = None
-        ultimo_ts = None
-        for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
-            cell_date = row[0].value
-            if isinstance(cell_date, datetime):
-                cell_date = cell_date.date()
-            if not (isinstance(cell_date, date) and cell_date == fecha):
-                continue
-            ts = row[4].value
-            if isinstance(ts, datetime) and (ultimo_ts is None or ts >= ultimo_ts):
-                ultimo_ts = ts
-                ultimo_row = idx
-        if ultimo_row is None:
-            wb.close()
-            return None
-        ws.delete_rows(ultimo_row)
-        total_dia = 0.0
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            cell_date = row[0]
-            if isinstance(cell_date, datetime):
-                cell_date = cell_date.date()
-            if isinstance(cell_date, date) and cell_date == fecha:
-                total_dia += float(row[3] or 0)
-        wb.save(path)
-        wb.close()
-        return total_dia
-
 
 def obtener_prestamos_raw_fecha(fecha: date, year: int) -> list[dict]:
     """Todos los movimientos de préstamos de una fecha, sin filtro de ciclo activo."""
@@ -1498,10 +1393,7 @@ def actualizar_prestamo_por_ts(fecha: date, year: int, ts_str: str, persona: str
         _formatear_filas_recientes_prestamos(ws, 1)
         wb.save(path)
         wb.close()
-    return {
-        "items": obtener_prestamos_fecha(fecha, year),
-        **obtener_resumen_prestamos(persona=persona),
-    }
+    return obtener_resumen_prestamos(persona=persona)
 
 
 def eliminar_prestamo_por_ts(fecha: date, year: int, ts_str: str) -> dict | None:
@@ -1525,10 +1417,7 @@ def eliminar_prestamo_por_ts(fecha: date, year: int, ts_str: str) -> dict | None
         ws.delete_rows(target)
         wb.save(path)
         wb.close()
-    return {
-        "items": obtener_prestamos_fecha(fecha, year),
-        **obtener_resumen_prestamos(persona=persona),
-    }
+    return obtener_resumen_prestamos(persona=persona)
 
 
 def actualizar_movimiento_por_ts(fecha: date, year: int, ts_str: str, tipo: str, concepto: str, valor: float, observacion: str, new_ts: datetime) -> dict | None:

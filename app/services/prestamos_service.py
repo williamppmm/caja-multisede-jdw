@@ -28,13 +28,25 @@ def guardar_prestamo(entrada: PrestamoEntrada) -> dict:
 
     try:
         timestamp = datetime.now().replace(microsecond=0)
-        resumen = excel_service.guardar_prestamo_registro(
+        excel_service.guardar_prestamo_registro(
             entrada.fecha,
             persona,
             tipo,
             valor,
             timestamp,
         )
+        if tipo == "pago":
+            resumen = {
+                "total_prestado": float(resumen_actual["total_prestado"]),
+                "total_pagado": float(resumen_actual["total_pagado"]) + valor,
+                "saldo_pendiente": float(resumen_actual["saldo_pendiente"]) - valor,
+            }
+        else:
+            resumen = {
+                "total_prestado": float(resumen_actual["total_prestado"]) + valor,
+                "total_pagado": float(resumen_actual["total_pagado"]),
+                "saldo_pendiente": float(resumen_actual["saldo_pendiente"]) + valor,
+            }
         nombres_service.agregar_item_catalogo("prestamos", persona)
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}

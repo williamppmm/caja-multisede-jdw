@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+from types import SimpleNamespace
 
 from app.config import DENOMINACIONES
 from app.services import excel_service, startup_state_service
@@ -76,29 +77,33 @@ def _fmt(d: date) -> str:
 
 # ─── Período operativo ────────────────────────────────────────────────────────
 
-def _encontrar_inicio_periodo(fecha_cuadre: date) -> date:
+def _cargar_fechas_modulos(modulos: list[str], years: list[int]) -> dict[str, set[date]]:
+    fechas_por_modulo: dict[str, set[date]] = {modulo: set() for modulo in modulos}
+    for year in years:
+        for modulo in modulos:
+            for fecha_str in excel_service.obtener_fechas_modulo_año(modulo, year):
+                try:
+                    fechas_por_modulo[modulo].add(date.fromisoformat(fecha_str))
+                except ValueError:
+                    continue
+    return fechas_por_modulo
+
+def _encontrar_inicio_periodo(
+    fecha_cuadre: date,
+    fechas_caja: set[date] | None = None,
+    fechas_contadores: set[date] | None = None,
+) -> date:
     """
     Busca hacia atrás el último día anterior a fecha_cuadre que tenga
     AMBOS Caja y Contadores. El período comienza el día siguiente a ese corte.
     Si no se encuentra ninguno, arranca desde el primer día con cualquier dato.
     """
-    year = fecha_cuadre.year
-    years_to_check = list(dict.fromkeys([year, year - 1]))
-
-    fechas_caja: set[date] = set()
-    fechas_contadores: set[date] = set()
-
-    for y in years_to_check:
-        for f in excel_service.obtener_fechas_modulo_año("caja", y):
-            try:
-                fechas_caja.add(date.fromisoformat(f))
-            except ValueError:
-                pass
-        for f in excel_service.obtener_fechas_modulo_año("contadores", y):
-            try:
-                fechas_contadores.add(date.fromisoformat(f))
-            except ValueError:
-                pass
+    if fechas_caja is None or fechas_contadores is None:
+        year = fecha_cuadre.year
+        years_to_check = list(dict.fromkeys([year, year - 1]))
+        fechas = _cargar_fechas_modulos(["caja", "contadores"], years_to_check)
+        fechas_caja = fechas["caja"]
+        fechas_contadores = fechas["contadores"]
 
     # Días anteriores a fecha_cuadre con ambos módulos completos
     dias_completos = sorted(
@@ -139,7 +144,14 @@ def resolver_periodo_operativo(fecha_cuadre: date) -> dict:
         fecha_cuadre debe tener ambos (Caja + Contadores) y no debe haber
         dias_inconsistentes en el período.
     """
-    inicio = _encontrar_inicio_periodo(fecha_cuadre)
+    MODULOS_ACUMULABLES = ["bonos", "gastos", "plataformas", "prestamos", "movimientos"]
+    years_to_check = list(dict.fromkeys([fecha_cuadre.year, fecha_cuadre.year - 1]))
+    fechas_por_modulo = _cargar_fechas_modulos(["caja", "contadores", *MODULOS_ACUMULABLES], years_to_check)
+    inicio = _encontrar_inicio_periodo(
+        fecha_cuadre,
+        fechas_caja=fechas_por_modulo["caja"],
+        fechas_contadores=fechas_por_modulo["contadores"],
+    )
 
     periodo: list[date] = []
     d = inicio
@@ -147,21 +159,19 @@ def resolver_periodo_operativo(fecha_cuadre: date) -> dict:
         periodo.append(d)
         d += timedelta(days=1)
 
-    MODULOS_ACUMULABLES = ["bonos", "gastos", "plataformas", "prestamos", "movimientos"]
-
     dias_acumulados: list[date] = []
     dias_inconsistentes: list[date] = []
 
     for d in periodo[:-1]:  # días anteriores a fecha_cuadre
-        tiene_caja_d = excel_service.fecha_existe_modulo("caja", d, d.year)
-        tiene_cont_d = excel_service.fecha_existe_modulo("contadores", d, d.year)
+        tiene_caja_d = d in fechas_por_modulo["caja"]
+        tiene_cont_d = d in fechas_por_modulo["contadores"]
 
         if tiene_caja_d and tiene_cont_d:
             # No debería ocurrir por construcción, pero se ignora defensivamente
             continue
         elif not tiene_caja_d and not tiene_cont_d:
             has_data = any(
-                excel_service.fecha_existe_modulo(m, d, d.year)
+                d in fechas_por_modulo[m]
                 for m in MODULOS_ACUMULABLES
             )
             if has_data:
@@ -170,8 +180,8 @@ def resolver_periodo_operativo(fecha_cuadre: date) -> dict:
             # Solo uno de los dos — inconsistencia operativa
             dias_inconsistentes.append(d)
 
-    tiene_caja_dia = excel_service.fecha_existe_modulo("caja", fecha_cuadre, fecha_cuadre.year)
-    tiene_cont_dia = excel_service.fecha_existe_modulo("contadores", fecha_cuadre, fecha_cuadre.year)
+    tiene_caja_dia = fecha_cuadre in fechas_por_modulo["caja"]
+    tiene_cont_dia = fecha_cuadre in fechas_por_modulo["contadores"]
 
     puede_guardar = tiene_caja_dia and tiene_cont_dia and not dias_inconsistentes
 
@@ -191,7 +201,7 @@ def resolver_periodo_operativo(fecha_cuadre: date) -> dict:
     if dias_inconsistentes:
         detalles: list[str] = []
         for d in dias_inconsistentes:
-            tiene_c = excel_service.fecha_existe_modulo("caja", d, d.year)
+            tiene_c = d in fechas_por_modulo["caja"]
             falta = "Contadores" if tiene_c else "Caja"
             detalles.append(f"{_fmt(d)} falta {falta}")
         partes_error.append(
@@ -228,7 +238,7 @@ def resolver_periodo_operativo(fecha_cuadre: date) -> dict:
         "mensaje_error": mensaje_error,
         "fechas_sin_caja": [
             str(d) for d in dias_inconsistentes
-            if not excel_service.fecha_existe_modulo("caja", d, d.year)
+            if d not in fechas_por_modulo["caja"]
         ],
     }
 
@@ -483,13 +493,8 @@ def autoguardar_cuadre_si_listo(fecha: date) -> dict | None:
     if not preconds["ok"] or not preconds["tiene_base_anterior"]:
         return None
 
-    class _EntradaAutoguardado:
-        def __init__(self, fecha_ref: date, forzar: bool):
-            self.fecha = fecha_ref
-            self.forzar = forzar
-
-    entrada = _EntradaAutoguardado(
-        fecha_ref=fecha,
+    entrada = SimpleNamespace(
+        fecha=fecha,
         forzar=excel_service.fecha_existe_modulo("cuadre", fecha, year),
     )
     return guardar_cuadre(entrada, float(preconds["base_anterior"] or 0))
