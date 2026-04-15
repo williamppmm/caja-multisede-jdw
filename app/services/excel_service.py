@@ -1,4 +1,5 @@
 import os
+from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
@@ -150,14 +151,7 @@ def obtener_hojas_activas() -> dict[str, str]:
 
 
 def _nombres_unicos(nombres: list[str]) -> list[str]:
-    vistos = set()
-    resultado = []
-    for nombre in nombres:
-        if not nombre or nombre in vistos:
-            continue
-        vistos.add(nombre)
-        resultado.append(nombre)
-    return resultado
+    return [nombre for nombre in dict.fromkeys(nombres) if nombre]
 
 
 def _nombres_legacy_caja() -> list[str]:
@@ -354,75 +348,94 @@ def _iterar_filas_fecha(hojas, fecha_objetivo: date):
 
 
 def _formatear_filas_recientes(ws, cantidad_filas: int) -> None:
+    _formatear_filas_recientes_columnas(
+        ws,
+        cantidad_filas,
+        {
+            1: "DD-MM-YYYY",
+            7: "#,##0",
+            8: "DD-MM-YYYY HH:mm:SS",
+        },
+    )
+
+
+def _formatear_filas_recientes_columnas(
+    ws,
+    cantidad_filas: int,
+    formatos: dict[int, str],
+) -> None:
     if cantidad_filas <= 0:
         return
 
     last_row = ws.max_row
     start_row = last_row - cantidad_filas + 1
     for row_num in range(start_row, last_row + 1):
-        ws.cell(row_num, 7).number_format = "#,##0"
-        ws.cell(row_num, 1).number_format = "DD-MM-YYYY"
-        ws.cell(row_num, 8).number_format = "DD-MM-YYYY HH:mm:SS"
+        for col, formato in formatos.items():
+            ws.cell(row_num, col).number_format = formato
 
 
 def _formatear_filas_recientes_bonos(ws, cantidad_filas: int) -> None:
-    if cantidad_filas <= 0:
-        return
-    last_row = ws.max_row
-    start_row = last_row - cantidad_filas + 1
-    for row_num in range(start_row, last_row + 1):
-        ws.cell(row_num, 1).number_format = "DD-MM-YYYY"
-        ws.cell(row_num, 2).number_format = "HH:mm AM/PM"
-        ws.cell(row_num, 4).number_format = "#,##0"
-        ws.cell(row_num, 5).number_format = "DD-MM-YYYY HH:mm:SS"
+    _formatear_filas_recientes_columnas(
+        ws,
+        cantidad_filas,
+        {
+            1: "DD-MM-YYYY",
+            2: "HH:mm AM/PM",
+            4: "#,##0",
+            5: "DD-MM-YYYY HH:mm:SS",
+        },
+    )
 
 
 def _formatear_filas_recientes_prestamos(ws, cantidad_filas: int) -> None:
-    if cantidad_filas <= 0:
-        return
-    last_row = ws.max_row
-    start_row = last_row - cantidad_filas + 1
-    for row_num in range(start_row, last_row + 1):
-        ws.cell(row_num, 1).number_format = "DD-MM-YYYY"
-        ws.cell(row_num, 2).number_format = "HH:mm AM/PM"
-        ws.cell(row_num, 5).number_format = "#,##0"
-        ws.cell(row_num, 6).number_format = "DD-MM-YYYY HH:mm:SS"
+    _formatear_filas_recientes_columnas(
+        ws,
+        cantidad_filas,
+        {
+            1: "DD-MM-YYYY",
+            2: "HH:mm AM/PM",
+            5: "#,##0",
+            6: "DD-MM-YYYY HH:mm:SS",
+        },
+    )
 
 
 def _formatear_filas_recientes_movimientos(ws, cantidad_filas: int) -> None:
-    if cantidad_filas <= 0:
-        return
-    last_row = ws.max_row
-    start_row = last_row - cantidad_filas + 1
-    for row_num in range(start_row, last_row + 1):
-        ws.cell(row_num, 1).number_format = "DD-MM-YYYY"
-        ws.cell(row_num, 2).number_format = "HH:mm AM/PM"
-        ws.cell(row_num, 5).number_format = "#,##0"
-        ws.cell(row_num, 7).number_format = "DD-MM-YYYY HH:mm:SS"
+    _formatear_filas_recientes_columnas(
+        ws,
+        cantidad_filas,
+        {
+            1: "DD-MM-YYYY",
+            2: "HH:mm AM/PM",
+            5: "#,##0",
+            7: "DD-MM-YYYY HH:mm:SS",
+        },
+    )
 
 
 def _formatear_filas_recientes_cuadre(ws, cantidad_filas: int) -> None:
-    if cantidad_filas <= 0:
-        return
-    last_row = ws.max_row
-    start_row = last_row - cantidad_filas + 1
-    for row_num in range(start_row, last_row + 1):
-        ws.cell(row_num, 1).number_format = "DD-MM-YYYY"   # fecha
-        ws.cell(row_num, 2).number_format = "DD-MM-YYYY"   # fecha_inicio_periodo
-        for col in range(3, 19):                            # columnas numéricas
-            ws.cell(row_num, col).number_format = "#,##0"
-        ws.cell(row_num, 19).number_format = "DD-MM-YYYY HH:mm:SS"  # fecha_hora_registro
+    _formatear_filas_recientes_columnas(
+        ws,
+        cantidad_filas,
+        {
+            1: "DD-MM-YYYY",
+            2: "DD-MM-YYYY",
+            **{col: "#,##0" for col in range(3, 19)},
+            19: "DD-MM-YYYY HH:mm:SS",
+        },
+    )
 
 
 def _formatear_filas_recientes_contadores(ws, cantidad_filas: int) -> None:
-    if cantidad_filas <= 0:
-        return
-    last_row = ws.max_row
-    start_row = last_row - cantidad_filas + 1
-    for row_num in range(start_row, last_row + 1):
-        ws.cell(row_num, 1).number_format = "DD-MM-YYYY"   # fecha
-        ws.cell(row_num, 15).number_format = "#,##0"        # resultado_monetario
-        ws.cell(row_num, 16).number_format = "DD-MM-YYYY HH:mm:SS"  # fecha_hora_registro
+    _formatear_filas_recientes_columnas(
+        ws,
+        cantidad_filas,
+        {
+            1: "DD-MM-YYYY",
+            15: "#,##0",
+            16: "DD-MM-YYYY HH:mm:SS",
+        },
+    )
 
 
 def fecha_existe_modulo(modulo: str, fecha: date, year: int) -> bool:
@@ -791,28 +804,24 @@ def obtener_historial_contadores(hasta_fecha: date) -> list[dict]:
     return eventos
 
 
-def _obtener_paths_excel_sede() -> list[Path]:
+def _obtener_paths_sede(prefijo: str, path_factory: Callable[[int], Path]) -> list[Path]:
     settings = get_settings()
     data_dir = Path(settings.get("data_dir") or ".")
     sede = normalizar_sede_archivo(settings.get("sede"))
-    patron = f"Contadores_{sede}_*.xlsx"
+    patron = f"{prefijo}_{sede}_*.xlsx"
     paths = sorted(data_dir.glob(patron))
-    actual = get_excel_path(date.today().year)
+    actual = path_factory(date.today().year)
     if actual not in paths:
         paths.append(actual)
     return paths
+
+
+def _obtener_paths_excel_sede() -> list[Path]:
+    return _obtener_paths_sede("Contadores", get_excel_path)
 
 
 def _obtener_paths_consolidado_sede() -> list[Path]:
-    settings = get_settings()
-    data_dir = Path(settings.get("data_dir") or ".")
-    sede = normalizar_sede_archivo(settings.get("sede"))
-    patron = f"Consolidado_{sede}_*.xlsx"
-    paths = sorted(data_dir.glob(patron))
-    actual = get_consolidado_path(date.today().year)
-    if actual not in paths:
-        paths.append(actual)
-    return paths
+    return _obtener_paths_sede("Consolidado", get_consolidado_path)
 
 
 def _parsear_fila_contadores(row) -> dict:
@@ -836,7 +845,13 @@ def _parsear_fila_contadores(row) -> dict:
     }
 
 
-def _leer_movimientos_prestamos_desde_hoja(ws) -> list[dict]:
+def _leer_movimientos_prestamos_desde_hoja(
+    ws,
+    *,
+    persona_norm: str | None = None,
+    fecha_objetivo: date | None = None,
+    fechas_objetivo: set[date] | None = None,
+) -> list[dict]:
     headers = [str(cell.value or "").strip().lower() for cell in ws[1]]
     schema_nuevo = headers[:6] == PRESTAMOS_HEADERS
     registros = []
@@ -847,6 +862,10 @@ def _leer_movimientos_prestamos_desde_hoja(ws) -> list[dict]:
         if isinstance(cell_date, datetime):
             cell_date = cell_date.date()
         if not isinstance(cell_date, date):
+            continue
+        if fecha_objetivo and cell_date != fecha_objetivo:
+            continue
+        if fechas_objetivo and cell_date not in fechas_objetivo:
             continue
 
         if schema_nuevo:
@@ -863,6 +882,8 @@ def _leer_movimientos_prestamos_desde_hoja(ws) -> list[dict]:
             timestamp = row[3]
 
         if not persona:
+            continue
+        if persona_norm and persona.strip().lower() != persona_norm:
             continue
         if isinstance(hora, datetime):
             hora_texto = hora.strftime("%I:%M %p")
@@ -884,6 +905,18 @@ def _leer_movimientos_prestamos_desde_hoja(ws) -> list[dict]:
             "fecha_hora_registro": timestamp.isoformat() if isinstance(timestamp, datetime) else str(timestamp or ""),
         })
     return registros
+
+
+def _resumen_prestamos_desde_registros(registros: list[dict]) -> dict:
+    total_prestado = sum(float(item["valor"] or 0) for item in registros if item["tipo_movimiento"] == "prestamo")
+    total_pagado = sum(float(item["valor"] or 0) for item in registros if item["tipo_movimiento"] == "pago")
+    saldo_pendiente = total_prestado - total_pagado
+    return {
+        "items": registros,
+        "total_prestado": total_prestado,
+        "total_pagado": total_pagado,
+        "saldo_pendiente": saldo_pendiente,
+    }
 
 def guardar_bono_registro(fecha: date, cliente: str, valor: float, timestamp: datetime) -> float:
     fila = [fecha, timestamp, cliente, valor, timestamp]
@@ -918,7 +951,7 @@ def guardar_prestamo_registro(
     tipo_movimiento: str,
     valor: float,
     timestamp: datetime,
-) -> dict:
+) -> None:
     fila = [fecha, timestamp, persona, tipo_movimiento, valor, timestamp]
     path = get_excel_path(fecha.year)
     with _bloqueo_escritura(path):
@@ -935,8 +968,6 @@ def guardar_prestamo_registro(
             ) from exc
         finally:
             wb.close()
-    resumen = obtener_resumen_prestamos(persona=persona)
-    return resumen
 
 
 def guardar_movimiento_registro(
@@ -1022,8 +1053,8 @@ def obtener_prestamos_fecha(fecha: date, year: int) -> list[dict]:
         if not hojas:
             return []
         for ws in hojas:
-            registros.extend(_leer_movimientos_prestamos_desde_hoja(ws))
-    return [item for item in registros if item["fecha"] == fecha.isoformat()]
+            registros.extend(_leer_movimientos_prestamos_desde_hoja(ws, fecha_objetivo=fecha))
+    return registros
 
 
 def obtener_movimientos_fecha(fecha: date, year: int) -> list[dict]:
@@ -1092,7 +1123,8 @@ def _construir_ciclo_activo_prestamos(registros: list[dict]) -> list[dict]:
     ]
 
 
-def obtener_movimientos_prestamos(fecha_hasta: date | None = None) -> list[dict]:
+def obtener_movimientos_prestamos(persona: str | None = None, fecha_hasta: date | None = None) -> list[dict]:
+    persona_norm = persona.strip().lower() if persona else None
     registros = []
     for path in _obtener_paths_excel_sede():
         if not path.exists():
@@ -1100,7 +1132,7 @@ def obtener_movimientos_prestamos(fecha_hasta: date | None = None) -> list[dict]
         with _abrir_workbook_lectura(path) as wb:
             hojas = _obtener_hojas_para_lectura(wb, "prestamos")
             for ws in hojas:
-                registros.extend(_leer_movimientos_prestamos_desde_hoja(ws))
+                registros.extend(_leer_movimientos_prestamos_desde_hoja(ws, persona_norm=persona_norm))
     if fecha_hasta:
         fecha_tope = fecha_hasta.isoformat()
         registros = [item for item in registros if item["fecha"] <= fecha_tope]
@@ -1108,19 +1140,7 @@ def obtener_movimientos_prestamos(fecha_hasta: date | None = None) -> list[dict]
 
 
 def obtener_resumen_prestamos(persona: str | None = None, fecha_hasta: date | None = None) -> dict:
-    registros = obtener_movimientos_prestamos(fecha_hasta=fecha_hasta)
-    if persona:
-        persona_norm = persona.strip().lower()
-        registros = [item for item in registros if item["persona"].strip().lower() == persona_norm]
-    total_prestado = sum(float(item["valor"] or 0) for item in registros if item["tipo_movimiento"] == "prestamo")
-    total_pagado = sum(float(item["valor"] or 0) for item in registros if item["tipo_movimiento"] == "pago")
-    saldo_pendiente = total_prestado - total_pagado
-    return {
-        "items": registros,
-        "total_prestado": total_prestado,
-        "total_pagado": total_pagado,
-        "saldo_pendiente": saldo_pendiente,
-    }
+    return _resumen_prestamos_desde_registros(obtener_movimientos_prestamos(persona=persona, fecha_hasta=fecha_hasta))
 
 
 def obtener_ultimo_bono(fecha: date, year: int) -> dict | None:

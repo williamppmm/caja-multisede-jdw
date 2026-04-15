@@ -1,4 +1,6 @@
+from collections import defaultdict
 from datetime import date, datetime, timedelta
+from types import SimpleNamespace
 
 from app.config import DENOMINACIONES
 from app.services import excel_service, startup_state_service
@@ -76,29 +78,145 @@ def _fmt(d: date) -> str:
 
 # ─── Período operativo ────────────────────────────────────────────────────────
 
-def _encontrar_inicio_periodo(fecha_cuadre: date) -> date:
+def _cargar_fechas_modulos(modulos: list[str], years: list[int]) -> dict[str, set[date]]:
+    fechas_por_modulo: dict[str, set[date]] = {modulo: set() for modulo in modulos}
+    for year in years:
+        for modulo in modulos:
+            for fecha_str in excel_service.obtener_fechas_modulo_año(modulo, year):
+                try:
+                    fechas_por_modulo[modulo].add(date.fromisoformat(fecha_str))
+                except ValueError:
+                    continue
+    return fechas_por_modulo
+
+
+def _cargar_datos_periodo(periodo: list[date]) -> dict:
+    fechas_por_year: dict[int, set[date]] = defaultdict(set)
+    for fecha in periodo:
+        fechas_por_year[fecha.year].add(fecha)
+
+    datos = {
+        "plataformas": {},
+        "bonos": defaultdict(list),
+        "gastos": defaultdict(list),
+        "prestamos": defaultdict(list),
+        "movimientos": defaultdict(list),
+    }
+
+    for year, fechas in fechas_por_year.items():
+        path = excel_service.get_excel_path(year)
+        if not path.exists():
+            continue
+
+        with excel_service._abrir_workbook_lectura(path) as wb:
+            for ws in excel_service._obtener_hojas_para_lectura(wb, "plataformas"):
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    if row[0] is None:
+                        continue
+                    cell_date = row[0]
+                    if isinstance(cell_date, datetime):
+                        cell_date = cell_date.date()
+                    if not isinstance(cell_date, date) or cell_date not in fechas:
+                        continue
+                    if cell_date in datos["plataformas"]:
+                        continue
+                    datos["plataformas"][cell_date] = {
+                        "venta_practisistemas": float(row[1] or 0),
+                        "venta_deportivas": float(row[2] or 0),
+                        "total_plataformas": float(row[3] or 0),
+                    }
+
+            for ws in excel_service._obtener_hojas_para_lectura(wb, "bonos"):
+                for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                    if row[0] is None:
+                        continue
+                    cell_date = row[0]
+                    if isinstance(cell_date, datetime):
+                        cell_date = cell_date.date()
+                    if not isinstance(cell_date, date) or cell_date not in fechas:
+                        continue
+                    hora = row[1]
+                    if isinstance(hora, datetime):
+                        hora_texto = hora.strftime("%I:%M %p")
+                    else:
+                        hora_texto = str(hora or "")
+                    datos["bonos"][cell_date].append({
+                        "sheet_row": idx,
+                        "fecha": cell_date.isoformat(),
+                        "fecha_display": cell_date.strftime("%d-%m-%Y"),
+                        "hora_display": hora_texto,
+                        "cliente": str(row[2] or ""),
+                        "valor": float(row[3] or 0),
+                        "fecha_hora_registro": row[4].isoformat() if isinstance(row[4], datetime) else str(row[4] or ""),
+                    })
+
+            for ws in excel_service._obtener_hojas_para_lectura(wb, "gastos"):
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    if row[0] is None or not excel_service._fila_es_modulo("gastos", row):
+                        continue
+                    cell_date = row[0]
+                    if isinstance(cell_date, datetime):
+                        cell_date = cell_date.date()
+                    if not isinstance(cell_date, date) or cell_date not in fechas:
+                        continue
+                    datos["gastos"][cell_date].append({
+                        "concepto": row[2] or "",
+                        "valor": float(row[6] or 0),
+                    })
+
+            for ws in excel_service._obtener_hojas_para_lectura(wb, "prestamos"):
+                for registro in excel_service._leer_movimientos_prestamos_desde_hoja(ws, fechas_objetivo=fechas):
+                    try:
+                        fecha_reg = date.fromisoformat(registro["fecha"])
+                    except ValueError:
+                        continue
+                    datos["prestamos"][fecha_reg].append(registro)
+
+            for ws in excel_service._obtener_hojas_para_lectura(wb, "movimientos"):
+                for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                    if row[0] is None:
+                        continue
+                    cell_date = row[0]
+                    if isinstance(cell_date, datetime):
+                        cell_date = cell_date.date()
+                    if not isinstance(cell_date, date) or cell_date not in fechas:
+                        continue
+                    hora = row[1]
+                    if isinstance(hora, datetime):
+                        hora_texto = hora.strftime("%I:%M %p")
+                    else:
+                        hora_texto = str(hora or "")
+                    datos["movimientos"][cell_date].append({
+                        "sheet_row": idx,
+                        "fecha": cell_date.isoformat(),
+                        "fecha_display": cell_date.strftime("%d-%m-%Y"),
+                        "hora_display": hora_texto,
+                        "tipo_movimiento": str(row[2] or "").strip().lower() or "salida",
+                        "concepto": str(row[3] or "").strip(),
+                        "valor": float(row[4] or 0),
+                        "observacion": str(row[5] or "").strip(),
+                        "fecha_hora_registro": row[6].isoformat() if isinstance(row[6], datetime) else str(row[6] or ""),
+                    })
+
+    return datos
+
+
+def _encontrar_inicio_periodo(
+    fecha_cuadre: date,
+    fechas_caja: set[date] | None = None,
+    fechas_contadores: set[date] | None = None,
+) -> date:
     """
     Busca hacia atrás el último día anterior a fecha_cuadre que tenga
     AMBOS Caja y Contadores. El período comienza el día siguiente a ese corte.
     Si no se encuentra ninguno, arranca desde el primer día con cualquier dato.
     """
-    year = fecha_cuadre.year
-    years_to_check = list(dict.fromkeys([year, year - 1]))
-
-    fechas_caja: set[date] = set()
-    fechas_contadores: set[date] = set()
-
-    for y in years_to_check:
-        for f in excel_service.obtener_fechas_modulo_año("caja", y):
-            try:
-                fechas_caja.add(date.fromisoformat(f))
-            except ValueError:
-                pass
-        for f in excel_service.obtener_fechas_modulo_año("contadores", y):
-            try:
-                fechas_contadores.add(date.fromisoformat(f))
-            except ValueError:
-                pass
+    if fechas_caja is None or fechas_contadores is None:
+        year = fecha_cuadre.year
+        years_to_check = list(dict.fromkeys([year, year - 1]))
+        fechas = _cargar_fechas_modulos(["caja", "contadores"], years_to_check)
+        fechas_caja = fechas["caja"]
+        fechas_contadores = fechas["contadores"]
 
     dias_completos = sorted(
         [d for d in (fechas_caja & fechas_contadores) if d < fecha_cuadre],
@@ -128,15 +246,23 @@ def resolver_periodo_operativo(fecha_cuadre: date) -> dict:
     """
     Construye el período operativo para fecha_cuadre y clasifica cada día:
 
-    - dias_acumulados: días sin Caja NI Contadores pero con datos acumulables.
-      Se arrastran al cuadre. No bloquean.
-    - dias_inconsistentes: días con solo uno de los dos. Bloquean el guardado.
+    - dias_acumulados:      días sin Caja NI Contadores pero con datos acumulables.
+                            Se arrastran al cuadre. No bloquean.
+    - dias_inconsistentes:  días con solo uno de los dos (Caja sin Contadores o
+                            viceversa). Error operativo. Bloquean el guardado.
 
     Regla de guardado:
-    - fecha_cuadre debe tener ambos (Caja + Contadores)
-    - no debe haber dias_inconsistentes en el período.
+        fecha_cuadre debe tener ambos (Caja + Contadores) y no debe haber
+        dias_inconsistentes en el período.
     """
-    inicio = _encontrar_inicio_periodo(fecha_cuadre)
+    MODULOS_ACUMULABLES = ["bonos", "gastos", "plataformas", "prestamos", "movimientos"]
+    years_to_check = list(dict.fromkeys([fecha_cuadre.year, fecha_cuadre.year - 1]))
+    fechas_por_modulo = _cargar_fechas_modulos(["caja", "contadores", *MODULOS_ACUMULABLES], years_to_check)
+    inicio = _encontrar_inicio_periodo(
+        fecha_cuadre,
+        fechas_caja=fechas_por_modulo["caja"],
+        fechas_contadores=fechas_por_modulo["contadores"],
+    )
 
     periodo: list[date] = []
     d = inicio
@@ -144,26 +270,25 @@ def resolver_periodo_operativo(fecha_cuadre: date) -> dict:
         periodo.append(d)
         d += timedelta(days=1)
 
-    modulos_acumulables = ["bonos", "gastos", "plataformas", "prestamos", "movimientos"]
-
     dias_acumulados: list[date] = []
     dias_inconsistentes: list[date] = []
 
     for d in periodo[:-1]:
-        tiene_caja_d = excel_service.fecha_existe_modulo("caja", d, d.year)
-        tiene_cont_d = excel_service.fecha_existe_modulo("contadores", d, d.year)
+        tiene_caja_d = d in fechas_por_modulo["caja"]
+        tiene_cont_d = d in fechas_por_modulo["contadores"]
 
         if tiene_caja_d and tiene_cont_d:
             continue
         if not tiene_caja_d and not tiene_cont_d:
-            has_data = any(excel_service.fecha_existe_modulo(m, d, d.year) for m in modulos_acumulables)
+            has_data = any(d in fechas_por_modulo[m] for m in MODULOS_ACUMULABLES)
             if has_data:
                 dias_acumulados.append(d)
         else:
             dias_inconsistentes.append(d)
 
-    tiene_caja_dia = excel_service.fecha_existe_modulo("caja", fecha_cuadre, fecha_cuadre.year)
-    tiene_cont_dia = excel_service.fecha_existe_modulo("contadores", fecha_cuadre, fecha_cuadre.year)
+    tiene_caja_dia = fecha_cuadre in fechas_por_modulo["caja"]
+    tiene_cont_dia = fecha_cuadre in fechas_por_modulo["contadores"]
+
     puede_guardar = tiene_caja_dia and tiene_cont_dia and not dias_inconsistentes
 
     partes_info: list[str] = []
@@ -180,7 +305,7 @@ def resolver_periodo_operativo(fecha_cuadre: date) -> dict:
     if dias_inconsistentes:
         detalles: list[str] = []
         for d in dias_inconsistentes:
-            tiene_c = excel_service.fecha_existe_modulo("caja", d, d.year)
+            tiene_c = d in fechas_por_modulo["caja"]
             falta = "Contadores" if tiene_c else "Caja"
             detalles.append(f"{_fmt(d)} falta {falta}")
         partes_error.append(
@@ -215,10 +340,12 @@ def resolver_periodo_operativo(fecha_cuadre: date) -> dict:
         "mensaje_error": mensaje_error,
         "fechas_sin_caja": [
             str(d) for d in dias_inconsistentes
-            if not excel_service.fecha_existe_modulo("caja", d, d.year)
+            if d not in fechas_por_modulo["caja"]
         ],
     }
 
+
+# ─── Precondiciones ───────────────────────────────────────────────────────────
 
 def verificar_precondiciones(fecha_cuadre: date) -> dict:
     resultado = resolver_periodo_operativo(fecha_cuadre)
@@ -233,6 +360,7 @@ def calcular_cuadre(fecha_cuadre: date, base_anterior: float) -> dict:
     from app.services.contadores_service import obtener_catalogo
 
     periodo = calcular_periodo(fecha_cuadre)
+    datos_periodo = _cargar_datos_periodo(periodo)
     catalogo_map = {item["item_id"]: item for item in obtener_catalogo()}
 
     total_contadores = 0.0
@@ -264,24 +392,22 @@ def calcular_cuadre(fecha_cuadre: date, base_anterior: float) -> dict:
         contadores_por_item[item_id]["yield_actual"] = int(item_data.get("yield_actual", 0))
 
     for d in periodo:
-        plataformas_data = excel_service.obtener_datos_plataformas_fecha(d, d.year)
+        plataformas_data = datos_periodo["plataformas"].get(d)
         if plataformas_data:
             total_practisistemas += float(plataformas_data.get("venta_practisistemas", 0))
             total_deportivas += float(plataformas_data.get("venta_deportivas", 0))
 
-        for b in excel_service.obtener_bonos_fecha(d, d.year):
+        for b in datos_periodo["bonos"].get(d, []):
             valor = float(b.get("valor", 0))
             total_bonos += valor
             cliente = b.get("cliente", "")
             bonos_por_cliente[cliente] = bonos_por_cliente.get(cliente, 0.0) + valor
 
-        gastos_data = excel_service.obtener_items_modulo_fecha("gastos", d, d.year)
-        if gastos_data:
-            for g in gastos_data.get("items", []):
-                gastos_items.append({"concepto": g.get("concepto", ""), "valor": float(g.get("valor", 0))})
-                total_gastos += float(g.get("valor", 0))
+        for g in datos_periodo["gastos"].get(d, []):
+            gastos_items.append({"concepto": g.get("concepto", ""), "valor": float(g.get("valor", 0))})
+            total_gastos += float(g.get("valor", 0))
 
-        for p in excel_service.obtener_prestamos_raw_fecha(d, d.year):
+        for p in datos_periodo["prestamos"].get(d, []):
             valor = float(p.get("valor", 0))
             tipo = p.get("tipo_movimiento", "prestamo")
             persona = p.get("persona", "")
@@ -296,7 +422,7 @@ def calcular_cuadre(fecha_cuadre: date, base_anterior: float) -> dict:
             else:
                 prestamos_por_persona[persona]["prestamos"] += valor
 
-        for m in excel_service.obtener_movimientos_fecha(d, d.year):
+        for m in datos_periodo["movimientos"].get(d, []):
             valor = float(m.get("valor", 0))
             if m.get("tipo_movimiento") == "ingreso":
                 total_mov_ingresos += valor
@@ -456,13 +582,8 @@ def autoguardar_cuadre_si_listo(fecha: date) -> dict | None:
     if not preconds["ok"] or not preconds["tiene_base_anterior"]:
         return None
 
-    class _EntradaAutoguardado:
-        def __init__(self, fecha_ref: date, forzar: bool):
-            self.fecha = fecha_ref
-            self.forzar = forzar
-
-    entrada = _EntradaAutoguardado(
-        fecha_ref=fecha,
+    entrada = SimpleNamespace(
+        fecha=fecha,
         forzar=excel_service.fecha_existe_modulo("cuadre", fecha, year),
     )
     return guardar_cuadre(entrada, float(preconds["base_anterior"] or 0))

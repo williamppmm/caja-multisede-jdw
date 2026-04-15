@@ -172,7 +172,6 @@ def consultar_estado_modulo(modulo: str, fecha_str: str) -> dict:
     existe = excel_service.fecha_existe_modulo(modulo, fecha, fecha.year)
     today = date.today()
     ayer = date.fromordinal(today.toordinal() - 1)
-    requiere_admin = modulo == "caja" and (existe or fecha not in {today, ayer})
     if modulo in ROW_TYPES or modulo == "plataformas":
         requiere_admin = fecha != today
     elif modulo == "caja":
