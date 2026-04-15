@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+from collections import defaultdict
 from types import SimpleNamespace
 
 from app.config import DENOMINACIONES
@@ -87,6 +88,122 @@ def _cargar_fechas_modulos(modulos: list[str], years: list[int]) -> dict[str, se
                 except ValueError:
                     continue
     return fechas_por_modulo
+
+
+def _cargar_datos_periodo(periodo: list[date]) -> dict:
+    fechas_por_year: dict[int, set[date]] = defaultdict(set)
+    for fecha in periodo:
+        fechas_por_year[fecha.year].add(fecha)
+
+    datos = {
+        "plataformas": {},
+        "bonos": defaultdict(list),
+        "gastos": defaultdict(list),
+        "prestamos": defaultdict(list),
+        "movimientos": defaultdict(list),
+    }
+
+    for year, fechas in fechas_por_year.items():
+        path = excel_service.get_excel_path(year)
+        if not path.exists():
+            continue
+
+        with excel_service._abrir_workbook_lectura(path) as wb:
+            # Plataformas
+            for ws in excel_service._obtener_hojas_para_lectura(wb, "plataformas"):
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    if row[0] is None:
+                        continue
+                    cell_date = row[0]
+                    if isinstance(cell_date, datetime):
+                        cell_date = cell_date.date()
+                    if not isinstance(cell_date, date) or cell_date not in fechas:
+                        continue
+                    if cell_date in datos["plataformas"]:
+                        continue
+                    datos["plataformas"][cell_date] = {
+                        "venta_practisistemas": float(row[1] or 0),
+                        "venta_deportivas": float(row[2] or 0),
+                        "total_plataformas": float(row[3] or 0),
+                    }
+
+            # Bonos
+            for ws in excel_service._obtener_hojas_para_lectura(wb, "bonos"):
+                for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                    if row[0] is None:
+                        continue
+                    cell_date = row[0]
+                    if isinstance(cell_date, datetime):
+                        cell_date = cell_date.date()
+                    if not isinstance(cell_date, date) or cell_date not in fechas:
+                        continue
+                    hora = row[1]
+                    if isinstance(hora, datetime):
+                        hora_texto = hora.strftime("%I:%M %p")
+                    else:
+                        hora_texto = str(hora or "")
+                    datos["bonos"][cell_date].append({
+                        "sheet_row": idx,
+                        "fecha": cell_date.isoformat(),
+                        "fecha_display": cell_date.strftime("%d-%m-%Y"),
+                        "hora_display": hora_texto,
+                        "cliente": str(row[2] or ""),
+                        "valor": float(row[3] or 0),
+                        "fecha_hora_registro": row[4].isoformat() if isinstance(row[4], datetime) else str(row[4] or ""),
+                    })
+
+            # Gastos
+            for ws in excel_service._obtener_hojas_para_lectura(wb, "gastos"):
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    if row[0] is None or not excel_service._fila_es_modulo("gastos", row):
+                        continue
+                    cell_date = row[0]
+                    if isinstance(cell_date, datetime):
+                        cell_date = cell_date.date()
+                    if not isinstance(cell_date, date) or cell_date not in fechas:
+                        continue
+                    datos["gastos"][cell_date].append({
+                        "concepto": row[2] or "",
+                        "valor": float(row[6] or 0),
+                    })
+
+            # Préstamos
+            for ws in excel_service._obtener_hojas_para_lectura(wb, "prestamos"):
+                for registro in excel_service._leer_movimientos_prestamos_desde_hoja(ws, fechas_objetivo=fechas):
+                    try:
+                        fecha_reg = date.fromisoformat(registro["fecha"])
+                    except ValueError:
+                        continue
+                    datos["prestamos"][fecha_reg].append(registro)
+
+            # Movimientos
+            for ws in excel_service._obtener_hojas_para_lectura(wb, "movimientos"):
+                for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                    if row[0] is None:
+                        continue
+                    cell_date = row[0]
+                    if isinstance(cell_date, datetime):
+                        cell_date = cell_date.date()
+                    if not isinstance(cell_date, date) or cell_date not in fechas:
+                        continue
+                    hora = row[1]
+                    if isinstance(hora, datetime):
+                        hora_texto = hora.strftime("%I:%M %p")
+                    else:
+                        hora_texto = str(hora or "")
+                    datos["movimientos"][cell_date].append({
+                        "sheet_row": idx,
+                        "fecha": cell_date.isoformat(),
+                        "fecha_display": cell_date.strftime("%d-%m-%Y"),
+                        "hora_display": hora_texto,
+                        "tipo_movimiento": str(row[2] or "").strip().lower() or "salida",
+                        "concepto": str(row[3] or "").strip(),
+                        "valor": float(row[4] or 0),
+                        "observacion": str(row[5] or "").strip(),
+                        "fecha_hora_registro": row[6].isoformat() if isinstance(row[6], datetime) else str(row[6] or ""),
+                    })
+
+    return datos
 
 def _encontrar_inicio_periodo(
     fecha_cuadre: date,
@@ -260,6 +377,7 @@ def calcular_cuadre(fecha_cuadre: date, base_anterior: float) -> dict:
     from app.services.contadores_service import obtener_catalogo
 
     periodo = calcular_periodo(fecha_cuadre)
+    datos_periodo = _cargar_datos_periodo(periodo)
     catalogo_map = {item["item_id"]: item for item in obtener_catalogo()}
 
     total_contadores = 0.0
@@ -294,27 +412,25 @@ def calcular_cuadre(fecha_cuadre: date, base_anterior: float) -> dict:
     # ── Módulos acumulables: todo el período ──────────────────────────────────
     for d in periodo:
         # Plataformas
-        plataformas_data = excel_service.obtener_datos_plataformas_fecha(d, d.year)
+        plataformas_data = datos_periodo["plataformas"].get(d)
         if plataformas_data:
             total_practisistemas += float(plataformas_data.get("venta_practisistemas", 0))
             total_deportivas += float(plataformas_data.get("venta_deportivas", 0))
 
         # Bonos
-        for b in excel_service.obtener_bonos_fecha(d, d.year):
+        for b in datos_periodo["bonos"].get(d, []):
             valor = float(b.get("valor", 0))
             total_bonos += valor
             cliente = b.get("cliente", "")
             bonos_por_cliente[cliente] = bonos_por_cliente.get(cliente, 0.0) + valor
 
         # Gastos
-        gastos_data = excel_service.obtener_items_modulo_fecha("gastos", d, d.year)
-        if gastos_data:
-            for g in gastos_data.get("items", []):
-                gastos_items.append({"concepto": g.get("concepto", ""), "valor": float(g.get("valor", 0))})
-                total_gastos += float(g.get("valor", 0))
+        for g in datos_periodo["gastos"].get(d, []):
+            gastos_items.append({"concepto": g.get("concepto", ""), "valor": float(g.get("valor", 0))})
+            total_gastos += float(g.get("valor", 0))
 
         # Préstamos
-        for p in excel_service.obtener_prestamos_raw_fecha(d, d.year):
+        for p in datos_periodo["prestamos"].get(d, []):
             valor = float(p.get("valor", 0))
             tipo = p.get("tipo_movimiento", "prestamo")
             persona = p.get("persona", "")
@@ -330,7 +446,7 @@ def calcular_cuadre(fecha_cuadre: date, base_anterior: float) -> dict:
                 prestamos_por_persona[persona]["prestamos"] += valor
 
         # Movimientos
-        for m in excel_service.obtener_movimientos_fecha(d, d.year):
+        for m in datos_periodo["movimientos"].get(d, []):
             valor = float(m.get("valor", 0))
             if m.get("tipo_movimiento") == "ingreso":
                 total_mov_ingresos += valor

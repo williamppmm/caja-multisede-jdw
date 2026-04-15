@@ -222,39 +222,21 @@ def set_active_site(site_id: str) -> dict:
     site = next((s for s in sites if s["id"] == site_id), None)
     if not site:
         return {"ok": False, "mensaje": f"Sede '{site_id}' no encontrada."}
-    # Guardar preservando todos los campos existentes
-    raw: dict = {}
-    if SETTINGS_PATH.exists():
-        try:
-            with open(SETTINGS_PATH, encoding="utf-8") as f:
-                raw = json.load(f)
-        except Exception:
-            pass
-    raw["active_site_id"] = site_id
-    with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
-        json.dump(raw, f, indent=2, ensure_ascii=False)
-    _invalidar_cache()
+    save_settings({"active_site_id": site_id})
     return {"ok": True, "active_site": site}
 
 
 def save_remote_sites(sites: list[dict]) -> list[dict]:
     normalizadas = _normalizar_remote_sites(sites)
-    raw: dict = {}
-    if SETTINGS_PATH.exists():
-        try:
-            with open(SETTINGS_PATH, encoding="utf-8") as f:
-                raw = json.load(f)
-        except Exception:
-            pass
-    raw["remote_sites"] = normalizadas
+    settings = get_settings()
     ids = {s["id"] for s in normalizadas}
-    current_active = raw.get("active_site_id", "")
+    current_active = str(settings.get("active_site_id") or "").strip()
     if current_active not in ids:
-        # Si solo existe una sede configurada, activarla automáticamente.
-        raw["active_site_id"] = normalizadas[0]["id"] if len(normalizadas) == 1 else ""
-    with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
-        json.dump(raw, f, indent=2, ensure_ascii=False)
-    _invalidar_cache()
+        current_active = normalizadas[0]["id"] if len(normalizadas) == 1 else ""
+    save_settings({
+        "remote_sites": normalizadas,
+        "active_site_id": current_active,
+    })
     return normalizadas
 
 
