@@ -341,7 +341,7 @@ def _powershell_startupinfo():
     return startupinfo
 
 
-def abrir_xlsx_en_hoja(path: Path, nombre_hoja: str) -> dict:
+def abrir_xlsx_en_hoja(path: Path, nombre_hoja: str, target_row: int | None = None) -> dict:
     if os.name != "nt":
         return {"ok": False, "mensaje": "Abrir Excel desde la app solo está disponible en Windows."}
     if not path.exists():
@@ -350,6 +350,7 @@ def abrir_xlsx_en_hoja(path: Path, nombre_hoja: str) -> dict:
     powershell_exe = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
     path_ps = str(path).replace("'", "''")
     hoja_ps = str(nombre_hoja or "").replace("'", "''")
+    target_row_ps = int(target_row) if isinstance(target_row, int) and target_row >= 2 else 0
     script = f"""
 $ErrorActionPreference = 'Stop'
 $xl = $null
@@ -362,7 +363,16 @@ try {{
     $sheet = $wb.Worksheets.Item('{hoja_ps}')
     $sheet.Activate() | Out-Null
     if ($xl.ActiveWindow -ne $null) {{
-        $xl.ActiveWindow.ScrollRow = 1
+        $targetRow = {target_row_ps}
+        if ($targetRow -lt 2) {{
+            $targetRow = $sheet.Cells($sheet.Rows.Count, 1).End(-4162).Row
+        }}
+        if ($targetRow -gt 1) {{
+            $sheet.Cells.Item($targetRow, 1).Select() | Out-Null
+            $xl.ActiveWindow.ScrollRow = [Math]::Max(1, $targetRow - 5)
+        }} else {{
+            $xl.ActiveWindow.ScrollRow = 1
+        }}
         $xl.ActiveWindow.ScrollColumn = 1
     }}
 }} catch {{
@@ -395,7 +405,13 @@ try {{
                 return {"ok": False, "mensaje": f"No se pudo abrir {path.name} en Excel."}
         except subprocess.TimeoutExpired:
             pass  # sigue corriendo = Excel está cargando, es el caso normal
-        return {"ok": True, "mensaje": f"Abriendo {path.name} en la hoja '{nombre_hoja}'.", "path": str(path), "sheet": nombre_hoja}
+        return {
+            "ok": True,
+            "mensaje": f"Abriendo {path.name} en la hoja '{nombre_hoja}'.",
+            "path": str(path),
+            "sheet": nombre_hoja,
+            "row": target_row if target_row_ps else None,
+        }
     except Exception:
         return {"ok": False, "mensaje": f"No se pudo abrir {path.name} en Excel."}
 

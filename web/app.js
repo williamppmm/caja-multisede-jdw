@@ -49,6 +49,7 @@ let cajaDrafts = {};
 let contadorCatalog = [];
 let contadoresDrafts = {};
 let contadoresLocked = false;
+let excelOpenTargets = {};
 
 function fmt(n) {
   return '$ ' + Math.round(n).toLocaleString('es-CO');
@@ -56,6 +57,24 @@ function fmt(n) {
 
 function esSuperAdminActivo() {
   return Boolean(configSuperAdminMode && configActiveSite);
+}
+
+function guardarDestinoExcelModulo(modulo, fecha, row) {
+  const rowNum = Number(row);
+  if (!modulo || !fecha || !Number.isInteger(rowNum) || rowNum < 2) return;
+  excelOpenTargets[modulo] = { fecha, row: rowNum };
+}
+
+function limpiarDestinoExcelModulo(modulo, fecha = null) {
+  if (!modulo || !excelOpenTargets[modulo]) return;
+  if (fecha && excelOpenTargets[modulo]?.fecha !== fecha) return;
+  delete excelOpenTargets[modulo];
+}
+
+function obtenerDestinoExcelModulo(modulo, fecha) {
+  const target = excelOpenTargets[modulo];
+  if (!target || target.fecha !== fecha) return null;
+  return Number.isInteger(target.row) && target.row >= 2 ? target.row : null;
 }
 
 function limpiarNumeroTexto(valor, allowNegative = false) {
@@ -1628,6 +1647,7 @@ async function editarRegistroPorTs(modulo, ts) {
       mostrarMensaje(data.mensaje || 'No se pudo editar el registro.', 'advertencia');
       return;
     }
+    guardarDestinoExcelModulo(modulo, fecha, item.sheet_row);
     await recargarModuloPorFecha(modulo, fecha);
     mostrarMensaje(data.mensaje || 'Registro actualizado correctamente.', 'ok');
   } catch {
@@ -1655,6 +1675,7 @@ async function eliminarRegistroPorTs(modulo, ts) {
       mostrarMensaje(data.mensaje || 'No se pudo eliminar el registro.', 'advertencia');
       return;
     }
+    limpiarDestinoExcelModulo(modulo, fecha);
     await recargarModuloPorFecha(modulo, fecha);
     mostrarMensaje(data.mensaje || 'Registro eliminado correctamente.', 'ok');
   } catch {
@@ -1937,6 +1958,7 @@ async function abrirXlsxModuloActual() {
     mostrarMensaje('Esta acción solo está disponible en super admin.', 'advertencia');
     return;
   }
+  const fecha = document.getElementById('fecha')?.value || '';
   try {
     const res = await fetch('/api/settings/open-module-xlsx', {
       method: 'POST',
@@ -1944,6 +1966,7 @@ async function abrirXlsxModuloActual() {
       body: JSON.stringify({
         modulo: currentModule,
         year: obtenerAnioModuloActual(),
+        row: obtenerDestinoExcelModulo(currentModule, fecha),
       }),
     });
     const data = await res.json();
@@ -2879,6 +2902,7 @@ async function guardar() {
     const hora12 = dt.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 
     if (currentModule === 'caja') {
+      limpiarDestinoExcelModulo(currentModule, fecha);
       setSharedModuleDate(fecha);
       document.getElementById('fecha').value = fecha;
       eliminarDraftCaja(fecha);
@@ -2886,11 +2910,13 @@ async function guardar() {
       setCajaEditable(false);
       mostrarMensaje(`✓ ${data.mensaje} — Total caja física: ${fmt(data.total_caja_fisica)} — ${formatFechaHoraVisual(data.fecha_hora_registro) || `${formatFechaVisual(fecha)} ${hora12}`}`, 'ok');
     } else if (currentModule === 'plataformas') {
+      limpiarDestinoExcelModulo(currentModule, fecha);
       setSharedModuleDate(fecha);
       document.getElementById('fecha').value = fecha;
       await cargarVistaModulo('plataformas', fecha);
       mostrarMensaje(`✓ ${data.mensaje} — Total plataformas: ${fmt(data.total_plataformas)} — ${formatFechaHoraVisual(data.fecha_hora_registro) || `${formatFechaVisual(fecha)} ${hora12}`}`, 'ok');
     } else {
+      limpiarDestinoExcelModulo(currentModule, fecha);
       setSharedModuleDate(fecha);
       document.getElementById('fecha').value = fecha;
       await cargarVistaModulo(currentModule, fecha);

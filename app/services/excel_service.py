@@ -249,6 +249,7 @@ def _escribir_encabezados(ws, modulo: str):
         cell.font = header_font
         cell.fill = header_fill
         cell.alignment = Alignment(horizontal="center")
+    ws.freeze_panes = "A2"
 
     if modulo == "bonos":
         widths = {"A": 12, "B": 12, "C": 28, "D": 14, "E": 22}
@@ -275,6 +276,15 @@ def _escribir_encabezados(ws, modulo: str):
         widths = {"A": 14, "B": 16, "C": 22, "D": 14, "E": 10, "F": 14, "G": 14, "H": 22}
     for col, width in widths.items():
         ws.column_dimensions[col].width = width
+
+
+def _marcar_celda_activa(ws, row_num: int) -> None:
+    ref = f"A{max(int(row_num or 1), 1)}"
+    try:
+        ws.sheet_view.selection[0].activeCell = ref
+        ws.sheet_view.selection[0].sqref = ref
+    except (IndexError, AttributeError, TypeError, ValueError):
+        pass
 
 
 def _hoja_tiene_datos(ws) -> bool:
@@ -449,6 +459,7 @@ def guardar_filas_modulo(modulo: str, filas: list, year: int, reemplazar_fecha: 
                 _formatear_filas_recientes_cuadre(ws, len(filas))
             else:
                 _formatear_filas_recientes(ws, len(filas))
+            _marcar_celda_activa(ws, ws.max_row)
 
         try:
             wb.save(path)
@@ -873,6 +884,7 @@ def guardar_bono_registro(fecha: date, cliente: str, valor: float, timestamp: da
 
         ws.append(fila)
         _formatear_filas_recientes_bonos(ws, 1)
+        _marcar_celda_activa(ws, ws.max_row)
         try:
             wb.save(path)
         except PermissionError as exc:
@@ -899,6 +911,7 @@ def guardar_prestamo_registro(
         _actualizar_encabezados_prestamos(ws)
         ws.append(fila)
         _formatear_filas_recientes_prestamos(ws, 1)
+        _marcar_celda_activa(ws, ws.max_row)
         try:
             wb.save(path)
         except PermissionError as exc:
@@ -924,6 +937,7 @@ def guardar_movimiento_registro(
         ws = _asegurar_hoja(wb, "movimientos")
         ws.append(fila)
         _formatear_filas_recientes_movimientos(ws, 1)
+        _marcar_celda_activa(ws, ws.max_row)
         try:
             wb.save(path)
         except PermissionError as exc:
@@ -1310,6 +1324,7 @@ def actualizar_bono_por_ts(fecha: date, year: int, ts_str: str, cliente: str, va
         ws.cell(target, 4).value = valor
         ws.cell(target, 5).value = new_ts
         _formatear_filas_recientes_bonos(ws, 1)
+        _marcar_celda_activa(ws, target)
         total_dia = sum(
             float(r[3] or 0)
             for r in ws.iter_rows(min_row=2, values_only=True)
@@ -1337,6 +1352,7 @@ def eliminar_bono_por_ts(fecha: date, year: int, ts_str: str) -> float | None:
             wb.close()
             return None
         ws.delete_rows(target)
+        _marcar_celda_activa(ws, ws.max_row)
         total_dia = sum(
             float(r[3] or 0)
             for r in ws.iter_rows(min_row=2, values_only=True)
@@ -1370,6 +1386,7 @@ def actualizar_gasto_por_ts(fecha: date, year: int, ts_str: str, concepto: str, 
         ws.cell(target, 7).value = valor
         ws.cell(target, 8).value = new_ts
         _formatear_filas_recientes(ws, 1)
+        _marcar_celda_activa(ws, target)
         total_dia = sum(
             float(r[6] or 0)
             for r in ws.iter_rows(min_row=2, values_only=True)
@@ -1401,6 +1418,7 @@ def eliminar_gasto_por_ts(fecha: date, year: int, ts_str: str) -> dict | None:
             wb.close()
             return None
         ws.delete_rows(target)
+        _marcar_celda_activa(ws, ws.max_row)
         total_dia = sum(
             float(r[6] or 0)
             for r in ws.iter_rows(min_row=2, values_only=True)
@@ -1433,6 +1451,7 @@ def actualizar_prestamo_por_ts(fecha: date, year: int, ts_str: str, persona: str
         ws.cell(target, 5).value = valor
         ws.cell(target, 6).value = new_ts
         _formatear_filas_recientes_prestamos(ws, 1)
+        _marcar_celda_activa(ws, target)
         wb.save(path)
         wb.close()
     return obtener_resumen_prestamos(persona=persona)
@@ -1457,6 +1476,7 @@ def eliminar_prestamo_por_ts(fecha: date, year: int, ts_str: str) -> dict | None
             wb.close()
             return None
         ws.delete_rows(target)
+        _marcar_celda_activa(ws, ws.max_row)
         wb.save(path)
         wb.close()
     return obtener_resumen_prestamos(persona=persona)
@@ -1483,6 +1503,7 @@ def actualizar_movimiento_por_ts(fecha: date, year: int, ts_str: str, tipo: str,
         ws.cell(target, 5).value = valor
         ws.cell(target, 6).value = observacion
         ws.cell(target, 7).value = new_ts
+        _marcar_celda_activa(ws, target)
         wb.save(path)
         wb.close()
     items = obtener_movimientos_fecha(fecha, year)
@@ -1508,6 +1529,7 @@ def eliminar_movimiento_por_ts(fecha: date, year: int, ts_str: str) -> dict | No
             wb.close()
             return None
         ws.delete_rows(target)
+        _marcar_celda_activa(ws, ws.max_row)
         wb.save(path)
         wb.close()
     items = obtener_movimientos_fecha(fecha, year)

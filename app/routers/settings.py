@@ -125,13 +125,17 @@ def open_module_xlsx(body: dict):
         year = int(body.get("year") or date.today().year)
     except Exception:
         year = date.today().year
+    try:
+        row = int(body.get("row")) if body.get("row") is not None else None
+    except Exception:
+        row = None
 
     if modulo not in excel_service.SECTION_PREFIXES:
         return {"ok": False, "mensaje": "Módulo no válido."}
 
     path = excel_service._path_modulo(modulo, year)
     hoja = excel_service._obtener_nombre_hoja_seccion(modulo)
-    return settings_service.abrir_xlsx_en_hoja(path, hoja)
+    return settings_service.abrir_xlsx_en_hoja(path, hoja, row)
 
 
 # ── Respaldos automáticos (solo super admin) ─────────────────────────────────
