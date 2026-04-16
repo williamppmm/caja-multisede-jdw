@@ -1832,26 +1832,16 @@ function aplicarDraftCaja(fecha) {
   return true;
 }
 
-function limpiarModuloActual() {
+async function limpiarModuloActual() {
   if (currentModule === 'caja') {
     eliminarDraftCaja(document.getElementById('fecha').value);
     limpiarCaja();
   } else if (currentModule === 'plataformas') {
     limpiarPlataformas();
   } else if (currentModule === 'contadores') {
-    eliminarDraftContadores(document.getElementById('fecha').value);
-    renderContadores(contadorCatalog.map(item => ({
-      item_id: item.item_id,
-      nombre: item.nombre,
-      denominacion: item.denominacion,
-      entradas: 0,
-      salidas: 0,
-      jackpot: 0,
-      yield_actual: 0,
-      referencia: { tipo: 'sin_referencia', fecha: '', entradas: 0, salidas: 0, jackpot: 0, yield: 0 },
-      resultado_monetario: 0,
-      alerta: false,
-    })), 0);
+    const fecha = document.getElementById('fecha').value;
+    eliminarDraftContadores(fecha);
+    await cargarDatosContadores(fecha);
   } else if (currentModule === 'bonos') {
     limpiarFormularioBonos();
   } else if (currentModule === 'prestamos') {
