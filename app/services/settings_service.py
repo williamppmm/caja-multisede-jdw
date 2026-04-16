@@ -44,6 +44,16 @@ def _normalizar_data_dir(value: str | None) -> str:
     return str(Path(raw).expanduser())
 
 
+def _normalizar_path_absoluto(value: str | None) -> str:
+    """Devuelve la ruta con expanduser + resolve para eliminar '..' y symlinks.
+    Usa strict=False para no fallar si la ruta aún no existe.
+    """
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    return str(Path(raw).expanduser().resolve())
+
+
 def _slug(text: str) -> str:
     """Genera un id simple desde un texto."""
     s = re.sub(r"\s+", "_", text.strip().lower())
@@ -73,7 +83,7 @@ def _normalizar_remote_site(raw: dict) -> dict | None:
         "id": site_id,
         "label": label,
         "sede": sede or label,
-        "data_dir": str(Path(data_dir).expanduser()),
+        "data_dir": _normalizar_path_absoluto(data_dir),
         "plataformas_ref": _normalizar_plataformas_ref(raw.get("plataformas_ref")),
     }
 
@@ -112,8 +122,8 @@ def _resolver_settings() -> dict:
     data["super_admin_mode"] = bool(data.get("super_admin_mode", False))
     data["remote_sites"] = _normalizar_remote_sites(data.get("remote_sites", []))
     data["active_site_id"] = str(data.get("active_site_id") or "").strip()
-    data["plataformas_ref_practi_path"] = str(data.get("plataformas_ref_practi_path") or "").strip()
-    data["plataformas_ref_bet_path"] = str(data.get("plataformas_ref_bet_path") or "").strip()
+    data["plataformas_ref_practi_path"] = _normalizar_path_absoluto(data.get("plataformas_ref_practi_path"))
+    data["plataformas_ref_bet_path"] = _normalizar_path_absoluto(data.get("plataformas_ref_bet_path"))
     data["plataformas_ref"] = _normalizar_plataformas_ref(data.get("plataformas_ref"))
     data["backup_enabled"] = bool(data.get("backup_enabled", False))
     data["backup_root"] = _normalizar_data_dir(data.get("backup_root")) if data.get("backup_root") else ""
@@ -170,9 +180,9 @@ def save_settings(data: dict) -> None:
     if "active_site_id" in cleaned:
         cleaned["active_site_id"] = str(cleaned["active_site_id"] or "").strip()
     if "plataformas_ref_practi_path" in cleaned:
-        cleaned["plataformas_ref_practi_path"] = str(cleaned["plataformas_ref_practi_path"] or "").strip()
+        cleaned["plataformas_ref_practi_path"] = _normalizar_path_absoluto(cleaned["plataformas_ref_practi_path"])
     if "plataformas_ref_bet_path" in cleaned:
-        cleaned["plataformas_ref_bet_path"] = str(cleaned["plataformas_ref_bet_path"] or "").strip()
+        cleaned["plataformas_ref_bet_path"] = _normalizar_path_absoluto(cleaned["plataformas_ref_bet_path"])
     if "plataformas_ref" in cleaned:
         cleaned["plataformas_ref"] = _normalizar_plataformas_ref(cleaned["plataformas_ref"])
     if "backup_enabled" in cleaned:
@@ -207,12 +217,12 @@ def get_active_site() -> dict | None:
     if not settings.get("super_admin_mode"):
         return None
     active_id = settings.get("active_site_id", "")
+    if not active_id:
+        return None
     sites = settings.get("remote_sites", [])
     for site in sites:
         if site["id"] == active_id:
             return site
-    if len(sites) == 1:
-        return sites[0]
     return None
 
 
@@ -244,6 +254,7 @@ def validate_remote_site(data_dir: str) -> dict:
     """Verifica que la carpeta existe, tiene xlsx, admite escritura y detecta el nombre de sede."""
     import re
     import tempfile
+    from app.config import normalizar_sede_archivo
     path = Path(str(data_dir or "").strip())
     if not path.exists():
         return {"ok": False, "mensaje": "La carpeta no existe."}
@@ -257,7 +268,7 @@ def validate_remote_site(data_dir: str) -> dict:
     for f in contadores_files:
         m = re.match(r"Contadores_(.+)_\d{4}\.xlsx$", f.name)
         if m:
-            sede = m.group(1)
+            sede = normalizar_sede_archivo(m.group(1))
             if sede not in seen:
                 seen.add(sede)
                 sedes_encontradas.append(sede)

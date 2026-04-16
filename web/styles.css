@@ -1449,6 +1449,11 @@ body.auth-banner-open::before {
   color: #c0392b;
 }
 
+.config-msg.advertencia {
+  background: #fffbea;
+  color: #7a5c00;
+}
+
 .modal-admin-wide {
   max-width: min(760px, 94vw);
 }

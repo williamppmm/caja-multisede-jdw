@@ -3339,6 +3339,18 @@ async function guardarSedeForm() {
   }
   const practi_header = document.getElementById('admin-sede-form-practi-header').value.trim();
   const bet_header = document.getElementById('admin-sede-form-bet-header').value.trim();
+
+  // Advertencia no bloqueante: si hay rutas globales de referencia configuradas pero faltan headers
+  const practiPath = document.getElementById('admin-practi-path')?.value.trim() || '';
+  const betPath    = document.getElementById('admin-bet-path')?.value.trim() || '';
+  if ((practiPath && !practi_header) || (betPath && !bet_header)) {
+    mostrarMensajeAdmin(
+      'Sede guardada, pero tiene rutas de referencia configuradas sin columna asignada. ' +
+      'Completa las columnas para que aparezcan los valores de referencia.',
+      'advertencia'
+    );
+  }
+
   const sitesActualizados = configRemoteSites.filter(s => s.id !== id);
   sitesActualizados.push({
     id: id || undefined,
@@ -3359,7 +3371,9 @@ async function guardarSedeForm() {
     renderSedesAdminTable();
     renderSuperAdminSedeBanner();
     cerrarFormularioSede();
-    mostrarMensajeAdmin('Sede guardada.', 'ok');
+    if (!((practiPath && !practi_header) || (betPath && !bet_header))) {
+      mostrarMensajeAdmin('Sede guardada.', 'ok');
+    }
   } catch {
     mostrarMensajeAdmin('Error al guardar la sede.', 'error');
   }
