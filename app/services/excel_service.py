@@ -363,7 +363,7 @@ def _formatear_filas_recientes(ws, cantidad_filas: int) -> None:
     _formatear_filas_por_columnas(ws, cantidad_filas, {
         1: "DD-MM-YYYY",
         7: "#,##0",
-        8: "DD-MM-YYYY HH:mm:SS",
+        8: "HH:mm AM/PM",
     })
 
 
@@ -383,7 +383,7 @@ def _formatear_filas_recientes_bonos(ws, cantidad_filas: int) -> None:
         1: "DD-MM-YYYY",
         2: "HH:mm AM/PM",
         4: "#,##0",
-        5: "DD-MM-YYYY HH:mm:SS",
+        5: "HH:mm AM/PM",
     })
 
 
@@ -392,7 +392,7 @@ def _formatear_filas_recientes_prestamos(ws, cantidad_filas: int) -> None:
         1: "DD-MM-YYYY",
         2: "HH:mm AM/PM",
         5: "#,##0",
-        6: "DD-MM-YYYY HH:mm:SS",
+        6: "HH:mm AM/PM",
     })
 
 
@@ -401,12 +401,12 @@ def _formatear_filas_recientes_movimientos(ws, cantidad_filas: int) -> None:
         1: "DD-MM-YYYY",
         2: "HH:mm AM/PM",
         5: "#,##0",
-        7: "DD-MM-YYYY HH:mm:SS",
+        7: "HH:mm AM/PM",
     })
 
 
 def _formatear_filas_recientes_cuadre(ws, cantidad_filas: int) -> None:
-    formatos = {1: "DD-MM-YYYY", 2: "DD-MM-YYYY", 19: "DD-MM-YYYY HH:mm:SS"}
+    formatos = {1: "DD-MM-YYYY", 2: "DD-MM-YYYY", 19: "HH:mm AM/PM"}
     formatos.update({col: "#,##0" for col in range(3, 19)})
     _formatear_filas_por_columnas(ws, cantidad_filas, formatos)
 
@@ -415,7 +415,17 @@ def _formatear_filas_recientes_contadores(ws, cantidad_filas: int) -> None:
     _formatear_filas_por_columnas(ws, cantidad_filas, {
         1: "DD-MM-YYYY",
         15: "#,##0",
-        16: "DD-MM-YYYY HH:mm:SS",
+        16: "HH:mm AM/PM",
+    })
+
+
+def _formatear_filas_recientes_plataformas(ws, cantidad_filas: int) -> None:
+    _formatear_filas_por_columnas(ws, cantidad_filas, {
+        1: "DD-MM-YYYY",
+        2: "#,##0",
+        3: "#,##0",
+        4: "#,##0",
+        5: "HH:mm AM/PM",
     })
 
 
@@ -457,6 +467,8 @@ def guardar_filas_modulo(modulo: str, filas: list, year: int, reemplazar_fecha: 
                 _formatear_filas_recientes_contadores(ws, len(filas))
             elif modulo == "cuadre":
                 _formatear_filas_recientes_cuadre(ws, len(filas))
+            elif modulo == "plataformas":
+                _formatear_filas_recientes_plataformas(ws, len(filas))
             else:
                 _formatear_filas_recientes(ws, len(filas))
             _marcar_celda_activa(ws, ws.max_row)
