@@ -2,851 +2,256 @@
 
 ## Objetivo
 
-Este documento define una base de pruebas funcionales y operativas para validar el comportamiento actual de CajaJDW antes de considerar el sistema estable para uso continuo o antes de introducir cambios importantes.
-
-Las pruebas están organizadas por:
-
-- configuración general
-- persistencia
-- módulos funcionales
-- concurrencia
-- regresión operativa
+Validar el comportamiento actual del sistema antes de considerar una rama o un build como estables.
 
 ## Alcance
 
 Este plan cubre:
 
-- validación manual funcional
-- consistencia de guardado en Excel
-- reglas de edición por fecha
-- comportamiento con admin y sin admin
-- riesgos asociados a uso con Dropbox
+- arranque y ejecutable
+- persistencia en Excel
+- módulos operativos
+- `Contadores`
+- `Cuadre`
+- diferencias clave entre ramas
 
-No cubre todavía:
+## Preparación
 
-- pruebas automatizadas
-- pruebas de carga formales
-- seguridad avanzada
-- despliegue Linux completo
+Antes de probar:
 
-## Preparación del entorno
+1. usar una carpeta de prueba por sede
+2. evitar trabajar sobre datos reales
+3. comprobar que el libro no esté abierto en Excel
+4. usar catálogos simples y repetibles
 
-Antes de iniciar las pruebas:
+## Casos críticos
 
-1. Preparar una carpeta de pruebas dedicada, preferiblemente en Dropbox.
-2. Configurar al menos dos sedes de prueba si se quiere validar separación por sede.
-3. Tener un libro Excel de prueba por sede o permitir que la app lo cree.
-4. Verificar que el equipo tenga permisos de lectura y escritura sobre la carpeta.
-5. Confirmar que el archivo no esté abierto en Excel al inicio.
+## A. Arranque
 
-## Datos base sugeridos
+### A-01 — Splash e inicio normal
 
-Usar datos simples y repetibles:
-
-- sede: `SatingaPrueba`
-- fecha actual
-- fecha anterior
-- una fecha antigua del mismo año
-- denominaciones normales de caja
-- 3 clientes de bonos
-- 3 personas para préstamos
-- 3 conceptos de gastos
-- 3 conceptos de movimientos
-- 3 ítems de contadores
-
-Catálogo sugerido para contadores:
-
-```text
-M01 | Ruleta 1 | 100
-M02 | Ruleta 2 | 200
-M03 | Máquina 3 | 500
-```
-
-## Criterios generales de aceptación
-
-Se considera que una prueba pasa cuando:
-
-- la app muestra el resultado esperado
-- la API responde coherentemente
-- el Excel queda consistente con la operación
-- no aparecen errores inesperados
-- al recargar la vista, los datos siguen correctos
-
-## Matriz de prioridad
-
-| Prioridad | Significado |
-|---|---|
-| Alta | riesgo operativo inmediato |
-| Media | riesgo funcional importante, no bloqueante |
-| Baja | mejora o verificación complementaria |
-
-## Pruebas generales
-
-## PG-01 — Inicio local
-
-Prioridad: Alta
-
-Pasos:
-
-1. Ejecutar `python launcher.py` o abrir el `.exe`.
-2. Confirmar que el navegador se abre automáticamente.
-3. Confirmar que la interfaz carga sin errores.
+1. abrir el `.exe`
+2. verificar splash
+3. confirmar que luego abre el navegador
 
 Resultado esperado:
 
-- la app abre correctamente
-- la fecha y módulos visibles coinciden con la configuración
+- el servidor inicia
+- la app carga sin error
 
-## PG-02 — Guardado de configuración
+### A-02 — Múltiples clics
 
-Prioridad: Alta
-
-Pasos:
-
-1. Entrar a Administración.
-2. Cambiar sede, carpeta y módulos habilitados.
-3. Guardar configuración.
-4. Cerrar y volver a abrir la aplicación.
+1. cerrar la app
+2. abrir el `.exe`
+3. hacer varios clics rápidos durante el arranque
 
 Resultado esperado:
 
-- la configuración persiste en `data/settings.json`
-- al reiniciar, la app conserva la configuración guardada
+- no se levantan varias instancias
+- no se duplican pestañas
 
-## PG-03 — Archivos anuales por sede
+## B. Persistencia básica
 
-Prioridad: Alta
+### B-01 — Creación de libros
 
-Pasos:
-
-1. Configurar una sede nueva.
-2. Guardar un registro operativo (Caja, Contadores, etc.).
-3. Guardar un Cuadre.
-4. Revisar la carpeta configurada.
+1. guardar datos de módulos operativos
+2. guardar un `Cuadre`
 
 Resultado esperado:
 
-- se crea `Contadores_<SEDE>_<AÑO>.xlsx` con los módulos operativos (Caja, Plataformas, Gastos, Bonos, Prestamos, Movimientos)
-- se crea `Consolidado_<SEDE>_<AÑO>.xlsx` con las hojas Contadores y Cuadre
-- ambos archivos corresponden a la sede configurada
+- existe `Contadores_<SEDE>_<AÑO>.xlsx`
+- existe `Consolidado_<SEDE>_<AÑO>.xlsx`
 
-## PG-04 — Separación entre sedes
+### B-02 — Libro abierto
 
-Prioridad: Alta
-
-Pasos:
-
-1. Configurar sede A y guardar registros.
-2. Cambiar a sede B y guardar registros.
-3. Revisar los archivos generados.
+1. abrir el Excel
+2. intentar guardar desde la app
 
 Resultado esperado:
 
-- cada sede escribe en su propio archivo
-- no se mezclan registros entre sedes
+- la app informa archivo ocupado
+- no corrompe el libro
 
-## Pruebas de Caja
+## C. Caja
 
-## CJ-01 — Guardado en modo cantidad
+### C-01 — Guardado normal
 
-Prioridad: Alta
-
-Pasos:
-
-1. Configurar modo de entrada `cantidad`.
-2. Ingresar cantidades en varias denominaciones.
-3. Ingresar monedas y billetes viejos.
-4. Guardar.
+1. ingresar billetes, monedas y viejos
+2. guardar
 
 Resultado esperado:
 
-- el total visible coincide con el cálculo manual
-- se guardan filas de caja para la fecha
-- al recargar la fecha, los valores se reconstruyen correctamente
+- total correcto
+- lectura correcta al recargar
 
-## CJ-02 — Guardado en modo total por denominación
+### C-02 — Corrección de Caja
 
-Prioridad: Alta
-
-Pasos:
-
-1. Cambiar modo de entrada a total por denominación.
-2. Ingresar subtotales por billete.
-3. Guardar.
+1. guardar una caja
+2. volver a esa fecha
+3. corregir con autorización
 
 Resultado esperado:
 
-- el sistema calcula cantidades derivadas
-- el total final es consistente
+- la fecha se reemplaza
+- no quedan duplicados
 
-## CJ-03 — Corrección de fecha existente sin admin
+## D. Contadores
 
-Prioridad: Alta
+### D-01 — Captura normal
 
-Pasos:
-
-1. Guardar una caja para una fecha.
-2. Intentar volver a guardar sobre la misma fecha sin autorización admin.
+1. registrar contadores válidos
+2. guardar
 
 Resultado esperado:
 
-- la app bloquea la operación
-- el usuario recibe un mensaje claro
+- yield correcto
+- resultado correcto
 
-## CJ-04 — Corrección de fecha existente con admin
+### D-02 — Referencia crítica
 
-Prioridad: Alta
-
-Pasos:
-
-1. Guardar una caja para una fecha.
-2. Autorizar admin.
-3. Guardar nuevos valores sobre la misma fecha.
+1. provocar decremento frente a referencia
+2. abrir panel de referencia crítica
+3. completar datos
+4. confirmar con `OK`
+5. guardar
 
 Resultado esperado:
 
-- la fecha se reemplaza correctamente
-- en Excel no quedan filas duplicadas de la misma caja reemplazada
+- se permite el guardado
+- el registro queda consistente
 
-## CJ-05 — Fecha futura
+### D-03 — Pausar un solo ítem
 
-Prioridad: Alta
-
-Pasos:
-
-1. Seleccionar una fecha futura.
-2. Intentar guardar.
+1. pausar un ítem
+2. ir al día siguiente
 
 Resultado esperado:
 
-- la app bloquea el guardado
+- solo ese ítem cambia
+- los demás no se alteran
 
-## Pruebas de Plataformas
+### D-04 — Pausa sin borrar formulario
 
-## PL-01 — Guardado del día
-
-Prioridad: Alta
-
-Pasos:
-
-1. Ingresar valores en Practisistemas y Deportivas.
-2. Guardar.
+1. empezar a llenar varios ítems
+2. pausar otro ítem
 
 Resultado esperado:
 
-- el total se calcula correctamente
-- se guarda una fila en la hoja de Plataformas
+- los inputs ya escritos en los demás ítems no se borran
 
-## PL-02 — Deportivas negativa
+### D-05 — Pausa histórica
 
-Prioridad: Media
-
-Pasos:
-
-1. Ingresar Practisistemas positiva.
-2. Ingresar Deportivas negativa.
-3. Guardar.
+1. pausar un ítem en una fecha
+2. abrir una fecha anterior
 
 Resultado esperado:
 
-- el sistema permite el valor según la lógica actual
-- el total final queda correcto
+- la pausa no contamina el pasado
 
-## PL-03 — Fecha distinta a hoy sin admin
+## E. Cuadre
 
-Prioridad: Alta
+### E-01 — Cálculo simple
 
-Pasos:
-
-1. Elegir una fecha anterior.
-2. Intentar guardar sin autorización.
+1. registrar datos en todos los módulos necesarios
+2. calcular `Cuadre`
 
 Resultado esperado:
 
-- la app bloquea la operación
+- `caja_teorica` correcta
+- `caja_fisica` correcta
+- `diferencia` correcta
 
-## Pruebas de Gastos
+### E-02 — Resincronización del cuadre afectado
 
-## GS-01 — Registro simple
-
-Prioridad: Alta
-
-Pasos:
-
-1. Registrar un gasto con concepto y valor.
+1. guardar un `Cuadre`
+2. corregir un módulo dentro de su período
 
 Resultado esperado:
 
-- aparece en la tabla del día
-- el total diario se actualiza
-- el concepto entra al catálogo local
+- el `Cuadre` afectado se actualiza
 
-## GS-02 — Múltiples gastos el mismo día
+### E-03 — Cascada por Caja
 
-Prioridad: Alta
-
-Pasos:
-
-1. Registrar tres gastos distintos el mismo día.
+1. guardar dos `Cuadres` consecutivos
+2. corregir `Caja` del primero
 
 Resultado esperado:
 
-- la tabla lista los tres
-- el total coincide con la suma
+- se recalcula el `Cuadre` afectado
+- si cambia `base_nueva`, también se recalcula el siguiente
 
-## GS-03 — Fecha distinta a hoy sin admin
+## F. Ramas
 
-Prioridad: Alta
+### F-01 — `main`
 
-Pasos:
+Validar:
 
-1. Elegir una fecha anterior.
-2. Intentar registrar gasto sin admin.
+- modo super admin
+- respaldos
+- multisede
 
-Resultado esperado:
+### F-02 — `version-usuario`
 
-- la app bloquea la operación
+Validar:
 
-## Pruebas de Bonos
+- `Resumen`
+- captura diaria
+- launcher de usuario
 
-## BN-01 — Registro simple
+### F-03 — `respaldo-version-especial`
 
-Prioridad: Alta
+Validar:
 
-Pasos:
-
-1. Registrar un bono con cliente y valor.
-
-Resultado esperado:
-
-- se agrega a la tabla del día
-- el total diario se actualiza
-- el cliente entra al catálogo local
-
-## BN-02 — Acumulado por cliente
-
-Prioridad: Media
-
-Pasos:
-
-1. Registrar dos bonos para el mismo cliente en la misma fecha.
+1. abrir la app por primera vez
+2. comprobar `Caja` en `ayer()`
+3. pasar a `Resumen`
+4. comprobar `Resumen` en `ayer()`
+5. pasar a otro módulo
 
 Resultado esperado:
 
-- la UI muestra acumulado correcto por cliente
+- `Caja` y `Resumen` respetan `ayer()` al inicio
+- al pasar a otro módulo, todo vuelve a `hoy()`
 
-## BN-03 — Editar último bono
+## G. Respaldo automático (`main`)
 
-Prioridad: Alta
+### G-01 — Configuración de backup
 
-Pasos:
-
-1. Registrar varios bonos.
-2. Editar el último.
-
-Resultado esperado:
-
-- solo cambia el último bono de la fecha
-- el total diario se recalcula correctamente
-
-## BN-04 — Eliminar último bono
-
-Prioridad: Alta
-
-Pasos:
-
-1. Registrar varios bonos.
-2. Eliminar el último.
+1. activar backup
+2. definir carpeta
+3. guardar settings
 
 Resultado esperado:
 
-- desaparece solo el último bono
-- el total diario se recalcula correctamente
+- se dispara un respaldo inmediato
 
-## Pruebas de Préstamos
+### G-02 — Idempotencia
 
-## PR-01 — Préstamo inicial
-
-Prioridad: Alta
-
-Pasos:
-
-1. Registrar un préstamo para una persona nueva.
+1. ejecutar backup nuevamente el mismo día
 
 Resultado esperado:
 
-- total prestado aumenta
-- saldo pendiente aumenta
+- no duplica respaldos válidos
 
-## PR-02 — Pago parcial
+## Regresión mínima sugerida
 
-Prioridad: Alta
+Antes de cerrar una rama o build, repetir al menos:
 
-Pasos:
+1. A-01
+2. A-02
+3. B-01
+4. C-01
+5. D-02
+6. D-03
+7. D-04
+8. E-01
+9. E-02
+10. E-03
 
-1. Con saldo pendiente existente, registrar un pago parcial.
+## Evolución futura de pruebas
 
-Resultado esperado:
+Si el sistema sigue creciendo, el siguiente paso natural es:
 
-- total pagado aumenta
-- saldo pendiente disminuye
-
-## PR-03 — Pago total
-
-Prioridad: Alta
-
-Pasos:
-
-1. Completar un pago que deje saldo en cero.
-
-Resultado esperado:
-
-- saldo pendiente queda en cero
-- el ciclo puede considerarse cerrado en la lógica del sistema
-
-## PR-04 — Pago mayor al saldo
-
-Prioridad: Alta
-
-Pasos:
-
-1. Intentar registrar un pago mayor al saldo pendiente.
-
-Resultado esperado:
-
-- la app bloquea el guardado
-
-## PR-05 — Nuevo ciclo tras saldo cero
-
-Prioridad: Alta
-
-Pasos:
-
-1. Cerrar completamente un ciclo de deuda.
-2. Registrar un nuevo préstamo para la misma persona.
-
-Resultado esperado:
-
-- el sistema maneja el nuevo ciclo como saldo activo vigente
-
-## Pruebas de Movimientos
-
-## MV-01 — Salida simple
-
-Prioridad: Alta
-
-Pasos:
-
-1. Registrar una salida con concepto y valor.
-
-Resultado esperado:
-
-- aparece en el historial
-- total salidas aumenta
-- neto disminuye
-
-## MV-02 — Ingreso simple
-
-Prioridad: Alta
-
-Pasos:
-
-1. Registrar un ingreso con concepto y valor.
-
-Resultado esperado:
-
-- aparece en el historial
-- total ingresos aumenta
-- neto aumenta
-
-## MV-03 — Catálogo de conceptos
-
-Prioridad: Media
-
-Pasos:
-
-1. Registrar un nuevo concepto.
-2. Recargar la app.
-
-Resultado esperado:
-
-- el concepto sigue disponible para autocompletar
-
-## Pruebas de Contadores
-
-## CT-01 — Captura normal
-
-Prioridad: Alta
-
-Pasos:
-
-1. Configurar catálogo con al menos tres ítems.
-2. Registrar contadores válidos para todos.
-
-Resultado esperado:
-
-- el sistema calcula yield y resultado por ítem
-- el total general se calcula correctamente
-
-## CT-02 — Guardado con referencia previa
-
-Prioridad: Alta
-
-Pasos:
-
-1. Guardar contadores un día.
-2. Ir al día siguiente.
-3. Cargar la base para la nueva fecha.
-
-Resultado esperado:
-
-- la referencia vigente aparece correctamente por ítem
-
-## CT-03 — Valor menor a referencia sin crítica
-
-Prioridad: Alta
-
-Pasos:
-
-1. Cargar un ítem con valores por debajo de su referencia.
-2. Intentar guardar sin referencia crítica.
-
-Resultado esperado:
-
-- la app bloquea el guardado
-
-## CT-04 — Valor menor a referencia con crítica autorizada
-
-Prioridad: Alta
-
-Pasos:
-
-1. Reducir un valor respecto a la referencia.
-2. Abrir referencia crítica (ícono ⚠ en la fila).
-3. Completar nueva referencia (campos E, S, J).
-4. Si aplica, ingresar producción acumulada antes del reset en campo Pre-reset.
-5. Confirmar con admin.
-6. Guardar.
-
-Resultado esperado:
-
-- la operación se permite
-- la referencia crítica queda embebida en el registro
-- el campo Pre-reset suma correctamente al resultado monetario del ítem
-
-## CT-05 — Pausar un ítem
-
-Prioridad: Media
-
-Pasos:
-
-1. Pausar un ítem desde la interfaz.
-
-Resultado esperado:
-
-- el ítem queda marcado en pausa
-- deja de capturarse normalmente
-
-## CT-06 — Reactivar un ítem
-
-Prioridad: Media
-
-Pasos:
-
-1. Reactivar un ítem pausado.
-
-Resultado esperado:
-
-- vuelve a mostrarse como capturable
-
-## Pruebas de Cuadre
-
-## CQ-00 — Archivo Consolidado
-
-Prioridad: Alta
-
-Pasos:
-
-1. Tener datos completos para una fecha.
-2. Guardar un Cuadre.
-3. Revisar la carpeta configurada.
-
-Resultado esperado:
-
-- existe `Consolidado_<SEDE>_<AÑO>.xlsx` con hojas Contadores y Cuadre
-- el archivo operativo `Contadores_<SEDE>_<AÑO>.xlsx` no tiene hoja Cuadre ni Contadores
-
-## CQ-01 — Cuadre sin base previa
-
-Prioridad: Alta
-
-Pasos:
-
-1. Asegurar que no exista cuadre anterior.
-2. Tener Caja y Contadores del día.
-3. Abrir módulo Cuadre.
-
-Resultado esperado:
-
-- el sistema pide base inicial
-- permite calcular con base manual
-
-## CQ-02 — Cuadre con base previa
-
-Prioridad: Alta
-
-Pasos:
-
-1. Tener un cuadre previo.
-2. Registrar operaciones en días siguientes.
-3. Abrir módulo Cuadre en la fecha nueva.
-
-Resultado esperado:
-
-- el sistema usa la base previa automáticamente
-- el período empieza después del último cuadre
-
-## CQ-03 — Falta Caja del día
-
-Prioridad: Alta
-
-Pasos:
-
-1. Tener movimientos y contadores, pero no Caja del día.
-2. Abrir Cuadre.
-
-Resultado esperado:
-
-- el sistema bloquea el cuadre
-- muestra mensaje claro
-
-## CQ-04 — Falta Contadores del día
-
-Prioridad: Alta
-
-Pasos:
-
-1. Tener Caja del día, pero no Contadores.
-2. Abrir Cuadre.
-
-Resultado esperado:
-
-- el sistema bloquea el cuadre
-
-## CQ-05 — Consistencia de totales
-
-Prioridad: Alta
-
-Pasos:
-
-1. Registrar datos conocidos en todos los módulos.
-2. Calcular el cuadre.
-3. Verificar manualmente la fórmula.
-
-Resultado esperado:
-
-- la caja teórica coincide con el cálculo manual
-- la diferencia coincide con caja física menos caja teórica
-
-## Pruebas de Excel y persistencia
-
-## EX-01 — Libro abierto en Excel
-
-Prioridad: Alta
-
-Pasos:
-
-1. Abrir el libro en Excel.
-2. Intentar guardar desde la app.
-
-Resultado esperado:
-
-- la app avisa que el archivo está ocupado o en uso
-- no deja el libro corrupto
-
-## EX-02 — Relectura tras guardar
-
-Prioridad: Alta
-
-Pasos:
-
-1. Guardar cualquier módulo.
-2. Cambiar de fecha.
-3. Volver a la fecha guardada.
-
-Resultado esperado:
-
-- los datos recargados coinciden con lo guardado
-
-## EX-03 — Catálogos locales
-
-Prioridad: Media
-
-Pasos:
-
-1. Registrar nuevos clientes, conceptos y personas.
-2. Cerrar y reabrir la app.
-
-Resultado esperado:
-
-- los catálogos siguen disponibles
-- los JSON locales viven dentro de `data/`
-
-## Pruebas de concurrencia y Dropbox
-
-## DR-01 — Doble clic en el mismo equipo
-
-Prioridad: Alta
-
-Pasos:
-
-1. Con la app ya corriendo, hacer doble clic en el `.exe` nuevamente.
-
-Resultado esperado:
-
-- no se inicia un segundo servidor
-- el navegador se abre (o se reutiliza la pestaña existente) apuntando a la instancia ya activa
-
-## DR-02 — Dos equipos de la misma sede
-
-Prioridad: Alta
-
-Pasos:
-
-1. Configurar dos equipos con la misma sede y la misma carpeta Dropbox.
-2. Guardar operaciones casi simultáneas.
-
-Resultado esperado:
-
-- observar si Dropbox crea conflicto o versión duplicada
-- documentar el comportamiento real
-
-Nota:
-
-Esta prueba es crítica porque refleja el límite más importante de la arquitectura actual.
-
-## DR-03 — Dos equipos de sedes distintas
-
-Prioridad: Alta
-
-Pasos:
-
-1. Configurar dos equipos con sedes distintas.
-2. Guardar en paralelo.
-
-Resultado esperado:
-
-- no debe haber conflicto entre archivos separados
-
-## Pruebas de respaldo automático (solo super admin)
-
-## BK-01 — Configuración de backup
-
-Prioridad: Alta
-
-Pasos:
-
-1. Abrir Administración en el build super admin.
-2. Activar la casilla "Activar respaldo automático".
-3. Introducir una ruta de carpeta destino y pulsar "Verificar acceso".
-4. Guardar configuración.
-
-Resultado esperado:
-
-- el botón "Verificar acceso" responde con mensaje de confirmación o error claro
-- al guardar, se dispara un respaldo inmediato en background (sin esperar el próximo ciclo de 4 horas)
-- la carpeta destino contiene subcarpetas por sede con los archivos copiados y un `manifest.json` con `valido: true`
-
-## BK-02 — Idempotencia del respaldo
-
-Prioridad: Media
-
-Pasos:
-
-1. Con backup ya ejecutado para hoy, ejecutar "Respaldar ahora" nuevamente.
-
-Resultado esperado:
-
-- el sistema detecta el `manifest.json` del día y omite la copia (mensaje: "Respaldo del día ya existe y está completo")
-- no se sobreescriben archivos existentes válidos
-
-## BK-03 — Rotación de respaldos
-
-Prioridad: Media
-
-Pasos:
-
-1. Forzar respaldos en días distintos hasta superar 3 días de retención (modificando fechas o ajustando `RETENTION_DAYS` en prueba).
-
-Resultado esperado:
-
-- las carpetas con fecha más antigua se eliminan automáticamente
-- quedan solo las últimas 3 fechas
-
-## BK-04 — Carpeta no accesible
-
-Prioridad: Alta
-
-Pasos:
-
-1. Configurar una carpeta destino que no exista y no pueda crearse (ruta de red no disponible o sin permisos).
-2. Ejecutar "Respaldar ahora".
-
-Resultado esperado:
-
-- el sistema responde con error claro
-- no deja archivos corruptos ni carpetas parciales
-
-## BK-05 — Log de respaldos
-
-Prioridad: Media
-
-Pasos:
-
-1. Ejecutar al menos un respaldo completo.
-2. Revisar la sección de estado de respaldo en Administración.
-
-Resultado esperado:
-
-- se muestran las últimas entradas del log con sede, fecha, archivos copiados y estado
-
-## Pruebas de regresión recomendadas después de cambios
-
-Después de tocar código, ejecutar al menos:
-
-1. PG-01
-2. PG-02
-3. PG-03
-4. CJ-01
-5. BN-03
-6. PR-04
-7. CT-03
-8. CT-04
-9. CQ-00
-10. CQ-03
-11. CQ-05
-12. DR-01
-13. EX-01
-
-Si se toca el sistema de respaldos, agregar también:
-
-14. BK-01
-15. BK-02
-16. BK-04
-
-## Registro de resultados
-
-Se recomienda llevar una tabla como esta:
-
-| Caso | Fecha | Responsable | Resultado | Observaciones |
-|---|---|---|---|---|
-| CJ-01 | 2026-04-03 | Nombre | OK / Falla | detalle |
-
-## Recomendación final
-
-Si el sistema va a seguir creciendo, este plan debería convertirse más adelante en:
-
-- pruebas manuales operativas
-- pruebas automatizadas de servicios críticos
-- pruebas de integración sobre Excel
-- checklist de aceptación antes de distribuir una nueva versión
+- mantener estas pruebas manuales
+- sumar pruebas automatizadas de servicios críticos
+- preparar validaciones más cercanas a una futura migración a base de datos

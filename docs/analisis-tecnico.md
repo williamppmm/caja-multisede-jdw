@@ -1,480 +1,194 @@
 # Análisis Técnico — CajaJDW
 
-## Resumen ejecutivo
+## Resumen
 
-CajaJDW es una aplicación local orientada a captura operativa y respaldo en Excel. Su diseño actual prioriza velocidad de adopción, compatibilidad con la forma de trabajo tradicional en hojas de cálculo y facilidad de explotación posterior con Excel o Power Query.
+CajaJDW ya funciona como una capa operativa por encima de Excel. Ese es su valor actual:
 
-La arquitectura es adecuada para un escenario con:
+- reduce edición manual directa sobre hojas
+- centraliza validaciones
+- controla cierres
+- mejora la corrección de datos
+- mantiene Excel como respaldo y salida analítica
 
-- pocos usuarios concurrentes por sede
-- necesidad de seguir usando Excel como formato natural
-- captura local desde equipos Windows
+## Arquitectura
 
-Su límite más importante no está en la funcionalidad diaria, sino en concurrencia distribuida, seguridad fuerte y mantenibilidad a medida que el sistema crece.
+Capas principales:
 
-## Arquitectura general
+1. launchers Python / EXE
+2. FastAPI
+3. frontend web local
+4. servicios por módulo
+5. persistencia Excel
 
-La aplicación funciona como un sistema local cliente-servidor:
+## Arranque
 
-1. `launcher.py` inicia Uvicorn.
-2. `app/main.py` monta FastAPI y sirve la interfaz.
-3. `web/index.html` y `web/app.js` implementan la UI.
-4. `app/routers/` expone la API REST.
-5. `app/services/` implementa la lógica de negocio.
-6. `app/services/excel_service.py` persiste en Excel.
+El arranque ya no es el del prototipo original.
 
-## Capas del sistema
+Hoy incluye:
 
-### Arranque
+- instancia única
+- splash
+- espera del servidor antes de abrir navegador
+- protección contra pestañas duplicadas al hacer varios clics
 
-[launcher.py](../launcher.py)
+Archivo central:
 
-Responsabilidades:
+- [launcher_boot.py](../launcher_boot.py)
 
-- verificar si ya hay una instancia corriendo en el puerto por defecto
-- si ya existe → abrir navegador y salir (instancia única)
-- si no existe → detectar puerto libre entre 8000 y 8009, iniciar servidor y abrir navegador
-
-Observaciones:
-
-- útil para operación no técnica
-- muy adecuado para distribución como `.exe`
-- el doble-clic accidental no duplica el proceso
-
-### Aplicación FastAPI
-
-[app/main.py](../app/main.py)
-
-Responsabilidades:
-
-- crear la app con lifespan (startup hook)
-- montar `/static`
-- incluir routers
-- servir `index.html`
-
-El lifespan arranca el loop de respaldos automáticos si la build es super admin:
-
-```python
-@asynccontextmanager
-async def lifespan(app):
-    if is_super_admin_build():
-        backup_service.programar_backup()
-    yield
-```
-
-### Configuración y rutas
-
-[app/config.py](../app/config.py)
-[app/runtime_paths.py](../app/runtime_paths.py)
-
-Responsabilidades:
-
-- definir denominaciones
-- resolver nombres de archivo Excel
-- resolver rutas en desarrollo o en modo `.exe`
-- concentrar JSON locales en `data/`
-
-Observaciones:
-
-- la lógica de nombre por sede y año está bien encapsulada
-- la ruta final del libro depende de `data/settings.json`
+Esto mejoró mucho la experiencia del ejecutable, especialmente para usuarios no técnicos.
 
 ## Persistencia
 
-## Modelo principal
+El sistema sigue teniendo una decisión fuerte:
 
-La persistencia principal está en:
+- Excel es la fuente de verdad
 
-[app/services/excel_service.py](../app/services/excel_service.py)
+Eso tiene ventajas:
 
-Este servicio:
+- adopción rápida
+- continuidad con el proceso real del negocio
+- facilidad de revisión manual
+- compatibilidad con Power Query
 
-- abre o crea workbooks
-- genera hojas por módulo y sede
-- escribe encabezados y formatos
-- consulta registros por fecha
-- reemplaza registros de una fecha cuando se corrige
-- administra un lock local `.lock`
-- mantiene compatibilidad con algunos formatos legacy
+Y también límites:
 
-## Diseño de los libros
+- no hay transacciones reales
+- no hay concurrencia distribuida fuerte
+- Dropbox no reemplaza una base de datos
 
-Dos libros por sede y año:
+## Servicios críticos
 
-**`Contadores_{sede}_{año}.xlsx`** — operativa diaria, una hoja por módulo:
+### `excel_service.py`
 
-- Caja
-- Plataformas
-- Gastos
-- Bonos
-- Prestamos
-- Movimientos
-
-**`Consolidado_{sede}_{año}.xlsx`** — consolidación del período:
-
-- Contadores
-- Cuadre
-
-Ventajas del diseño:
-
-- separa bien dominios de información
-- simplifica auditoría manual
-- hace más estable la lectura con Power Query
-- reduce conflicto entre sedes
-
-## Limitaciones del modelo Excel
-
-1. No hay transacciones reales.
-2. No hay control distribuido entre varios equipos.
-3. El lock local no resuelve conflictos entre clientes distintos.
-4. Dropbox puede producir conflictos de sincronización si dos usuarios de la misma sede escriben casi a la vez.
-
-Conclusión:
-
-- como almacenamiento operativo local es válido
-- como almacenamiento multiusuario concurrente es frágil
-
-## Modelos de datos
-
-[app/models/caja_models.py](../app/models/caja_models.py)
-[app/models/contadores_models.py](../app/models/contadores_models.py)
-[app/models/cuadre_models.py](../app/models/cuadre_models.py)
-
-La validación de entrada con Pydantic cubre bien:
-
-- tipos
-- no negativos
-- obligatoriedad de campos clave
-- tipos válidos de movimiento
-- estructura requerida para referencia crítica
-
-Esto le da a la app una base bastante sana del lado backend.
-
-## Routers
-
-## Router principal
-
-[app/routers/modules.py](../app/routers/modules.py)
-
-Agrupa endpoints para:
-
-- guardar registros
-- consultar estado por fecha
-- consultar datos de una fecha
-- consultar última fecha registrada
-- administrar catálogos
-- operaciones especiales como editar/eliminar último bono
-
-Observación:
-
-- el router es claro y funcional
-- la API es relativamente consistente
-- varios endpoints están muy orientados a la interfaz actual
-
-## Router de settings
-
-[app/routers/settings.py](../app/routers/settings.py)
+Es el corazón técnico de la persistencia.
 
 Responsabilidades:
 
-- leer y guardar settings
-- gestionar sedes remotas (`/api/settings/remote-sites`, `/api/settings/active-site`)
-- abrir selector de carpeta
-- abrir un libro Excel en su hoja correspondiente (`/api/settings/open-module-xlsx`): usa PowerShell COM para abrir Excel en la hoja del módulo indicado; `communicate(timeout=2)` con `TimeoutExpired` tratado como éxito (Excel sigue cargando = caso normal)
-- apagar la app (`/api/app/shutdown`)
-- recibir heartbeat del navegador (`/api/app/heartbeat`)
-- endpoints de respaldo automático (solo super admin):
-  - `GET /api/backup/status` — estado y últimas entradas del log
-  - `POST /api/backup/run-now` — dispara un respaldo inmediato
-  - `POST /api/backup/validate-root` — verifica que la carpeta destino exista y admita escritura
+- lectura por módulo
+- escritura por módulo
+- reemplazo por fecha
+- búsqueda de períodos
+- lectura de `Cuadre` y dependencia entre cierres
 
-Observación:
+Es el punto más delicado del sistema.
 
-- el heartbeat activa un watchdog: si no llega ninguno en 75 s el proceso termina solo
-- esto cubre el caso de cierre de navegador sin usar el botón Finalizar
-- guardar settings dispara automáticamente un respaldo inmediato en background si `backup_enabled` y `backup_root` están configurados
+### `contadores_service.py`
 
-## Servicios por módulo
+Es el módulo con mayor complejidad de negocio.
 
-## Caja y módulos simples
+Hoy resuelve:
 
-[app/services/caja_service.py](../app/services/caja_service.py)
+- referencias vigentes
+- referencia crítica
+- pausas por fecha
+- guardado controlado
 
-Contiene la lógica para:
+La mejora más importante fue abandonar la pausa global del catálogo y pasar a una pausa temporal por fecha.
 
-- construir filas de Caja
-- construir filas de módulos simples por items
-- guardar Caja
-- guardar Plataformas
-- guardar Gastos
-- consultar estado de edición por fecha
+### `cuadre_service.py`
 
-Fortalezas:
+Ya no solo calcula el cierre; también coordina resincronización.
 
-- lógica clara
-- separación razonable entre preparación de filas y persistencia
+Puntos clave:
 
-## Bonos
+- recalcula el `Cuadre` afectado por una corrección
+- si una corrección en `Caja` cambia `base_nueva`, arrastra el siguiente cierre
 
-[app/services/bonos_service.py](../app/services/bonos_service.py)
+Eso corrige un problema contable real que antes quedaba desalineado.
 
-Responsabilidades:
+## Diferencia entre Resumen y Cuadre
 
-- registrar bono
-- consultar bonos por fecha
-- actualizar último bono
-- eliminar último bono
+`Resumen`:
 
-Punto importante:
+- consolida por período
+- sirve para lectura operativa
+- no hace balance físico vs teórico
 
-- el criterio de “último bono” depende del timestamp más reciente de la fecha
+`Cuadre`:
 
-## Préstamos
+- sí hace el cierre contable
+- depende de `base_anterior`
+- define `base_nueva`
 
-[app/services/prestamos_service.py](../app/services/prestamos_service.py)
+Técnicamente, `Cuadre` tiene dependencia encadenada entre cierres.  
+`Resumen` no.
 
-Responsabilidades:
+## Fortalezas actuales
 
-- registrar préstamo o pago
-- impedir pagos mayores al saldo pendiente
-- devolver resumen vigente
+- muy alineado con la operación real
+- sin dependencia de infraestructura compleja
+- instalación y despliegue simples
+- build distribuible por rama
+- buena cobertura funcional para el tamaño actual de la operación
 
-Punto importante:
+## Riesgos actuales
 
-- la lógica de saldo vivo depende del historial consolidado leído desde Excel
+- Excel compartido sigue siendo frágil si dos equipos escriben el mismo libro
+- varios comportamientos dependen del reloj local del equipo
+- `app.js` y `excel_service.py` siguen concentrando bastante responsabilidad
+- la seguridad es operativa, no robusta
 
-## Movimientos
+## Qué ya mejoró mucho
 
-[app/services/movimientos_service.py](../app/services/movimientos_service.py)
+### 1. Arranque
 
-Responsabilidades:
+Antes:
 
-- registrar ingresos y salidas extraordinarias
-- resumir netos del día
+- doble clic podía provocar múltiples pestañas o confusión
 
-## Contadores
+Ahora:
 
-[app/services/contadores_service.py](../app/services/contadores_service.py)
+- el launcher es predecible
 
-Es el módulo de mayor complejidad.
+### 2. Contadores
 
-Responsabilidades:
+Antes:
 
-- administrar catálogo de ítems
-- pausar o reactivar ítems
-- reconstruir referencias vigentes desde historial
-- calcular yield actual
-- detectar alertas
-- exigir referencia crítica si hay decrementos frente a referencia
+- la pausa era global y podía contaminar históricos
 
-Lógica central:
+Ahora:
 
-- cada ítem tiene una referencia vigente basada en eventos anteriores
-- si el valor actual baja respecto a esa referencia, se bloquea el guardado normal
-- si el usuario tiene admin, puede definir una nueva referencia crítica con valores de entradas, salidas y jackpot en el punto del reset
-- el campo `produccion_pre_reset` permite registrar la producción monetaria acumulada hasta ese reset técnico, que se suma al resultado del período
+- la pausa es temporal y acotada por ítem
 
-Esto convierte el módulo en algo más cercano a control operativo que a mera captura.
+### 3. Cuadre
 
-## Cuadre
+Antes:
 
-[app/services/cuadre_service.py](../app/services/cuadre_service.py)
+- una corrección podía dejar cierres siguientes con base desactualizada
 
-Responsabilidades:
+Ahora:
 
-- encontrar último cuadre previo
-- calcular el período contable
-- verificar precondiciones
-- sumar y restar los módulos implicados
-- comparar caja teórica vs caja física
-- guardar el resultado final del cierre
+- la base de `Caja` puede cascader al siguiente `Cuadre`
 
-Fortalezas:
+## Evolución futura
 
-- lógica útil y bastante bien alineada con el negocio
-- contempla períodos de varios días
-- permite primera base manual
+La siguiente decisión grande no será de frontend ni de launcher, sino de persistencia.
 
-Riesgo:
-
-- cualquier inconsistencia previa en módulos origen afecta el cuadre completo
-
-## Respaldos automáticos (super admin)
-
-[app/services/backup_service.py](../app/services/backup_service.py)
-
-Solo activo en el build super admin (`is_super_admin_build() == True`).
-
-Responsabilidades:
-
-- recorrer las sedes remotas configuradas y copiar sus archivos críticos a una carpeta central
-- archivos respaldados por sede: `Contadores_*.xlsx`, `Consolidado_*.xlsx`, `contadores_items.json`, `startup_state.json`
-- verificar integridad antes de copiar: xlsx con openpyxl (read-only), json con `json.load`
-- copia atómica: `tempfile.NamedTemporaryFile` → `Path.replace(dst)` para evitar archivos parcialmente escritos
-- criterio de omisión: si ya existe `manifest.json` con `valido: true` en la carpeta del día, se salta (idempotente)
-- rotación: conserva los últimos 3 días por sede, elimina los anteriores
-- log: `backup_root/backup_log.jsonl` en formato JSONL, una entrada por ejecución con resultados por sede
-
-Scheduling:
-
-- se lanza un loop daemon en el lifespan de FastAPI: espera 10 minutos tras el arranque y luego repite cada 4 horas
-- al guardar la configuración con backup habilitado se dispara un intento inmediato en background, sin esperar la siguiente vuelta del loop
-- un lock (`_backup_lock`) previene ejecuciones solapadas
-
-## Frontend
-
-[web/index.html](../web/index.html)
-[web/app.js](../web/app.js)
-
-## Estado actual
-
-El frontend es una SPA simple sin framework.
-
-`app.js` concentra:
-
-- render de módulos
-- validaciones
-- control de pestañas
-- manejo de fecha
-- autorización admin
-- consumo de API
-- borradores temporales de Caja y Contadores
-- render del Cuadre
-- administración de catálogos
-
-Ventajas:
-
-- desarrollo rápido
-- baja complejidad de tooling
-- fácil despliegue con FastAPI + estáticos
-
-Desventajas:
-
-- demasiada responsabilidad en un solo archivo
-- alto acoplamiento al DOM
-- cambios de UI pueden afectar lógica lateral
-
-## Seguridad
-
-Estado actual:
-
-- existe una contraseña admin fija en frontend
-- la autorización se usa para habilitar correcciones y acciones especiales
-
-Problema:
-
-- no debe considerarse seguridad real
-- cualquier persona con acceso al frontend o al código puede verla
-
-Conclusión:
-
-- esto sirve como barrera operativa básica
-- no sirve como control fuerte ni auditoría real
-
-## Compatibilidad con Windows y Linux
-
-## Windows
-
-Es la plataforma mejor soportada hoy.
-
-Razones:
-
-- `.bat`
-- scripts PowerShell
-- empaquetado con PyInstaller
-- selectores de archivos y carpetas integrados
-
-## Linux
-
-Todavía no es prioridad, pero el análisis deja claro lo siguiente:
-
-Lo más portable:
-
-- FastAPI
-- servicios Python
-- estructura de datos
-- lógica de negocio
-
-Lo menos portable:
-
-- scripts de instalación
-- build actual del `.exe`
-- parte de la experiencia de escritorio
-- selectores de archivo orientados a Windows
-
-## Riesgos principales
-
-1. Persistencia distribuida frágil con Dropbox.
-2. Seguridad admin débil.
-3. `excel_service.py` demasiado central y crítico.
-4. `web/app.js` demasiado grande y acoplado.
-5. Ausencia de pruebas automatizadas.
-6. Dependencia fuerte de Windows para distribución cómoda.
-7. ~~Ausencia de respaldos automáticos~~ — **mitigado**: el build super admin incluye respaldo periódico configurable con rotación de 3 días y log de resultados.
-
-## Prioridades de prueba
-
-## Alta prioridad
-
-- corrección de fechas existentes
-- guardado concurrente con libro abierto
-- comportamiento de Contadores con referencia crítica
-- préstamos con varios ciclos de deuda
-- cuadre en períodos de varios días
-- validación contra conflicto de Dropbox entre equipos de la misma sede
-
-## Media prioridad
-
-- migración desde hojas legacy
-- catálogos locales en instalaciones distintas
-- edición del último bono
-- cambio de sede o carpeta compartida
-
-## Baja prioridad por ahora
-
-- compatibilidad Linux
-- refactor frontend
-- desacoplar persistencia Excel de la lógica de negocio
-
-## Escenarios recomendados de evolución
-
-## Escenario 1: seguir con Excel como operación principal
-
-Conviene si:
-
-- la concurrencia sigue siendo baja
-- una sede no tiene muchos capturadores simultáneos
-- el valor principal sigue siendo rapidez y familiaridad con Excel
-
-En este escenario conviene mejorar:
-
-- documentación operativa
-- pruebas manuales
-- backups
-- revisión de conflictos de Dropbox
-
-## Escenario 2: Excel como respaldo y MySQL como fuente principal
-
-Conviene si:
-
-- varias personas capturan sobre la misma sede
-- se necesita mejor auditoría
-- se requiere seguridad real
-- se quiere crecer sin depender de sincronización de archivos
-
-En ese escenario:
-
-- MySQL sería la fuente transaccional
-- la app seguiría capturando igual desde frontend
-- Excel pasaría a exportación o réplica analítica
-- Power Query seguiría siendo útil
+Cuando la operación crezca, lo natural será:
+
+- mover la operación principal a base de datos
+- dejar Excel como:
+  - respaldo
+  - exportación
+  - insumo analítico
+
+Eso tendría sentido especialmente si:
+
+- aumenta la concurrencia
+- se necesita mejor trazabilidad
+- Dropbox deja de ser suficiente
 
 ## Conclusión
 
-CajaJDW ya no es un boceto. Tiene lógica operativa real y una base bastante sólida para el escenario actual de trabajo por sede con respaldo en Excel.
+Hoy CajaJDW ya es una aplicación operativa real, no un simple “frontend para Excel”.
 
-Su mayor valor hoy es que encaja con la operación real del negocio sin obligar a abandonar Excel.
+El sistema ganó:
 
-Su mayor límite futuro es que Excel compartido no escala bien como fuente operativa multiusuario.
+- control de captura
+- control de cierres
+- corrección más segura
+- mejor experiencia de arranque
 
-La decisión futura más importante no será “si seguir con Excel”, sino cuándo conviene que Excel deje de ser la fuente primaria y pase a ser salida o respaldo de una base central.
+Su siguiente límite natural no es funcional, sino estructural:
+
+- cuándo dejar de usar Excel como backend primario
