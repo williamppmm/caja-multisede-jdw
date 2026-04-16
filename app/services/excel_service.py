@@ -1212,6 +1212,36 @@ def obtener_cuadre_que_contiene_fecha(fecha_op: date) -> dict | None:
     return candidato
 
 
+def obtener_siguiente_cuadre(fecha_cierre: date) -> dict | None:
+    candidato = None
+    cierre_candidato = None
+
+    for year in {fecha_cierre.year, fecha_cierre.year + 1}:
+        path = _path_modulo("cuadre", year)
+        if not path.exists():
+            continue
+        with _abrir_workbook_lectura(path) as wb:
+            hojas = _obtener_hojas_para_lectura(wb, "cuadre")
+            if not hojas:
+                continue
+            for ws in hojas:
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    if row[0] is None:
+                        continue
+                    try:
+                        cuadre = _parsear_fila_cuadre(row)
+                        cierre = date.fromisoformat(cuadre["fecha"])
+                    except (ValueError, TypeError, KeyError):
+                        continue
+                    if cierre <= fecha_cierre:
+                        continue
+                    if cierre_candidato is None or cierre < cierre_candidato:
+                        candidato = cuadre
+                        cierre_candidato = cierre
+
+    return candidato
+
+
 def _ts_matches(cell_val, ts_str: str) -> bool:
     if isinstance(cell_val, datetime):
         return cell_val.isoformat() == ts_str

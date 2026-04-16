@@ -83,7 +83,7 @@ def guardar_caja(entrada: CajaEntrada) -> dict:
     if entrada.forzar:
         mensaje = cuadre_service.anexar_mensaje_sync(
             mensaje,
-            cuadre_service.sincronizar_cuadre_afectado(entrada.fecha),
+            cuadre_service.sincronizar_cadena_caja(entrada.fecha),
         )
 
     return {

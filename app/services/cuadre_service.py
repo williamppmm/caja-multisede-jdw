@@ -640,6 +640,53 @@ def sincronizar_cuadre_afectado(fecha_operacion: date) -> dict | None:
     return sincronizar_cuadre_guardado(fecha_cierre)
 
 
+def sincronizar_cadena_caja(fecha_operacion: date) -> dict | None:
+    fecha_cierre = buscar_fecha_cuadre_afectado(fecha_operacion)
+    if fecha_cierre is None:
+        return None
+
+    mensajes: list[str] = []
+    recursiones = 0
+    actual = fecha_cierre
+
+    while actual is not None and recursiones < 10:
+        anterior = excel_service.obtener_datos_cuadre_fecha(actual, actual.year)
+        base_nueva_anterior = float(anterior.get("base_nueva", 0)) if anterior else None
+
+        sync_result = sincronizar_cuadre_guardado(actual)
+        if sync_result and sync_result.get("mensaje"):
+            mensajes.append(sync_result["mensaje"])
+        if not sync_result or not sync_result.get("ok"):
+            return {
+                "ok": False,
+                "recalculado": any("recalculado" in msg.lower() for msg in mensajes),
+                "fecha_cuadre": str(actual),
+                "mensaje": " ".join(mensajes).strip(),
+            }
+
+        actualizado = excel_service.obtener_datos_cuadre_fecha(actual, actual.year)
+        base_nueva_actual = float(actualizado.get("base_nueva", 0)) if actualizado else None
+
+        if base_nueva_anterior is not None and base_nueva_actual == base_nueva_anterior:
+            break
+
+        siguiente = excel_service.obtener_siguiente_cuadre(actual)
+        if not siguiente:
+            break
+        try:
+            actual = date.fromisoformat(siguiente["fecha"])
+        except ValueError:
+            break
+        recursiones += 1
+
+    return {
+        "ok": True,
+        "recalculado": True,
+        "fecha_cuadre": str(fecha_cierre),
+        "mensaje": " ".join(mensajes).strip(),
+    }
+
+
 def anexar_mensaje_sync(mensaje_base: str, sync_result: dict | None) -> str:
     if not sync_result or not sync_result.get("mensaje"):
         return mensaje_base
