@@ -102,6 +102,21 @@ Persistencia:
 
 - hoja `Plataformas` de `Contadores_{sede}_{año}.xlsx`
 
+#### Referencias externas (solo super admin con sede activa)
+
+En el build super admin, al abrir el módulo se consultan dos archivos externos de solo lectura:
+
+- `Ventas_dia_Practisistemas.xlsx` (hoja `Resumen`, columna configurable por sede)
+- `Ventas_dia_Bet.xlsm` (hoja `xDias`, columna configurable por sede)
+
+Los valores aparecen como referencia visual debajo del formulario de captura. Se comparan contra lo ingresado mostrando `Coincide` o `Difiere Δ`. No se guardan en ningún Excel propio.
+
+Condiciones para que aparezca el panel:
+
+- build super admin activo (`CAJA_SUPER_ADMIN=1`)
+- sede activa seleccionada explícitamente
+- rutas y columnas configuradas en el panel de administración
+
 ### Gastos
 
 Propósito:
@@ -280,10 +295,17 @@ Algunos endpoints importantes:
 
 - `POST /api/modulos/caja/guardar`
 - `POST /api/modulos/plataformas/guardar`
+- `GET  /api/modulos/plataformas/fecha/{fecha}/datos`
+- `GET  /api/modulos/plataformas/fecha/{fecha}/referencias` — valores de archivos externos (solo super admin)
 - `POST /api/modulos/contadores/guardar`
 - `POST /api/modulos/cuadre/guardar`
-- `GET /api/modulos/cuadre/calcular/{fecha}`
+- `GET  /api/modulos/cuadre/calcular/{fecha}`
 - `POST /api/modulos/contadores/catalogo/{item_id}/pausar`
+- `GET  /api/settings` — retorna configuración incluyendo `is_super_admin_build`
+- `POST /api/settings` — guarda configuración, retorna `active_site`
+- `POST /api/settings/remote-sites` — guarda lista de sedes, retorna `sites` y `active_site`
+- `POST /api/settings/active-site` — cambia sede activa
+- `POST /api/settings/remote-sites/validate` — verifica carpeta y detecta sede
 - `POST /api/app/heartbeat`
 - `POST /api/app/shutdown`
 

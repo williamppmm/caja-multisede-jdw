@@ -195,11 +195,20 @@ Base de usuario con una diferencia concreta:
 
 ### Desarrollo
 
+Versión usuario:
+
 ```powershell
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 python launcher.py
+```
+
+Versión super admin (puerto 8001):
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+$env:CAJA_SUPER_ADMIN='1'; uvicorn app.main:app --reload --port 8001
 ```
 
 ### Instalación rápida
