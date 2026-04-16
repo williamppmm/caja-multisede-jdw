@@ -1,4 +1,7 @@
+import json
 import os
+import socket
+import time
 from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import date, datetime
@@ -13,6 +16,9 @@ from app.services.settings_service import get_settings
 
 class ArchivoCajaOcupadoError(Exception):
     pass
+
+
+_LOCK_TTL = 60  # segundos — lock más antiguo que esto se considera huérfano
 
 
 SECTION_PREFIXES = {
@@ -191,30 +197,82 @@ def _fila_es_modulo(modulo: str, row) -> bool:
     return False
 
 
+def _lock_metadata() -> bytes:
+    return json.dumps({
+        "ts": time.time(),
+        "pid": os.getpid(),
+        "host": socket.gethostname(),
+    }).encode()
+
+
+def _lock_host(lock_path: Path) -> str:
+    try:
+        return json.loads(lock_path.read_bytes()).get("host", "")
+    except Exception:
+        return ""
+
+
+def _lock_age_seconds(lock_path: Path) -> float:
+    try:
+        data = json.loads(lock_path.read_bytes())
+        ts = float(data.get("ts"))
+        return max(0.0, time.time() - ts)
+    except Exception:
+        try:
+            return max(0.0, time.time() - lock_path.stat().st_mtime)
+        except OSError:
+            return 0.0
+
+
 @contextmanager
 def _bloqueo_escritura(path: Path):
+    # Capa 1: archivo propietario que Excel crea al abrir el xlsx (Windows).
+    # Dropbox lo sincroniza, así que detecta si otro equipo lo tiene abierto en Excel.
+    owner_path = path.parent / f"~${path.name}"
+    if owner_path.exists():
+        raise ArchivoCajaOcupadoError(
+            "El libro esta siendo usado por Excel en este equipo o en otro equipo de la red. "
+            "Cierra el archivo en Excel antes de guardar."
+        )
+
+    # Capa 2: archivo .lock con metadata (host, pid, timestamp).
+    # Dropbox lo sincroniza, bloqueando guardados simultáneos entre distintos equipos.
+    # Si el lock tiene más de _LOCK_TTL segundos se considera huérfano y se elimina automáticamente.
     lock_path = path.with_suffix(path.suffix + ".lock")
     fd = None
+    lock_creado = False
     try:
-        try:
-            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_RDWR)
-        except FileExistsError as exc:
-            raise ArchivoCajaOcupadoError(
-                "Otro guardado esta en curso. Vuelve a presionar Guardar en unos segundos."
-            ) from exc
-        except PermissionError as exc:
-            raise ArchivoCajaOcupadoError(
-                "No se pudo guardar porque el libro esta abierto o sincronizandose. Cierra Excel y vuelve a intentarlo."
-            ) from exc
-        except OSError as exc:
-            raise ArchivoCajaOcupadoError(
-                "No se pudo bloquear el libro para guardar. Vuelve a intentarlo en unos segundos."
-            ) from exc
+        for intento in range(2):
+            try:
+                fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_RDWR)
+                os.write(fd, _lock_metadata())
+                lock_creado = True
+                break
+            except FileExistsError:
+                age = _lock_age_seconds(lock_path)
+                if age > _LOCK_TTL and intento == 0:
+                    lock_path.unlink(missing_ok=True)
+                    continue  # reintento único tras limpiar lock huérfano
+                host = _lock_host(lock_path)
+                suffix = f" desde el equipo '{host}'" if host else ""
+                raise ArchivoCajaOcupadoError(
+                    f"Otro usuario esta guardando en este momento{suffix}. "
+                    "Vuelve a intentarlo en unos segundos."
+                )
+            except PermissionError as exc:
+                raise ArchivoCajaOcupadoError(
+                    "No se pudo guardar porque el libro esta abierto o sincronizandose. "
+                    "Cierra Excel y vuelve a intentarlo."
+                ) from exc
+            except OSError as exc:
+                raise ArchivoCajaOcupadoError(
+                    "No se pudo bloquear el libro para guardar. Vuelve a intentarlo en unos segundos."
+                ) from exc
         yield
     finally:
         if fd is not None:
             os.close(fd)
-        if lock_path.exists():
+        if lock_creado and lock_path.exists():
             lock_path.unlink(missing_ok=True)
 
 
@@ -376,6 +434,11 @@ def _formatear_filas_por_columnas(ws, cantidad_filas: int, formatos: dict[int, s
     for row_num in range(start_row, last_row + 1):
         for col, formato in formatos.items():
             ws.cell(row_num, col).number_format = formato
+
+
+def _formatear_fila(ws, row_num: int, formatos: dict[int, str]) -> None:
+    for col, formato in formatos.items():
+        ws.cell(row_num, col).number_format = formato
 
 
 def _formatear_filas_recientes_bonos(ws, cantidad_filas: int) -> None:
@@ -1335,15 +1398,21 @@ def actualizar_bono_por_ts(fecha: date, year: int, ts_str: str, cliente: str, va
         ws.cell(target, 3).value = cliente
         ws.cell(target, 4).value = valor
         ws.cell(target, 5).value = new_ts
-        _formatear_filas_recientes_bonos(ws, 1)
+        _formatear_fila(ws, target, {1: "DD-MM-YYYY", 2: "HH:mm AM/PM", 4: "#,##0", 5: "HH:mm AM/PM"})
         _marcar_celda_activa(ws, target)
         total_dia = sum(
             float(r[3] or 0)
             for r in ws.iter_rows(min_row=2, values_only=True)
             if (r[0].date() if isinstance(r[0], datetime) else r[0]) == fecha
         )
-        wb.save(path)
-        wb.close()
+        try:
+            wb.save(path)
+        except PermissionError as exc:
+            raise ArchivoCajaOcupadoError(
+                "No se pudo guardar porque el libro esta siendo usado por otro proceso. Intenta nuevamente."
+            ) from exc
+        finally:
+            wb.close()
     return {"cliente": cliente, "valor": valor, "total_dia": total_dia}
 
 
@@ -1370,8 +1439,14 @@ def eliminar_bono_por_ts(fecha: date, year: int, ts_str: str) -> float | None:
             for r in ws.iter_rows(min_row=2, values_only=True)
             if (r[0].date() if isinstance(r[0], datetime) else r[0]) == fecha
         )
-        wb.save(path)
-        wb.close()
+        try:
+            wb.save(path)
+        except PermissionError as exc:
+            raise ArchivoCajaOcupadoError(
+                "No se pudo guardar porque el libro esta siendo usado por otro proceso. Intenta nuevamente."
+            ) from exc
+        finally:
+            wb.close()
     return total_dia
 
 
@@ -1397,7 +1472,7 @@ def actualizar_gasto_por_ts(fecha: date, year: int, ts_str: str, concepto: str, 
         ws.cell(target, 3).value = concepto
         ws.cell(target, 7).value = valor
         ws.cell(target, 8).value = new_ts
-        _formatear_filas_recientes(ws, 1)
+        _formatear_fila(ws, target, {1: "DD-MM-YYYY", 7: "#,##0", 8: "HH:mm AM/PM"})
         _marcar_celda_activa(ws, target)
         total_dia = sum(
             float(r[6] or 0)
@@ -1405,8 +1480,14 @@ def actualizar_gasto_por_ts(fecha: date, year: int, ts_str: str, concepto: str, 
             if str(r[1] or "").strip().lower() == "gasto"
             and (r[0].date() if isinstance(r[0], datetime) else r[0]) == fecha
         )
-        wb.save(path)
-        wb.close()
+        try:
+            wb.save(path)
+        except PermissionError as exc:
+            raise ArchivoCajaOcupadoError(
+                "No se pudo guardar porque el libro esta siendo usado por otro proceso. Intenta nuevamente."
+            ) from exc
+        finally:
+            wb.close()
     return {"concepto": concepto, "valor": valor, "total_dia": total_dia}
 
 
@@ -1437,8 +1518,14 @@ def eliminar_gasto_por_ts(fecha: date, year: int, ts_str: str) -> dict | None:
             if str(r[1] or "").strip().lower() == "gasto"
             and (r[0].date() if isinstance(r[0], datetime) else r[0]) == fecha
         )
-        wb.save(path)
-        wb.close()
+        try:
+            wb.save(path)
+        except PermissionError as exc:
+            raise ArchivoCajaOcupadoError(
+                "No se pudo guardar porque el libro esta siendo usado por otro proceso. Intenta nuevamente."
+            ) from exc
+        finally:
+            wb.close()
     return {"total_dia": total_dia}
 
 
@@ -1462,10 +1549,16 @@ def actualizar_prestamo_por_ts(fecha: date, year: int, ts_str: str, persona: str
         ws.cell(target, 4).value = tipo
         ws.cell(target, 5).value = valor
         ws.cell(target, 6).value = new_ts
-        _formatear_filas_recientes_prestamos(ws, 1)
+        _formatear_fila(ws, target, {1: "DD-MM-YYYY", 2: "HH:mm AM/PM", 5: "#,##0", 6: "HH:mm AM/PM"})
         _marcar_celda_activa(ws, target)
-        wb.save(path)
-        wb.close()
+        try:
+            wb.save(path)
+        except PermissionError as exc:
+            raise ArchivoCajaOcupadoError(
+                "No se pudo guardar porque el libro esta siendo usado por otro proceso. Intenta nuevamente."
+            ) from exc
+        finally:
+            wb.close()
     return obtener_resumen_prestamos(persona=persona)
 
 
@@ -1489,8 +1582,14 @@ def eliminar_prestamo_por_ts(fecha: date, year: int, ts_str: str) -> dict | None
             return None
         ws.delete_rows(target)
         _marcar_celda_activa(ws, ws.max_row)
-        wb.save(path)
-        wb.close()
+        try:
+            wb.save(path)
+        except PermissionError as exc:
+            raise ArchivoCajaOcupadoError(
+                "No se pudo guardar porque el libro esta siendo usado por otro proceso. Intenta nuevamente."
+            ) from exc
+        finally:
+            wb.close()
     return obtener_resumen_prestamos(persona=persona)
 
 
@@ -1515,9 +1614,16 @@ def actualizar_movimiento_por_ts(fecha: date, year: int, ts_str: str, tipo: str,
         ws.cell(target, 5).value = valor
         ws.cell(target, 6).value = observacion
         ws.cell(target, 7).value = new_ts
+        _formatear_fila(ws, target, {1: "DD-MM-YYYY", 2: "HH:mm AM/PM", 5: "#,##0", 7: "HH:mm AM/PM"})
         _marcar_celda_activa(ws, target)
-        wb.save(path)
-        wb.close()
+        try:
+            wb.save(path)
+        except PermissionError as exc:
+            raise ArchivoCajaOcupadoError(
+                "No se pudo guardar porque el libro esta siendo usado por otro proceso. Intenta nuevamente."
+            ) from exc
+        finally:
+            wb.close()
     items = obtener_movimientos_fecha(fecha, year)
     total_ingresos = sum(float(i["valor"] or 0) for i in items if i["tipo_movimiento"] == "ingreso")
     total_salidas = sum(float(i["valor"] or 0) for i in items if i["tipo_movimiento"] == "salida")
@@ -1542,8 +1648,14 @@ def eliminar_movimiento_por_ts(fecha: date, year: int, ts_str: str) -> dict | No
             return None
         ws.delete_rows(target)
         _marcar_celda_activa(ws, ws.max_row)
-        wb.save(path)
-        wb.close()
+        try:
+            wb.save(path)
+        except PermissionError as exc:
+            raise ArchivoCajaOcupadoError(
+                "No se pudo guardar porque el libro esta siendo usado por otro proceso. Intenta nuevamente."
+            ) from exc
+        finally:
+            wb.close()
     items = obtener_movimientos_fecha(fecha, year)
     total_ingresos = sum(float(i["valor"] or 0) for i in items if i["tipo_movimiento"] == "ingreso")
     total_salidas = sum(float(i["valor"] or 0) for i in items if i["tipo_movimiento"] == "salida")
