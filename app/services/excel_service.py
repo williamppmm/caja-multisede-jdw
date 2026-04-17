@@ -1097,16 +1097,23 @@ def obtener_movimientos_fecha(fecha: date, year: int) -> list[dict]:
     return registros
 
 
-def _construir_ciclo_activo_prestamos(registros: list[dict]) -> list[dict]:
+def _construir_ciclo_activo_prestamos(registros: list[dict], fecha_ref: date | None = None) -> list[dict]:
+    from datetime import date as _date
+    fecha_ref_iso = (fecha_ref or _date.today()).isoformat()
+
     registros = sorted(registros, key=lambda item: (item["fecha"], item["fecha_hora_registro"] or ""))
 
-    # Calcular saldo corrido completo y registrar dónde cerró cada ciclo (saldo == 0).
     saldos: dict[str, float] = {}
-    ultimo_corte: dict[str, int] = {}  # índice donde el saldo llegó a cero por última vez
+    ciclo_inicio: dict[str, int] = {}   # índice de inicio del ciclo actual
+    ciclo_cierre: dict[str, tuple[int, str]] = {}  # (índice, fecha) del último cierre
 
     for i, item in enumerate(registros):
         persona_key = item["persona"].strip().lower()
-        saldo = saldos.get(persona_key, 0.0)
+        saldo_prev = saldos.get(persona_key, 0.0)
+        # Un nuevo ciclo comienza cuando llega un préstamo con saldo previo en cero
+        if abs(saldo_prev) < 0.01 and item["tipo_movimiento"] == "prestamo":
+            ciclo_inicio[persona_key] = i
+        saldo = saldo_prev
         if item["tipo_movimiento"] == "pago":
             saldo -= float(item["valor"] or 0)
         else:
@@ -1114,13 +1121,23 @@ def _construir_ciclo_activo_prestamos(registros: list[dict]) -> list[dict]:
         item["saldo_pendiente"] = round(saldo, 2)
         saldos[persona_key] = saldo
         if abs(saldo) < 0.01:
-            ultimo_corte[persona_key] = i  # ciclo cerrado aquí
+            ciclo_cierre[persona_key] = (i, item["fecha"])
 
-    # Devolver solo el ciclo activo de cada persona (movimientos posteriores al último cierre).
-    return [
-        item for i, item in enumerate(registros)
-        if i > ultimo_corte.get(item["persona"].strip().lower(), -1)
-    ]
+    resultado = []
+    for i, item in enumerate(registros):
+        persona_key = item["persona"].strip().lower()
+        inicio = ciclo_inicio.get(persona_key, 0)
+        saldo_final = saldos.get(persona_key, 0.0)
+        if abs(saldo_final) >= 0.01:
+            # Ciclo abierto: mostrar desde el inicio del ciclo actual
+            if i >= inicio:
+                resultado.append(item)
+        else:
+            # Ciclo cerrado: mostrar solo si se cerró en fecha_ref (visible ese día)
+            cierre = ciclo_cierre.get(persona_key)
+            if cierre and cierre[1] == fecha_ref_iso and inicio <= i <= cierre[0]:
+                resultado.append(item)
+    return resultado
 
 
 def obtener_movimientos_prestamos(persona: str | None = None, fecha_hasta: date | None = None) -> list[dict]:
@@ -1136,7 +1153,7 @@ def obtener_movimientos_prestamos(persona: str | None = None, fecha_hasta: date 
     if fecha_hasta:
         fecha_tope = fecha_hasta.isoformat()
         registros = [item for item in registros if item["fecha"] <= fecha_tope]
-    return _construir_ciclo_activo_prestamos(registros)
+    return _construir_ciclo_activo_prestamos(registros, fecha_ref=fecha_hasta)
 
 
 def obtener_resumen_prestamos(persona: str | None = None, fecha_hasta: date | None = None) -> dict:

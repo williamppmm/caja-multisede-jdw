@@ -16,7 +16,7 @@ def guardar_prestamo(entrada: PrestamoEntrada) -> dict:
     persona = entrada.persona.strip()
     tipo = entrada.tipo_movimiento
     valor = float(entrada.valor)
-    resumen_actual = excel_service.obtener_resumen_prestamos(persona=persona)
+    resumen_actual = excel_service.obtener_resumen_prestamos(persona=persona, fecha_hasta=entrada.fecha)
     saldo_actual = float(resumen_actual["saldo_pendiente"])
 
     if tipo == "pago" and valor > saldo_actual:
@@ -96,7 +96,7 @@ def actualizar_ultimo_prestamo(entrada: PrestamoEntrada) -> dict:
 
     try:
         timestamp = datetime.now().replace(microsecond=0)
-        resumen = excel_service.actualizar_ultimo_prestamo(
+        items = excel_service.actualizar_ultimo_prestamo(
             entrada.fecha,
             entrada.fecha.year,
             persona,
@@ -104,12 +104,13 @@ def actualizar_ultimo_prestamo(entrada: PrestamoEntrada) -> dict:
             valor,
             timestamp,
         )
-        if resumen is None:
+        if items is None:
             return {"ok": False, "mensaje": "No hay un último movimiento de préstamos para corregir.", "fecha": str(entrada.fecha)}
         nombres_service.agregar_item_catalogo("prestamos", persona)
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
+    resumen = excel_service.obtener_resumen_prestamos(persona=persona, fecha_hasta=entrada.fecha)
     mensaje = "Último préstamo actualizado correctamente" if tipo == "prestamo" else "Último pago actualizado correctamente"
     return {
         "ok": True,
@@ -126,13 +127,19 @@ def actualizar_ultimo_prestamo(entrada: PrestamoEntrada) -> dict:
 
 
 def eliminar_ultimo_prestamo(fecha: date) -> dict:
+    ultimo = excel_service.obtener_ultimo_prestamo(fecha, fecha.year)
+    if ultimo is None:
+        return {"ok": False, "mensaje": "No hay un último movimiento de préstamos para eliminar.", "fecha": str(fecha)}
+    persona_eliminada = str(ultimo.get("persona", "")).strip()
+
     try:
-        resumen = excel_service.eliminar_ultimo_prestamo(fecha, fecha.year)
-        if resumen is None:
+        items = excel_service.eliminar_ultimo_prestamo(fecha, fecha.year)
+        if items is None:
             return {"ok": False, "mensaje": "No hay un último movimiento de préstamos para eliminar.", "fecha": str(fecha)}
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
 
+    resumen = excel_service.obtener_resumen_prestamos(persona=persona_eliminada, fecha_hasta=fecha)
     return {
         "ok": True,
         "mensaje": "Último movimiento de préstamos eliminado correctamente",

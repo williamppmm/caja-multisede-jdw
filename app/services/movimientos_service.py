@@ -53,10 +53,16 @@ def obtener_registros(fecha: date) -> dict:
     }
 
 
+def _resumen_de_items(items: list[dict]) -> dict:
+    total_ingresos = sum(float(i["valor"] or 0) for i in items if i["tipo_movimiento"] == "ingreso")
+    total_salidas = sum(float(i["valor"] or 0) for i in items if i["tipo_movimiento"] == "salida")
+    return {"total_ingresos": total_ingresos, "total_salidas": total_salidas, "neto": total_ingresos - total_salidas}
+
+
 def actualizar_ultimo_movimiento(entrada: MovimientoEntrada) -> dict:
     try:
         timestamp = datetime.now().replace(microsecond=0)
-        resumen = excel_service.actualizar_ultimo_movimiento(
+        items = excel_service.actualizar_ultimo_movimiento(
             entrada.fecha,
             entrada.fecha.year,
             entrada.tipo_movimiento,
@@ -65,12 +71,13 @@ def actualizar_ultimo_movimiento(entrada: MovimientoEntrada) -> dict:
             entrada.observacion,
             timestamp,
         )
-        if resumen is None:
+        if items is None:
             return {"ok": False, "mensaje": "No hay un último movimiento para corregir.", "fecha": str(entrada.fecha)}
         nombres_service.agregar_item_catalogo("movimientos", entrada.concepto)
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
+    resumen = _resumen_de_items(items)
     return {
         "ok": True,
         "mensaje": "Último movimiento actualizado correctamente",
@@ -88,12 +95,13 @@ def actualizar_ultimo_movimiento(entrada: MovimientoEntrada) -> dict:
 
 def eliminar_ultimo_movimiento(fecha: date) -> dict:
     try:
-        resumen = excel_service.eliminar_ultimo_movimiento(fecha, fecha.year)
-        if resumen is None:
+        items = excel_service.eliminar_ultimo_movimiento(fecha, fecha.year)
+        if items is None:
             return {"ok": False, "mensaje": "No hay un último movimiento para eliminar.", "fecha": str(fecha)}
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
 
+    resumen = _resumen_de_items(items)
     return {
         "ok": True,
         "mensaje": "Último movimiento eliminado correctamente",

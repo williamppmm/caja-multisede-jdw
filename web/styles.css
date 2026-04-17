@@ -565,6 +565,12 @@ input[type="number"]::-webkit-outer-spin-button {
   text-align: center !important;
 }
 
+.prestamo-saldado td {
+  color: #9ca3af;
+  text-decoration: line-through;
+  font-style: italic;
+}
+
 table.contadores-tabla th {
   background: linear-gradient(180deg, #365da7 0%, var(--brand) 100%);
   color: #fff;

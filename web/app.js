@@ -624,7 +624,7 @@ function calcularPlataformas() {
   const deport = parseNumeroInput('venta_deportivas', true) || 0;
   document.getElementById('resumen-practisistemas').textContent = fmt(practi);
   document.getElementById('resumen-deportivas').textContent = fmt(deport);
-  document.getElementById('resumen-plataformas-total').textContent = fmt(practi + deport);
+  document.getElementById('plataformas-local-total').textContent = fmt(practi + deport);
   actualizarEstadoDeportivas();
 }
 
@@ -1523,6 +1523,7 @@ function renderPrestamosRegistros(items = [], resumen = {}) {
   } else {
     [...loanItems].reverse().forEach(item => {
       const tr = document.createElement('tr');
+      if ((item.saldo_pendiente ?? 1) === 0) tr.classList.add('prestamo-saldado');
       const fechaHora = item.fecha
         ? `${formatFechaVisual(item.fecha)} ${item.hora_display || ''}`.trim()
         : (item.hora_display || '');
@@ -2227,26 +2228,29 @@ async function registrarBono() {
     const fecha = document.getElementById('fecha').value;
     const cliente = document.getElementById('bono-cliente').value.trim();
     const valor = parseNumeroInput('bono-valor');
-
-    const res = await fetch('/api/modulos/bonos/ultimo/editar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fecha, cliente, valor, forzar: false }),
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      mostrarMensaje(data.mensaje, 'advertencia');
-      return;
+    try {
+      const res = await fetch('/api/modulos/bonos/ultimo/editar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fecha, cliente, valor, forzar: false }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        mostrarMensaje(data.mensaje, 'advertencia');
+        return;
+      }
+      resetQuickEditMode('bonos');
+      limpiarFormularioBonos();
+      bonusNames = Array.from(new Set([...bonusNames, cliente])).sort((a, b) => a.localeCompare(b, 'es'));
+      renderBonusNames();
+      await cargarBonosDelDia(fecha);
+      actualizarBonosVisuales();
+      mostrarMensaje(`✓ ${data.mensaje} — ${data.cliente}: ${fmt(data.valor)} — Total día: ${fmt(data.total_dia)}`, 'ok');
+      await verificarFechaActual();
+      document.getElementById('bono-cliente').focus();
+    } catch {
+      mostrarMensaje('Error de conexión con el servidor.', 'error');
     }
-    resetQuickEditMode('bonos');
-    limpiarFormularioBonos();
-    bonusNames = Array.from(new Set([...bonusNames, cliente])).sort((a, b) => a.localeCompare(b, 'es'));
-    renderBonusNames();
-    await cargarBonosDelDia(fecha);
-    actualizarBonosVisuales();
-    mostrarMensaje(`✓ ${data.mensaje} — ${data.cliente}: ${fmt(data.valor)} — Total día: ${fmt(data.total_dia)}`, 'ok');
-    await verificarFechaActual();
-    document.getElementById('bono-cliente').focus();
     return;
   }
   const error = validarBono();
@@ -2257,25 +2261,28 @@ async function registrarBono() {
   const fecha = document.getElementById('fecha').value;
   const cliente = document.getElementById('bono-cliente').value.trim();
   const valor = parseNumeroInput('bono-valor');
-
-  const res = await fetch('/api/modulos/bonos/registrar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, cliente, valor, forzar: isOverrideActive('bonos', fecha) }),
-  });
-  const data = await res.json();
-  if (!data.ok) {
-    mostrarMensaje(data.mensaje, 'advertencia');
-    return;
+  try {
+    const res = await fetch('/api/modulos/bonos/registrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha, cliente, valor, forzar: isOverrideActive('bonos', fecha) }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      mostrarMensaje(data.mensaje, 'advertencia');
+      return;
+    }
+    limpiarFormularioBonos();
+    bonusNames = Array.from(new Set([...bonusNames, cliente])).sort((a, b) => a.localeCompare(b, 'es'));
+    renderBonusNames();
+    await cargarBonosDelDia(fecha);
+    actualizarBonosVisuales();
+    mostrarMensaje(`✓ ${data.mensaje} — ${data.cliente}: ${fmt(data.valor)} — Total día: ${fmt(data.total_dia)}`, 'ok');
+    await verificarFechaActual();
+    document.getElementById('bono-cliente').focus();
+  } catch {
+    mostrarMensaje('Error de conexión con el servidor.', 'error');
   }
-  limpiarFormularioBonos();
-  bonusNames = Array.from(new Set([...bonusNames, cliente])).sort((a, b) => a.localeCompare(b, 'es'));
-  renderBonusNames();
-  await cargarBonosDelDia(fecha);
-  actualizarBonosVisuales();
-  mostrarMensaje(`✓ ${data.mensaje} — ${data.cliente}: ${fmt(data.valor)} — Total día: ${fmt(data.total_dia)}`, 'ok');
-  await verificarFechaActual();
-  document.getElementById('bono-cliente').focus();
 }
 
 async function registrarPrestamo() {
@@ -2289,26 +2296,29 @@ async function registrarPrestamo() {
     const persona = document.getElementById('prestamo-persona').value.trim();
     const tipo_movimiento = obtenerTipoPrestamoSeleccionado();
     const valor = parseNumeroInput('prestamo-valor');
-
-    const res = await fetch('/api/modulos/prestamos/ultimo/editar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fecha, persona, tipo_movimiento, valor, forzar: false }),
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      mostrarMensaje(data.mensaje, 'advertencia');
-      return;
+    try {
+      const res = await fetch('/api/modulos/prestamos/ultimo/editar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fecha, persona, tipo_movimiento, valor, forzar: false }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        mostrarMensaje(data.mensaje, 'advertencia');
+        return;
+      }
+      resetQuickEditMode('prestamos');
+      limpiarFormularioPrestamos();
+      loanNames = Array.from(new Set([...loanNames, persona])).sort((a, b) => a.localeCompare(b, 'es'));
+      renderLoanNames();
+      await cargarPrestamosDelDia(fecha);
+      actualizarPrestamosVisuales();
+      mostrarMensaje(`✓ ${data.mensaje} — ${data.persona}: ${fmt(data.valor)} — Saldo pendiente: ${fmt(data.saldo_pendiente)}`, 'ok');
+      await verificarFechaActual();
+      document.getElementById('prestamo-persona').focus();
+    } catch {
+      mostrarMensaje('Error de conexión con el servidor.', 'error');
     }
-    resetQuickEditMode('prestamos');
-    limpiarFormularioPrestamos();
-    loanNames = Array.from(new Set([...loanNames, persona])).sort((a, b) => a.localeCompare(b, 'es'));
-    renderLoanNames();
-    await cargarPrestamosDelDia(fecha);
-    actualizarPrestamosVisuales();
-    mostrarMensaje(`✓ ${data.mensaje} — ${data.persona}: ${fmt(data.valor)} — Saldo pendiente: ${fmt(data.saldo_pendiente)}`, 'ok');
-    await verificarFechaActual();
-    document.getElementById('prestamo-persona').focus();
     return;
   }
   const error = validarPrestamo();
@@ -2320,25 +2330,28 @@ async function registrarPrestamo() {
   const persona = document.getElementById('prestamo-persona').value.trim();
   const tipo_movimiento = obtenerTipoPrestamoSeleccionado();
   const valor = parseNumeroInput('prestamo-valor');
-
-  const res = await fetch('/api/modulos/prestamos/registrar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, persona, tipo_movimiento, valor, forzar: isOverrideActive('prestamos', fecha) }),
-  });
-  const data = await res.json();
-  if (!data.ok) {
-    mostrarMensaje(data.mensaje, 'advertencia');
-    return;
+  try {
+    const res = await fetch('/api/modulos/prestamos/registrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha, persona, tipo_movimiento, valor, forzar: isOverrideActive('prestamos', fecha) }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      mostrarMensaje(data.mensaje, 'advertencia');
+      return;
+    }
+    limpiarFormularioPrestamos();
+    loanNames = Array.from(new Set([...loanNames, persona])).sort((a, b) => a.localeCompare(b, 'es'));
+    renderLoanNames();
+    await cargarPrestamosDelDia(fecha);
+    actualizarPrestamosVisuales();
+    mostrarMensaje(`✓ ${data.mensaje} — ${data.persona}: ${fmt(data.valor)} — Saldo pendiente: ${fmt(data.saldo_pendiente)}`, 'ok');
+    await verificarFechaActual();
+    document.getElementById('prestamo-persona').focus();
+  } catch {
+    mostrarMensaje('Error de conexión con el servidor.', 'error');
   }
-  limpiarFormularioPrestamos();
-  loanNames = Array.from(new Set([...loanNames, persona])).sort((a, b) => a.localeCompare(b, 'es'));
-  renderLoanNames();
-  await cargarPrestamosDelDia(fecha);
-  actualizarPrestamosVisuales();
-  mostrarMensaje(`✓ ${data.mensaje} — ${data.persona}: ${fmt(data.valor)} — Saldo pendiente: ${fmt(data.saldo_pendiente)}`, 'ok');
-  await verificarFechaActual();
-  document.getElementById('prestamo-persona').focus();
 }
 
 async function registrarMovimiento() {
@@ -2352,26 +2365,29 @@ async function registrarMovimiento() {
     const tipo_movimiento = obtenerTipoMovimientoSeleccionado();
     const concepto = document.getElementById('movimiento-concepto').value.trim();
     const valor = parseNumeroInput('movimiento-valor');
-
-    const res = await fetch('/api/modulos/movimientos/ultimo/editar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fecha, tipo_movimiento, concepto, valor, observacion: '', forzar: false }),
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      mostrarMensaje(data.mensaje, 'advertencia');
-      return;
+    try {
+      const res = await fetch('/api/modulos/movimientos/ultimo/editar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fecha, tipo_movimiento, concepto, valor, observacion: '', forzar: false }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        mostrarMensaje(data.mensaje, 'advertencia');
+        return;
+      }
+      resetQuickEditMode('movimientos');
+      limpiarFormularioMovimientos();
+      movementConcepts = Array.from(new Set([...movementConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
+      renderMovementConcepts();
+      await cargarMovimientosDelDia(fecha);
+      actualizarMovimientosVisuales();
+      mostrarMensaje(`✓ ${data.mensaje} — ${data.concepto}: ${fmt(data.valor)} — Neto día: ${fmt(data.neto)}`, 'ok');
+      await verificarFechaActual();
+      document.getElementById('movimiento-concepto').focus();
+    } catch {
+      mostrarMensaje('Error de conexión con el servidor.', 'error');
     }
-    resetQuickEditMode('movimientos');
-    limpiarFormularioMovimientos();
-    movementConcepts = Array.from(new Set([...movementConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
-    renderMovementConcepts();
-    await cargarMovimientosDelDia(fecha);
-    actualizarMovimientosVisuales();
-    mostrarMensaje(`✓ ${data.mensaje} — ${data.concepto}: ${fmt(data.valor)} — Neto día: ${fmt(data.neto)}`, 'ok');
-    await verificarFechaActual();
-    document.getElementById('movimiento-concepto').focus();
     return;
   }
   const error = validarMovimiento();
@@ -2383,25 +2399,28 @@ async function registrarMovimiento() {
   const tipo_movimiento = obtenerTipoMovimientoSeleccionado();
   const concepto = document.getElementById('movimiento-concepto').value.trim();
   const valor = parseNumeroInput('movimiento-valor');
-
-  const res = await fetch('/api/modulos/movimientos/registrar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, tipo_movimiento, concepto, valor, observacion: '', forzar: isOverrideActive('movimientos', fecha) }),
-  });
-  const data = await res.json();
-  if (!data.ok) {
-    mostrarMensaje(data.mensaje, 'advertencia');
-    return;
+  try {
+    const res = await fetch('/api/modulos/movimientos/registrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha, tipo_movimiento, concepto, valor, observacion: '', forzar: isOverrideActive('movimientos', fecha) }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      mostrarMensaje(data.mensaje, 'advertencia');
+      return;
+    }
+    limpiarFormularioMovimientos();
+    movementConcepts = Array.from(new Set([...movementConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
+    renderMovementConcepts();
+    await cargarMovimientosDelDia(fecha);
+    actualizarMovimientosVisuales();
+    mostrarMensaje(`✓ ${data.mensaje} — ${data.concepto}: ${fmt(data.valor)} — Neto día: ${fmt(data.neto)}`, 'ok');
+    await verificarFechaActual();
+    document.getElementById('movimiento-concepto').focus();
+  } catch {
+    mostrarMensaje('Error de conexión con el servidor.', 'error');
   }
-  limpiarFormularioMovimientos();
-  movementConcepts = Array.from(new Set([...movementConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
-  renderMovementConcepts();
-  await cargarMovimientosDelDia(fecha);
-  actualizarMovimientosVisuales();
-  mostrarMensaje(`✓ ${data.mensaje} — ${data.concepto}: ${fmt(data.valor)} — Neto día: ${fmt(data.neto)}`, 'ok');
-  await verificarFechaActual();
-  document.getElementById('movimiento-concepto').focus();
 }
 
 function validarGasto() {
@@ -2431,25 +2450,28 @@ async function registrarGasto() {
     const fecha = document.getElementById('fecha').value;
     const concepto = document.getElementById('gasto-concepto').value.trim();
     const valor = parseNumeroInput('gasto-valor');
-
-    const res = await fetch('/api/modulos/gastos/ultimo/editar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fecha, items: [{ concepto, valor }], forzar: false }),
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      mostrarMensaje(data.mensaje, 'advertencia');
-      return;
+    try {
+      const res = await fetch('/api/modulos/gastos/ultimo/editar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fecha, items: [{ concepto, valor }], forzar: false }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        mostrarMensaje(data.mensaje, 'advertencia');
+        return;
+      }
+      resetQuickEditMode('gastos');
+      limpiarFormularioGastos();
+      expenseConcepts = Array.from(new Set([...expenseConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
+      renderExpenseConcepts();
+      await cargarDatosModuloItems('gastos', fecha);
+      mostrarMensaje(`✓ ${data.mensaje} — ${concepto}: ${fmt(valor)} — Total día: ${fmt(data.total)}`, 'ok');
+      await verificarFechaActual();
+      document.getElementById('gasto-concepto').focus();
+    } catch {
+      mostrarMensaje('Error de conexión con el servidor.', 'error');
     }
-    resetQuickEditMode('gastos');
-    limpiarFormularioGastos();
-    expenseConcepts = Array.from(new Set([...expenseConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
-    renderExpenseConcepts();
-    await cargarDatosModuloItems('gastos', fecha);
-    mostrarMensaje(`✓ ${data.mensaje} — ${concepto}: ${fmt(valor)} — Total día: ${fmt(data.total)}`, 'ok');
-    await verificarFechaActual();
-    document.getElementById('gasto-concepto').focus();
     return;
   }
   const error = validarGasto();
@@ -2460,24 +2482,27 @@ async function registrarGasto() {
   const fecha = document.getElementById('fecha').value;
   const concepto = document.getElementById('gasto-concepto').value.trim();
   const valor = parseNumeroInput('gasto-valor');
-
-  const res = await fetch('/api/modulos/gastos/guardar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, items: [{ concepto, valor }], forzar: isOverrideActive('gastos', fecha) }),
-  });
-  const data = await res.json();
-  if (!data.ok) {
-    mostrarMensaje(data.mensaje, 'advertencia');
-    return;
+  try {
+    const res = await fetch('/api/modulos/gastos/guardar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha, items: [{ concepto, valor }], forzar: isOverrideActive('gastos', fecha) }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      mostrarMensaje(data.mensaje, 'advertencia');
+      return;
+    }
+    limpiarFormularioGastos();
+    expenseConcepts = Array.from(new Set([...expenseConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
+    renderExpenseConcepts();
+    await cargarDatosModuloItems('gastos', fecha);
+    mostrarMensaje(`✓ ${data.mensaje} — ${concepto}: ${fmt(valor)} — Total día: ${fmt(data.total)}`, 'ok');
+    await verificarFechaActual();
+    document.getElementById('gasto-concepto').focus();
+  } catch {
+    mostrarMensaje('Error de conexión con el servidor.', 'error');
   }
-  limpiarFormularioGastos();
-  expenseConcepts = Array.from(new Set([...expenseConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
-  renderExpenseConcepts();
-  await cargarDatosModuloItems('gastos', fecha);
-  mostrarMensaje(`✓ ${data.mensaje} — ${concepto}: ${fmt(valor)} — Total día: ${fmt(data.total)}`, 'ok');
-  await verificarFechaActual();
-  document.getElementById('gasto-concepto').focus();
 }
 
 function validarContadores() {
@@ -2727,20 +2752,24 @@ async function eliminarUltimoBono() {
   const fecha = document.getElementById('fecha').value;
   const confirmar = window.confirm('Se eliminará el último bono registrado para esta fecha. ¿Deseas continuar?');
   if (!confirmar) return;
-  const res = await fetch('/api/modulos/bonos/ultimo/eliminar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha }),
-  });
-  const data = await res.json();
-  if (!data.ok) {
-    mostrarMensaje(data.mensaje, 'advertencia');
-    return;
+  try {
+    const res = await fetch('/api/modulos/bonos/ultimo/eliminar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      mostrarMensaje(data.mensaje, 'advertencia');
+      return;
+    }
+    resetQuickEditMode('bonos');
+    await cargarBonosDelDia(fecha);
+    mostrarMensaje(`✓ ${data.mensaje} — Total día: ${fmt(data.total_dia)}`, 'ok');
+    document.getElementById('bono-cliente').focus();
+  } catch {
+    mostrarMensaje('Error de conexión con el servidor.', 'error');
   }
-  resetQuickEditMode('bonos');
-  await cargarBonosDelDia(fecha);
-  mostrarMensaje(`✓ ${data.mensaje} — Total día: ${fmt(data.total_dia)}`, 'ok');
-  document.getElementById('bono-cliente').focus();
 }
 
 async function editarUltimoGasto() {
@@ -2760,20 +2789,24 @@ async function eliminarUltimoGasto() {
   const fecha = document.getElementById('fecha').value;
   const confirmar = window.confirm('Se eliminará el último gasto registrado para hoy. ¿Deseas continuar?');
   if (!confirmar) return;
-  const res = await fetch('/api/modulos/gastos/ultimo/eliminar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha }),
-  });
-  const data = await res.json();
-  if (!data.ok) {
-    mostrarMensaje(data.mensaje, 'advertencia');
-    return;
+  try {
+    const res = await fetch('/api/modulos/gastos/ultimo/eliminar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      mostrarMensaje(data.mensaje, 'advertencia');
+      return;
+    }
+    resetQuickEditMode('gastos');
+    await cargarDatosModuloItems('gastos', fecha);
+    mostrarMensaje(`✓ ${data.mensaje} — Total día: ${fmt(data.total)}`, 'ok');
+    document.getElementById('gasto-concepto').focus();
+  } catch {
+    mostrarMensaje('Error de conexión con el servidor.', 'error');
   }
-  resetQuickEditMode('gastos');
-  await cargarDatosModuloItems('gastos', fecha);
-  mostrarMensaje(`✓ ${data.mensaje} — Total día: ${fmt(data.total)}`, 'ok');
-  document.getElementById('gasto-concepto').focus();
 }
 
 async function editarUltimoPrestamo() {
@@ -2797,20 +2830,24 @@ async function eliminarUltimoPrestamo() {
   const fecha = document.getElementById('fecha').value;
   const confirmar = window.confirm('Se eliminará el último movimiento de préstamos registrado para hoy. ¿Deseas continuar?');
   if (!confirmar) return;
-  const res = await fetch('/api/modulos/prestamos/ultimo/eliminar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha }),
-  });
-  const data = await res.json();
-  if (!data.ok) {
-    mostrarMensaje(data.mensaje, 'advertencia');
-    return;
+  try {
+    const res = await fetch('/api/modulos/prestamos/ultimo/eliminar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      mostrarMensaje(data.mensaje, 'advertencia');
+      return;
+    }
+    resetQuickEditMode('prestamos');
+    await cargarPrestamosDelDia(fecha);
+    mostrarMensaje(`✓ ${data.mensaje} — Saldo pendiente: ${fmt(data.saldo_pendiente)}`, 'ok');
+    document.getElementById('prestamo-persona').focus();
+  } catch {
+    mostrarMensaje('Error de conexión con el servidor.', 'error');
   }
-  resetQuickEditMode('prestamos');
-  await cargarPrestamosDelDia(fecha);
-  mostrarMensaje(`✓ ${data.mensaje} — Saldo pendiente: ${fmt(data.saldo_pendiente)}`, 'ok');
-  document.getElementById('prestamo-persona').focus();
 }
 
 async function editarUltimoMovimiento() {
@@ -2833,20 +2870,24 @@ async function eliminarUltimoMovimiento() {
   const fecha = document.getElementById('fecha').value;
   const confirmar = window.confirm('Se eliminará el último movimiento registrado para hoy. ¿Deseas continuar?');
   if (!confirmar) return;
-  const res = await fetch('/api/modulos/movimientos/ultimo/eliminar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha }),
-  });
-  const data = await res.json();
-  if (!data.ok) {
-    mostrarMensaje(data.mensaje, 'advertencia');
-    return;
+  try {
+    const res = await fetch('/api/modulos/movimientos/ultimo/eliminar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      mostrarMensaje(data.mensaje, 'advertencia');
+      return;
+    }
+    resetQuickEditMode('movimientos');
+    await cargarMovimientosDelDia(fecha);
+    mostrarMensaje(`✓ ${data.mensaje} — Neto día: ${fmt(data.neto)}`, 'ok');
+    document.getElementById('movimiento-concepto').focus();
+  } catch {
+    mostrarMensaje('Error de conexión con el servidor.', 'error');
   }
-  resetQuickEditMode('movimientos');
-  await cargarMovimientosDelDia(fecha);
-  mostrarMensaje(`✓ ${data.mensaje} — Neto día: ${fmt(data.neto)}`, 'ok');
-  document.getElementById('movimiento-concepto').focus();
 }
 
 async function importarNombresBonos() {
@@ -2866,7 +2907,19 @@ async function importarNombresBonos() {
   }
 }
 
+function ajustarMultiplosBilletes() {
+  if (configModoEntrada === 'cantidad') return;
+  DENOMINACIONES.forEach(d => {
+    const val = parseNumeroInput(`sub_${d}`) || 0;
+    if (val > 0 && val % d !== 0) {
+      setNumeroInputValue(`sub_${d}`, Math.floor(val / d) * d);
+    }
+  });
+  calcularCaja();
+}
+
 function validarCaja() {
+  ajustarMultiplosBilletes();
   for (const d of DENOMINACIONES) {
     if (configModoEntrada === 'cantidad') {
       const raw = document.getElementById(`cant_${d}`).value;
@@ -2879,9 +2932,6 @@ function validarCaja() {
       const val = raw === '' ? 0 : parseNumeroTexto(raw);
       if (isNaN(val) || val < 0) {
         return `Total inválido para $ ${d.toLocaleString('es-CO')}.`;
-      }
-      if (val > 0 && val % d !== 0) {
-        return `$ ${val.toLocaleString('es-CO')} no es múltiplo de $ ${d.toLocaleString('es-CO')}.`;
       }
     }
   }
@@ -2998,8 +3048,7 @@ async function guardar() {
       setSharedModuleDate(fecha);
       document.getElementById('fecha').value = fecha;
       eliminarDraftCaja(fecha);
-      limpiarCaja();
-      setCajaEditable(false);
+      await cargarDatosCaja(fecha);
       mostrarMensaje(`✓ ${data.mensaje} — Total caja física: ${fmt(data.total_caja_fisica)} — ${formatFechaHoraVisual(data.fecha_hora_registro) || `${formatFechaVisual(fecha)} ${hora12}`}`, 'ok');
     } else if (currentModule === 'plataformas') {
       setSharedModuleDate(fecha);
@@ -3287,7 +3336,18 @@ async function init() {
     inp.addEventListener('input', calcularCaja);
     inp.addEventListener('input', () => formatearInputNumerico(inp, false, true));
     inp.addEventListener('focus', () => limpiarFormatoInputNumerico(inp));
-    inp.addEventListener('blur', () => formatearInputNumerico(inp, false, true));
+    inp.addEventListener('blur', () => {
+      if (configModoEntrada !== 'cantidad' && inp.id.startsWith('sub_')) {
+        const denom = parseInt(inp.id.replace('sub_', ''), 10);
+        const val = parseNumeroInput(inp.id) || 0;
+        if (val > 0 && val % denom !== 0) {
+          setNumeroInputValue(inp.id, Math.floor(val / denom) * denom);
+          calcularCaja();
+          guardarDraftCaja();
+        }
+      }
+      formatearInputNumerico(inp, false, true);
+    });
     inp.addEventListener('input', () => guardarDraftCaja());
     inp.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !inp.readOnly) {
