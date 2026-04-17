@@ -1,5 +1,4 @@
 import json
-import json
 import shutil
 from datetime import date, datetime
 from pathlib import Path
@@ -18,11 +17,9 @@ def _get_pausas_path() -> Path:
     return get_excel_folder() / _PAUSAS_FILENAME
 
 
-def _esta_pausado(item_id: str, fecha: date, pausas_data: dict, catalog_pausado: bool = False) -> bool:
+def _esta_pausado(item_id: str, fecha: date, pausas_data: dict) -> bool:
     eventos = pausas_data.get(item_id, [])
     if not eventos:
-        # Compatibilidad vieja: antes existia un booleano global "pausado" en catalogo.
-        # Ya no queremos que siga afectando fechas si no hay eventos reales.
         return False
     fecha_str = str(fecha)
     previos = sorted([e for e in eventos if e["fecha"] <= fecha_str], key=lambda e: e["fecha"])
@@ -205,7 +202,7 @@ def construir_base_fecha(fecha: date) -> dict:
                 "observacion": guardado.get("observacion", ""),
             }
 
-        esta_pausado_hoy = _esta_pausado(item["item_id"], fecha, pausas_data, bool(item.get("pausado", False)))
+        esta_pausado_hoy = _esta_pausado(item["item_id"], fecha, pausas_data)
 
         jackpot_heredado = int(
             ultimo_registro.get("jackpot", ref.get("jackpot", 0) if ref else 0)
@@ -309,7 +306,7 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
 
         meta = catalogo[fila.item_id]
 
-        if _esta_pausado(fila.item_id, entrada.fecha, pausas_data, bool(meta.get("pausado", False))):
+        if _esta_pausado(fila.item_id, entrada.fecha, pausas_data):
             ref_p = obtener_referencia_vigente(fila.item_id, entrada.fecha, eventos_por_item)
             if ref_p:
                 ref_e = int(ref_p.get("entradas", 0))
