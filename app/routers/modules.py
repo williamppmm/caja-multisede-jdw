@@ -271,8 +271,11 @@ def guardar_catalogo(tipo: str, body: dict):
 
 @router.post("/contadores/catalogo/{item_id}/pausar")
 def pausar_contador(item_id: str, body: dict):
+    from datetime import date
     pausado = bool(body.get("pausado", True))
-    return contadores_service.pausar_item(item_id, pausado)
+    fecha_str = body.get("fecha")
+    fecha = date.fromisoformat(fecha_str) if fecha_str else date.today()
+    return contadores_service.pausar_item(item_id, pausado, fecha)
 
 
 @router.post("/bonos/ultimo/editar", response_model=BonoRespuesta)

@@ -723,12 +723,10 @@ table.contadores-tabla th {
   margin-top: 10px;
 }
 
-.contador-critica-confirm input[type="password"] {
+.critica-aviso {
+  font-size: 0.78rem;
+  color: #555;
   flex: 1;
-  padding: 6px 10px;
-  border: 1px solid #bbb;
-  border-radius: 5px;
-  font-size: 0.9rem;
 }
 
 .btn-confirmar-critica {
@@ -746,13 +744,6 @@ table.contadores-tabla th {
 .btn-confirmar-critica:hover { background: #1e3c7a; }
 .btn-confirmar-critica:disabled { background: #aaa; cursor: default; }
 
-.critica-pass-error {
-  display: block;
-  margin-top: 4px;
-  font-size: 0.8rem;
-  color: #c0392b;
-  font-weight: 600;
-}
 
 .contador-critica-grid {
   display: grid;
@@ -808,11 +799,18 @@ table.contadores-tabla th {
   color: #aaa;
 }
 
-.contador-pausa-celdas {
-  text-align: center;
-  color: #bbb;
-  font-style: italic;
-  font-size: 0.85rem;
+.input-pausa-readonly {
+  background: #f0f2f6 !important;
+  color: #9aa !important;
+  cursor: default;
+}
+
+.pausa-sin-ref-aviso {
+  font-size: 0.72rem;
+  color: #e67e22;
+  margin-left: 2px;
+  vertical-align: super;
+  cursor: help;
 }
 
 /* Nombre + microcontroles en una sola línea */
@@ -890,15 +888,6 @@ table.contadores-tabla th {
   box-shadow: 0 4px 16px rgba(0,0,0,0.13);
 }
 
-.contador-pausa-accion input[type="password"] {
-  flex: 1;
-  min-width: 110px;
-  padding: 5px 8px;
-  border: 1px solid #bbb;
-  border-radius: 5px;
-  font-size: 0.85rem;
-}
-
 .btn-toggle-pausa {
   padding: 5px 11px;
   background: #7b8798;
@@ -915,12 +904,9 @@ table.contadores-tabla th {
   background: #2e7d32;
 }
 
-.pausa-pass-error {
-  display: block;
-  width: 100%;
+.pausa-aviso {
   font-size: 0.78rem;
-  color: #c0392b;
-  font-weight: 600;
+  color: #555;
 }
 
 .contadores-resumen-top {
@@ -1990,8 +1976,6 @@ h2,
 .movimientos-form .campo-manual input,
 #panel-contadores .contador-campo,
 #panel-contadores .contador-critica input,
-#panel-contadores .contador-pausa-accion input[type="password"],
-#panel-contadores .contador-critica-confirm input[type="password"],
 #cuadre-base-input-wrap input {
   font-size: 0.95rem;
 }

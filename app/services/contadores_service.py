@@ -1,4 +1,5 @@
 import json
+import json
 import shutil
 from datetime import date, datetime
 from pathlib import Path
@@ -9,6 +10,25 @@ from app.services.local_data_service import get_local_data_path
 
 
 _CATALOGO_FILENAME = "contadores_items.json"
+_PAUSAS_FILENAME = "contadores_pausas.json"
+
+
+def _get_pausas_path() -> Path:
+    from app.config import get_excel_folder
+    return get_excel_folder() / _PAUSAS_FILENAME
+
+
+def _esta_pausado(item_id: str, fecha: date, pausas_data: dict, catalog_pausado: bool = False) -> bool:
+    eventos = pausas_data.get(item_id, [])
+    if not eventos:
+        # Compatibilidad vieja: antes existia un booleano global "pausado" en catalogo.
+        # Ya no queremos que siga afectando fechas si no hay eventos reales.
+        return False
+    fecha_str = str(fecha)
+    previos = sorted([e for e in eventos if e["fecha"] <= fecha_str], key=lambda e: e["fecha"])
+    if not previos:
+        return False
+    return previos[-1]["tipo"] == "pausa"
 
 
 def _get_catalogo_path() -> Path:
@@ -75,19 +95,17 @@ def guardar_catalogo(items: list[dict]) -> list[dict]:
     return obtener_catalogo()
 
 
-def pausar_item(item_id: str, pausado: bool) -> dict:
-    """Pausa o despausa un ítem del catálogo. Devuelve el catálogo actualizado."""
+def pausar_item(item_id: str, pausado: bool, fecha: date) -> dict:
     data = _leer_json(_get_catalogo_path(), [])
-    encontrado = False
-    for raw in data:
-        if raw.get("item_id") == item_id:
-            raw["pausado"] = pausado
-            encontrado = True
-            break
-    if not encontrado:
+    if not any(raw.get("item_id") == item_id for raw in data):
         return {"ok": False, "mensaje": f"Item '{item_id}' no encontrado en el catálogo."}
-    _guardar_json(_get_catalogo_path(), data)
-    return {"ok": True, "item_id": item_id, "pausado": pausado}
+    pausas = _leer_json(_get_pausas_path(), {})
+    eventos = [e for e in pausas.get(item_id, []) if e["fecha"] != str(fecha)]
+    eventos.append({"tipo": "pausa" if pausado else "reactivacion", "fecha": str(fecha)})
+    eventos.sort(key=lambda e: e["fecha"])
+    pausas[item_id] = eventos
+    _guardar_json(_get_pausas_path(), pausas)
+    return {"ok": True, "item_id": item_id, "pausado": pausado, "fecha": str(fecha)}
 
 
 def fecha_existe(fecha: date) -> bool:
@@ -164,6 +182,7 @@ def obtener_ultimo_registro_real(item_id: str, fecha_actual: date, eventos_por_i
 
 def construir_base_fecha(fecha: date) -> dict:
     catalogo = obtener_catalogo()
+    pausas_data = _leer_json(_get_pausas_path(), {})
     eventos_por_item = _construir_eventos_por_item(fecha, catalogo)
     guardados = excel_service.obtener_datos_contadores_fecha(fecha, fecha.year)
     existe = bool(guardados)
@@ -186,19 +205,31 @@ def construir_base_fecha(fecha: date) -> dict:
                 "observacion": guardado.get("observacion", ""),
             }
 
-        actual_entradas = int(guardado.get("entradas", 0))
-        actual_salidas = int(guardado.get("salidas", 0))
-        actual_jackpot = int(guardado.get(
-            "jackpot",
-            ultimo_registro.get("jackpot", ref.get("jackpot", 0) if ref else 0) if ultimo_registro else (ref.get("jackpot", 0) if ref else 0),
-        ))
+        esta_pausado_hoy = _esta_pausado(item["item_id"], fecha, pausas_data, bool(item.get("pausado", False)))
+
+        jackpot_heredado = int(
+            ultimo_registro.get("jackpot", ref.get("jackpot", 0) if ref else 0)
+            if ultimo_registro else (ref.get("jackpot", 0) if ref else 0)
+        )
+        if esta_pausado_hoy and not guardado and ref:
+            actual_entradas = int(ref.get("entradas", 0))
+            actual_salidas = int(ref.get("salidas", 0))
+            actual_jackpot = jackpot_heredado
+        else:
+            actual_entradas = int(guardado.get("entradas", 0))
+            actual_salidas = int(guardado.get("salidas", 0))
+            actual_jackpot = int(guardado.get("jackpot", jackpot_heredado))
+
         yield_actual = _yield(actual_entradas, actual_salidas, actual_jackpot)
         yield_ref = int(ref.get("yield", 0)) if ref else 0
-        alerta = bool(ref) and (
+        alerta = (not esta_pausado_hoy) and bool(ref) and (
             actual_entradas < int(ref.get("entradas", 0))
             or actual_salidas < int(ref.get("salidas", 0))
             or actual_jackpot < int(ref.get("jackpot", 0))
         )
+
+        resultado_unidades = int(guardado.get("resultado_unidades", yield_actual - yield_ref))
+        resultado_monetario = float(guardado.get("resultado_monetario", (yield_actual - yield_ref) * int(item["denominacion"])))
 
         fhr = guardado.get("fecha_hora_registro", "")
         if fhr and not fecha_hora_registro:
@@ -225,8 +256,8 @@ def construir_base_fecha(fecha: date) -> dict:
                 "yield": yield_ref,
                 "observacion": ref.get("observacion", "") if ref else "",
             },
-            "resultado_unidades": int(guardado.get("resultado_unidades", yield_actual - yield_ref)),
-            "resultado_monetario": float(guardado.get("resultado_monetario", (yield_actual - yield_ref) * int(item["denominacion"]))),
+            "resultado_unidades": resultado_unidades,
+            "resultado_monetario": resultado_monetario,
             "alerta": alerta,
             "usar_referencia_critica": usar_critica,
             "produccion_pre_reset_guardada": int(guardado.get("produccion_pre_reset", 0)),
@@ -235,10 +266,10 @@ def construir_base_fecha(fecha: date) -> dict:
             "ref_salidas_guardada": guardado.get("ref_salidas"),
             "ref_jackpot_guardada": guardado.get("ref_jackpot"),
             "fecha_hora_registro": fhr,
-            "pausado": bool(item.get("pausado", False)),
+            "pausado": esta_pausado_hoy,
         })
 
-    total = sum(float(f["resultado_monetario"]) for f in filas if f.get("activo", True) and not f.get("pausado", False))
+    total = sum(float(f["resultado_monetario"]) for f in filas if f.get("activo", True))
     return {
         "fecha": str(fecha),
         "existe": existe,
@@ -257,6 +288,7 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
             "mensaje": "No hay items configurados en Contadores. Agrégalos desde Administración.",
             "fecha": str(entrada.fecha),
         }
+    pausas_data = _leer_json(_get_pausas_path(), {})
     eventos_por_item = _construir_eventos_por_item(entrada.fecha, list(catalogo.values()))
 
     fecha_str = str(entrada.fecha)
@@ -276,24 +308,45 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
             continue
 
         meta = catalogo[fila.item_id]
-        if meta.get("pausado", False):
-            continue  # Máquina en pausa — omitir silenciosamente
 
-        ref = obtener_referencia_vigente(fila.item_id, entrada.fecha, eventos_por_item)
-        alerta = bool(ref) and (
-            fila.entradas < int(ref.get("entradas", 0))
-            or fila.salidas < int(ref.get("salidas", 0))
-            or fila.jackpot < int(ref.get("jackpot", 0))
-        )
-        if alerta and not fila.usar_referencia_critica:
-            alertas += 1
+        if _esta_pausado(fila.item_id, entrada.fecha, pausas_data, bool(meta.get("pausado", False))):
+            ref_p = obtener_referencia_vigente(fila.item_id, entrada.fecha, eventos_por_item)
+            if ref_p:
+                ref_e = int(ref_p.get("entradas", 0))
+                ref_s = int(ref_p.get("salidas", 0))
+                ultimo_reg_p = obtener_ultimo_registro_real(fila.item_id, entrada.fecha, eventos_por_item)
+                ref_j = int(
+                    ultimo_reg_p.get("jackpot", ref_p.get("jackpot", 0))
+                    if ultimo_reg_p else ref_p.get("jackpot", 0)
+                )
+                y_ref = int(ref_p.get("yield", 0))
+                y_actual = _yield(ref_e, ref_s, ref_j)
+                res_unidades = y_actual - y_ref
+                filas_guardadas.append({
+                    "item_id": fila.item_id,
+                    "nombre": meta["nombre"],
+                    "denominacion": int(meta["denominacion"]),
+                    "entradas": ref_e,
+                    "salidas": ref_s,
+                    "jackpot": ref_j,
+                    "yield_actual": y_actual,
+                    "yield_referencia": y_ref,
+                    "produccion_pre_reset": 0,
+                    "resultado_unidades": res_unidades,
+                    "resultado_monetario": float(res_unidades * int(meta["denominacion"])),
+                    "observacion": "pausado",
+                    "ref_entradas": None,
+                    "ref_salidas": None,
+                    "ref_jackpot": None,
+                })
             continue
 
-        ref_efectiva = ref
         observacion_ref = ""
         ref_entradas = None
         ref_salidas = None
         ref_jackpot = None
+        ref = obtener_referencia_vigente(fila.item_id, entrada.fecha, eventos_por_item)
+        ref_efectiva = ref
 
         if fila.usar_referencia_critica:
             if not entrada.forzar or fila.referencia_critica is None:
@@ -315,6 +368,21 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
                 "yield": _yield(ref_entradas, ref_salidas, ref_jackpot),
             }
             observacion_ref = ref_crit.observacion
+
+        alerta = bool(ref_efectiva) and (
+            fila.entradas < int(ref_efectiva.get("entradas", 0))
+            or fila.salidas < int(ref_efectiva.get("salidas", 0))
+            or fila.jackpot < int(ref_efectiva.get("jackpot", 0))
+        )
+        if alerta:
+            if fila.usar_referencia_critica:
+                return {
+                    "ok": False,
+                    "mensaje": f"El item {meta['nombre']} sigue por debajo de la referencia crítica en Entradas, Salidas o Jackpot.",
+                    "fecha": fecha_str,
+                }
+            alertas += 1
+            continue
 
         yield_actual = _yield(fila.entradas, fila.salidas, fila.jackpot)
         yield_referencia = int(ref_efectiva.get("yield", 0)) if ref_efectiva else 0

@@ -427,7 +427,7 @@ function esControlEdicionActual(control) {
     return control.matches('#movimiento-concepto, #movimiento-valor, #btn-movimiento-registrar, #btn-movimiento-editar-ultimo, #btn-movimiento-eliminar-ultimo, input[name="movimiento-tipo"]');
   }
   if (currentModule === 'contadores') {
-    return control.matches('.contador-campo, .btn-confirmar-critica, .btn-toggle-pausa, summary, .contador-critica input, .contador-pausa input');
+    return control.matches('.contador-campo, .btn-confirmar-critica, .btn-toggle-pausa, summary, .contador-critica input');
   }
   if (currentModule === 'cuadre') {
     return control.matches('#cuadre-base-input, #btn-cuadre-guardar');
@@ -774,12 +774,13 @@ function getContadoresInputs() {
 function setContadoresEditable(editable) {
   contadoresLocked = !editable;
   getContadoresInputs().forEach(input => {
-    input.readOnly = contadoresLocked;
+    const pausaReadonly = input.classList.contains('input-pausa-readonly');
+    input.readOnly = contadoresLocked || pausaReadonly;
     if (input.tagName === 'INPUT') input.disabled = false;
     // Crítica inputs are always excluded from tab order; only .contador-campo fields navigate with Tab/Enter
     const esCritica = input.closest('.contador-critica');
-    input.tabIndex = (contadoresLocked || esCritica) ? -1 : 0;
-    input.classList.toggle('input-readonly', contadoresLocked);
+    input.tabIndex = (contadoresLocked || esCritica || pausaReadonly) ? -1 : 0;
+    input.classList.toggle('input-readonly', contadoresLocked && !pausaReadonly);
   });
   document.querySelectorAll('.btn-confirmar-critica').forEach(btn => {
     btn.disabled = contadoresLocked;
@@ -791,6 +792,7 @@ function filaDesdeDataset(row) {
     item_id: row.dataset.itemId,
     nombre: row.dataset.nombre,
     denominacion: Number(row.dataset.denominacion || 0),
+    activo: row.dataset.activo !== '0',
     refEntradas: Number(row.dataset.refEntradas || 0),
     refSalidas: Number(row.dataset.refSalidas || 0),
     refJackpot: Number(row.dataset.refJackpot || 0),
@@ -892,15 +894,16 @@ function obtenerModulosConCambiosSinGuardar() {
   return pendientes;
 }
 
-function crearInputContador(role, value = '', refPlaceholder = null) {
+function crearInputContador(role, value = '', refPlaceholder = null, readonly = false) {
   const limpio = limpiarNumeroTexto(value);
   const numero = limpio === '' ? 0 : Number(limpio);
   const placeholder = refPlaceholder != null && Number(refPlaceholder) > 0
     ? limpiarNumeroTexto(refPlaceholder)
     : '0';
-  // Entradas y salidas deben arrancar visualmente vacias cuando su valor es 0.
-  // Jackpot, en cambio, puede venir heredado del ultimo registro y debe mostrarse
-  // siempre que traiga un valor real distinto de 0.
+  if (readonly) {
+    const valorRo = numero !== 0 ? limpio : '0';
+    return `<input type="text" inputmode="numeric" class="contador-campo input-pausa-readonly" data-role="${role}" value="${valorRo}" placeholder="${placeholder}" readonly tabindex="-1" />`;
+  }
   const valor = numero === 0 ? '' : limpio;
   return `<input type="text" inputmode="numeric" class="contador-campo" data-role="${role}" value="${valor}" placeholder="${placeholder}" />`;
 }
@@ -953,6 +956,7 @@ function renderContadores(items = [], total = 0) {
     tr.dataset.itemId = fila.item_id;
     tr.dataset.nombre = fila.nombre;
     tr.dataset.denominacion = String(fila.denominacion || 0);
+    tr.dataset.activo = fila.activo === false ? '0' : '1';
     tr.dataset.guardado = fila.fecha_hora_registro ? '1' : '0';
     tr.dataset.refEntradas = String(fila.referencia?.entradas || 0);
     tr.dataset.refSalidas = String(fila.referencia?.salidas || 0);
@@ -964,68 +968,54 @@ function renderContadores(items = [], total = 0) {
     tr.dataset.pausado = fila.pausado ? '1' : '0';
     tr.className = fila.pausado ? 'contador-pausado' : '';
 
-    if (fila.pausado) {
-      tr.innerHTML = `
-        <td>
-          <div class="contador-fila-nombre">
-            <span class="contador-item-nombre"><span class="contador-item-id-inline">${fila.item_id}</span> ${fila.nombre}</span>
-            <details class="contador-pausa-detalle">
-              <summary title="Reactivar máquina">▶</summary>
-              <div class="contador-pausa-accion">
-                <input type="password" data-role="pausa-password" placeholder="Clave" autocomplete="off" tabindex="-1" />
-                <button type="button" class="btn-toggle-pausa" data-pausado="1" tabindex="-1">OK</button>
-                <span class="pausa-pass-error oculto"></span>
+    const refFechaTitle = fila.referencia?.fecha || 'Base 0';
+    const tieneRef = fila.referencia?.tipo !== 'sin_referencia';
+    const entradasReadonly = fila.pausado;
+    const pausaLabel = fila.pausado ? '▶' : '⏸';
+    const pausaTitle = fila.pausado ? 'Reactivar máquina' : 'Pausar máquina';
+    const pausaAviso = fila.pausado ? '¿Reactivar esta máquina?' : '¿Pausar esta máquina?';
+    const sinRefAviso = fila.pausado && !tieneRef
+      ? '<span class="pausa-sin-ref-aviso" title="Sin referencia para congelar">·</span>'
+      : '';
+    tr.innerHTML = `
+      <td>
+        <div class="contador-fila-nombre">
+          <span class="contador-item-nombre"><span class="contador-item-id-inline">${fila.item_id}</span> ${fila.nombre}${sinRefAviso}</span>
+          <details class="contador-critica-detalle oculto" ${fila.usar_referencia_critica ? 'open' : ''}>
+            <summary class="critica-summary ${fila.usar_referencia_critica ? 'autorizado' : ''}" title="${fila.usar_referencia_critica ? 'Autorizado' : 'Ref. crítica'}">${fila.usar_referencia_critica ? '✓' : '⚠'}</summary>
+            <div class="contador-critica">
+              <div class="contador-critica-grid">
+                <input type="text" inputmode="numeric" data-role="critica-entradas" placeholder="E" value="${limpiarNumeroTexto((fila.ref_entradas_guardada ?? fila.referencia?.entradas) || 0)}" />
+                <input type="text" inputmode="numeric" data-role="critica-salidas" placeholder="S" value="${limpiarNumeroTexto((fila.ref_salidas_guardada ?? fila.referencia?.salidas) || 0)}" />
+                <input type="text" inputmode="numeric" data-role="critica-jackpot" placeholder="J" value="${limpiarNumeroTexto((fila.ref_jackpot_guardada ?? fila.referencia?.jackpot) || 0)}" />
               </div>
-            </details>
-          </div>
-        </td>
-        <td>${fmt(fila.denominacion || 0)}</td>
-        <td colspan="7" class="contador-pausa-celdas">— en pausa —</td>
-      `;
-    } else {
-      const refFechaTitle = fila.referencia?.fecha || 'Base 0';
-      tr.innerHTML = `
-        <td>
-          <div class="contador-fila-nombre">
-            <span class="contador-item-nombre"><span class="contador-item-id-inline">${fila.item_id}</span> ${fila.nombre}</span>
-            <details class="contador-critica-detalle oculto" ${fila.usar_referencia_critica ? 'open' : ''}>
-              <summary class="critica-summary ${fila.usar_referencia_critica ? 'autorizado' : ''}" title="${fila.usar_referencia_critica ? 'Autorizado' : 'Ref. crítica'}">${fila.usar_referencia_critica ? '✓' : '⚠'}</summary>
-              <div class="contador-critica">
-                <div class="contador-critica-grid">
-                  <input type="text" inputmode="numeric" data-role="critica-entradas" placeholder="E" value="${limpiarNumeroTexto((fila.ref_entradas_guardada ?? fila.referencia?.entradas) || 0)}" />
-                  <input type="text" inputmode="numeric" data-role="critica-salidas" placeholder="S" value="${limpiarNumeroTexto((fila.ref_salidas_guardada ?? fila.referencia?.salidas) || 0)}" />
-                  <input type="text" inputmode="numeric" data-role="critica-jackpot" placeholder="J" value="${limpiarNumeroTexto((fila.ref_jackpot_guardada ?? fila.referencia?.jackpot) || 0)}" />
-                </div>
-                <div class="contador-critica-pre-reset">
-                  <label class="critica-pre-reset-label">Pre-reset</label>
-                  <input type="text" inputmode="numeric" data-role="critica-pre-reset" placeholder="0" value="${limpiarNumeroTexto(fila.produccion_pre_reset_guardada || 0)}" />
-                </div>
-                <div class="contador-critica-confirm">
-                  <input type="password" data-role="critica-password" placeholder="Clave" autocomplete="off" />
-                  <button type="button" class="btn-confirmar-critica">OK</button>
-                </div>
-                <span class="critica-pass-error oculto"></span>
+              <div class="contador-critica-pre-reset">
+                <label class="critica-pre-reset-label">Pre-reset</label>
+                <input type="text" inputmode="numeric" data-role="critica-pre-reset" placeholder="0" value="${limpiarNumeroTexto(fila.produccion_pre_reset_guardada || 0)}" />
               </div>
-            </details>
-            <details class="contador-pausa-detalle">
-              <summary title="Pausar máquina">⏸</summary>
-              <div class="contador-pausa-accion">
-                <input type="password" data-role="pausa-password" placeholder="Clave" autocomplete="off" tabindex="-1" />
-                <button type="button" class="btn-toggle-pausa" data-pausado="0" tabindex="-1">OK</button>
-                <span class="pausa-pass-error oculto"></span>
+              <div class="contador-critica-confirm">
+                <span class="critica-aviso">Los valores ingresados se usarán como referencia de corrección.</span>
+                <button type="button" class="btn-confirmar-critica">OK</button>
               </div>
-            </details>
-          </div>
-        </td>
-        <td>${fmt(fila.denominacion || 0)}</td>
-        <td>${crearInputContador('entradas', fila.entradas, fila.referencia?.entradas)}</td>
-        <td>${crearInputContador('salidas', fila.salidas, fila.referencia?.salidas)}</td>
-        <td>${crearInputContador('jackpot', fila.jackpot)}</td>
-        <td class="contador-yield" data-role="yield-actual">${limpiarNumeroTexto(fila.yield_actual || 0, true)}</td>
-        <td data-role="yield-ref">${limpiarNumeroTexto(fila.referencia?.yield || 0, true)}<span class="yield-ref-fecha" title="${refFechaTitle}">·</span></td>
-        <td class="contador-resultado ${fila.resultado_monetario < 0 ? 'negativo' : ''}" data-role="resultado">${fmt(fila.resultado_monetario || 0)}</td>
-      `;
-    }
+            </div>
+          </details>
+          <details class="contador-pausa-detalle">
+            <summary title="${pausaTitle}">${pausaLabel}</summary>
+            <div class="contador-pausa-accion">
+              <span class="pausa-aviso">${pausaAviso}</span>
+              <button type="button" class="btn-toggle-pausa" data-pausado="${fila.pausado ? '1' : '0'}" tabindex="-1">OK</button>
+            </div>
+          </details>
+        </div>
+      </td>
+      <td>${fmt(fila.denominacion || 0)}</td>
+      <td>${crearInputContador('entradas', fila.entradas, fila.referencia?.entradas, entradasReadonly)}</td>
+      <td>${crearInputContador('salidas', fila.salidas, fila.referencia?.salidas, entradasReadonly)}</td>
+      <td>${crearInputContador('jackpot', fila.jackpot, null, fila.pausado)}</td>
+      <td class="contador-yield" data-role="yield-actual">${fila.pausado ? '' : limpiarNumeroTexto(fila.yield_actual || 0, true)}</td>
+      <td data-role="yield-ref">${limpiarNumeroTexto(fila.referencia?.yield || 0, true)}<span class="yield-ref-fecha" title="${refFechaTitle}">·</span></td>
+      <td class="contador-resultado ${!fila.pausado && fila.resultado_monetario < 0 ? 'negativo' : ''}" data-role="resultado">${fila.pausado ? '' : fmt(fila.resultado_monetario || 0)}</td>
+    `;
     tbody.appendChild(tr);
   });
 
@@ -1041,6 +1031,24 @@ function valorContadorRow(row, role) {
   return isNaN(valor) || valor < 0 ? 0 : valor;
 }
 
+function obtenerReferenciaActivaContador(row) {
+  const usaCritica = row.dataset.criticaAutorizada === '1';
+  if (usaCritica) {
+    return {
+      entradas: valorContadorRow(row, 'critica-entradas'),
+      salidas: valorContadorRow(row, 'critica-salidas'),
+      jackpot: valorContadorRow(row, 'critica-jackpot'),
+      esCritica: true,
+    };
+  }
+  return {
+    entradas: Number(row.dataset.refEntradas || 0),
+    salidas: Number(row.dataset.refSalidas || 0),
+    jackpot: Number(row.dataset.refJackpot || 0),
+    esCritica: false,
+  };
+}
+
 function recalcularFilaContador(row) {
   const fila = filaDesdeDataset(row);
   const guardado = row.dataset.guardado === '1';
@@ -1051,11 +1059,12 @@ function recalcularFilaContador(row) {
   const jackpot = valorContadorRow(row, 'jackpot');
   const usaCritica = row.dataset.criticaAutorizada === '1';
   const detalleCritica = row.querySelector('.contador-critica-detalle');
+  const refActiva = obtenerReferenciaActivaContador(row);
 
   const alerta = completa && (
-    entradas < fila.refEntradas
-    || salidas < fila.refSalidas
-    || jackpot < fila.refJackpot
+    entradas < refActiva.entradas
+    || salidas < refActiva.salidas
+    || jackpot < refActiva.jackpot
   );
   if (detalleCritica) {
     // Mostrar cuando: hay alerta, está autorizado, o el panel ya está abierto (el usuario lo expandió para editar).
@@ -1101,7 +1110,7 @@ function recalcularFilaContador(row) {
 function recalcularContadores() {
   let total = 0;
   document.querySelectorAll('#contadores-body tr[data-item-id]').forEach(row => {
-    if (row.dataset.pausado === '1') return;
+    if (row.dataset.activo === '0') return;
     recalcularFilaContador(row);
     if (!(row.dataset.guardado === '1' || filaContadorTieneCaptura(row))) return;
     const texto = row.querySelector('[data-role="resultado"]')?.textContent || '';
@@ -1173,17 +1182,6 @@ function actualizarSummaryCritica(row) {
 }
 
 function confirmarReferenciaCritica(row) {
-  const passField = row.querySelector('[data-role="critica-password"]');
-  const passError = row.querySelector('.critica-pass-error');
-  const pass = (passField?.value || '').trim();
-  const ok = isOverrideActive('contadores') || pass === CONTRASENA;
-  if (!ok) {
-    if (passError) { passError.textContent = 'Contraseña incorrecta.'; passError.classList.remove('oculto'); }
-    if (passField) { passField.value = ''; passField.focus(); }
-    return;
-  }
-  if (passError) { passError.textContent = ''; passError.classList.add('oculto'); }
-  if (passField) passField.value = '';
   const defaults = {
     'critica-entradas': row.dataset.refEntradas || '0',
     'critica-salidas': row.dataset.refSalidas || '0',
@@ -1205,27 +1203,42 @@ async function togglePausaContador(btn) {
   const row = btn.closest('tr');
   if (!row) return;
   const pausado = btn.dataset.pausado === '1';
-  const detalle = btn.closest('.contador-pausa-detalle');
-  const passField = detalle?.querySelector('[data-role="pausa-password"]');
-  const passError = detalle?.querySelector('.pausa-pass-error');
-  const pass = (passField?.value || '').trim();
-  const ok = isOverrideActive('contadores') || pass === CONTRASENA;
-  if (!ok) {
-    if (passError) { passError.textContent = 'Contraseña incorrecta.'; passError.classList.remove('oculto'); }
-    if (passField) { passField.value = ''; passField.focus(); }
+  const itemId = row.dataset.itemId;
+  const fecha = document.getElementById('fecha')?.value;
+
+  if (!pausado && row.dataset.refTipo === 'sin_referencia') {
+    mostrarMensaje(`${row.dataset.nombre}: no hay referencia vigente para congelar esta máquina.`, 'error');
     return;
   }
-  const itemId = row.dataset.itemId;
+
+  const snapshot = {};
+  document.querySelectorAll('#contadores-body tr[data-item-id]').forEach(tr => {
+    if (tr.dataset.itemId === itemId || tr.dataset.pausado === '1') return;
+    snapshot[tr.dataset.itemId] = {
+      entradas: tr.querySelector('[data-role="entradas"]')?.value || '',
+      salidas:  tr.querySelector('[data-role="salidas"]')?.value  || '',
+      jackpot:  tr.querySelector('[data-role="jackpot"]')?.value  || '',
+    };
+  });
+
   try {
     const res = await fetch(`/api/modulos/contadores/catalogo/${encodeURIComponent(itemId)}/pausar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pausado: !pausado }),
+      body: JSON.stringify({ pausado: !pausado, fecha }),
     });
     const data = await res.json();
     if (!data.ok) { mostrarMensaje(data.mensaje || 'Error al cambiar estado.', 'error'); return; }
-    const fecha = document.getElementById('fecha')?.value;
     await cargarDatosContadores(fecha);
+    Object.entries(snapshot).forEach(([id, vals]) => {
+      const tr = document.querySelector(`#contadores-body tr[data-item-id="${id}"]`);
+      if (!tr || tr.dataset.pausado === '1') return;
+      ['entradas', 'salidas', 'jackpot'].forEach(role => {
+        const input = tr.querySelector(`[data-role="${role}"]`);
+        if (input && !input.readOnly) input.value = vals[role];
+      });
+    });
+    recalcularContadores();
     mostrarMensaje(`${row.dataset.nombre}: ${!pausado ? 'máquina pausada' : 'máquina reactivada'}.`, 'ok');
   } catch {
     mostrarMensaje('Error de conexión al cambiar estado de pausa.', 'error');
@@ -1744,26 +1757,16 @@ function aplicarDraftCaja(fecha) {
   return true;
 }
 
-function limpiarModuloActual() {
+async function limpiarModuloActual() {
   if (currentModule === 'caja') {
     eliminarDraftCaja(document.getElementById('fecha').value);
     limpiarCaja();
   } else if (currentModule === 'plataformas') {
     limpiarPlataformas();
   } else if (currentModule === 'contadores') {
-    eliminarDraftContadores(document.getElementById('fecha').value);
-    renderContadores(contadorCatalog.map(item => ({
-      item_id: item.item_id,
-      nombre: item.nombre,
-      denominacion: item.denominacion,
-      entradas: 0,
-      salidas: 0,
-      jackpot: 0,
-      yield_actual: 0,
-      referencia: { tipo: 'sin_referencia', fecha: '', entradas: 0, salidas: 0, jackpot: 0, yield: 0 },
-      resultado_monetario: 0,
-      alerta: false,
-    })), 0);
+    const fecha = document.getElementById('fecha').value;
+    eliminarDraftContadores(fecha);
+    await cargarDatosContadores(fecha);
   } else if (currentModule === 'bonos') {
     resetQuickEditMode('bonos');
     limpiarFormularioBonos();
@@ -2510,7 +2513,7 @@ function validarContadores() {
   if (!rows.length) return 'No hay ítems configurados en Contadores.';
 
   for (const row of rows) {
-    if (row.dataset.pausado === '1') continue;
+    if (row.dataset.activo === '0') continue;
     const tieneCaptura = filaContadorTieneCaptura(row);
     const completa = filaContadorCompleta(row);
 
@@ -2533,13 +2536,15 @@ function validarContadores() {
     const entradas = valorContadorRow(row, 'entradas');
     const salidas = valorContadorRow(row, 'salidas');
     const jackpot = valorContadorRow(row, 'jackpot');
-    const alerta = entradas < Number(row.dataset.refEntradas || 0)
-      || salidas < Number(row.dataset.refSalidas || 0)
-      || jackpot < Number(row.dataset.refJackpot || 0);
-    const usaCritica = row.dataset.criticaAutorizada === '1';
+    const refActiva = obtenerReferenciaActivaContador(row);
+    const alerta = entradas < refActiva.entradas
+      || salidas < refActiva.salidas
+      || jackpot < refActiva.jackpot;
 
-    if (alerta && !usaCritica) {
-      return `${row.dataset.nombre}: hay valores menores a la referencia en Entradas, Salidas o Jackpot. Abre "Referencia crítica", ajusta los valores y confirma con la contraseña.`;
+    if (alerta) {
+      return refActiva.esCritica
+        ? `${row.dataset.nombre}: el registro sigue por debajo de la referencia crítica en Entradas, Salidas o Jackpot. Ajusta los valores capturados o redefine la referencia crítica.`
+        : `${row.dataset.nombre}: hay valores menores a la referencia en Entradas, Salidas o Jackpot. Abre "Referencia crítica", ajusta los valores y confirma con OK.`;
     }
 
   }
@@ -2556,7 +2561,7 @@ async function guardarContadores() {
 
   const fecha = document.getElementById('fecha').value;
   const items = [...document.querySelectorAll('#contadores-body tr[data-item-id]')]
-    .filter(row => row.dataset.pausado !== '1')
+    .filter(row => row.dataset.activo !== '0')
     .map(row => {
     const usarReferenciaCritica = row.dataset.criticaAutorizada === '1';
     const item = {
@@ -3526,14 +3531,7 @@ async function init() {
     }
   }, true);
   document.getElementById('contadores-body').addEventListener('keydown', e => {
-    const ROLES_CRITICA = ['critica-entradas', 'critica-salidas', 'critica-jackpot', 'critica-pre-reset', 'critica-password'];
-
-    // Enter en contraseña: confirmar directamente
-    if (e.key === 'Enter' && e.target.matches('[data-role="critica-password"]')) {
-      e.preventDefault();
-      confirmarReferenciaCritica(e.target.closest('tr'));
-      return;
-    }
+    const ROLES_CRITICA = ['critica-entradas', 'critica-salidas', 'critica-jackpot', 'critica-pre-reset'];
 
     // Tab / Enter dentro del sub-módulo de referencia crítica
     if ((e.key === 'Tab' || e.key === 'Enter') && ROLES_CRITICA.includes(e.target.dataset.role)) {
@@ -3548,8 +3546,9 @@ async function init() {
       if (idx !== -1 && idx < orden.length - 1) {
         orden[idx + 1].focus();
         orden[idx + 1].select?.();
+      } else if (e.key === 'Enter') {
+        confirmarReferenciaCritica(row);
       } else {
-        // Último campo (contraseña) + Tab → botón Confirmar
         row.querySelector('.btn-confirmar-critica')?.focus();
       }
       return;
@@ -3899,9 +3898,9 @@ function renderCuadre(datos) {
   const contBody = document.getElementById('cuadre-contadores-body');
   contBody.innerHTML = '';
   const contItems = datos.contadores?.items || [];
-  contItems.forEach((item, idx) => {
+  contItems.forEach(item => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${idx + 1}</td><td>${item.nombre}</td><td>${item.yield_actual}</td><td>${fmt(item.resultado)}</td>`;
+    tr.innerHTML = `<td>${item.item_id}</td><td>${item.nombre}</td><td>${item.yield_actual}</td><td>${fmt(item.resultado)}</td>`;
     contBody.appendChild(tr);
   });
   if (!contItems.length) {
@@ -4046,9 +4045,9 @@ function renderCuadreGuardado(datos, fecha, calculado = null) {
   const contItems = calculado?.contadores?.items || [];
   if (contItems.length) {
     contBody.innerHTML = '';
-    contItems.forEach((item, idx) => {
+    contItems.forEach(item => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${idx + 1}</td><td>${item.nombre}</td><td>${item.yield_actual}</td><td>${fmt(item.resultado)}</td>`;
+      tr.innerHTML = `<td>${item.item_id}</td><td>${item.nombre}</td><td>${item.yield_actual}</td><td>${fmt(item.resultado)}</td>`;
       contBody.appendChild(tr);
     });
   } else {
