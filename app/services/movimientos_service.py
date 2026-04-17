@@ -4,6 +4,19 @@ from app.models.caja_models import MovimientoEntrada
 from app.services import excel_service, nombres_service
 
 
+def _sincronizar_cuadre(resultado: dict, fecha: date) -> dict:
+    from app.services import cuadre_service
+    sync = cuadre_service.sincronizar_cuadre_afectado(fecha)
+    if sync is None:
+        return resultado
+    fecha_fmt = fecha.strftime("%d-%m-%Y")
+    if sync.get("ok"):
+        resultado["mensaje"] += f". Tus cambios han afectado el Cuadre del {fecha_fmt}"
+    else:
+        resultado["mensaje"] += ". Tus cambios podrían no reflejarse en el Cuadre de inmediato"
+    return resultado
+
+
 def guardar_movimiento(entrada: MovimientoEntrada) -> dict:
     hoy = date.today()
     if entrada.fecha != hoy and not entrada.forzar:
@@ -26,7 +39,7 @@ def guardar_movimiento(entrada: MovimientoEntrada) -> dict:
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
-    return {
+    return _sincronizar_cuadre({
         "ok": True,
         "mensaje": "Movimiento guardado correctamente",
         "fecha": str(entrada.fecha),
@@ -38,7 +51,7 @@ def guardar_movimiento(entrada: MovimientoEntrada) -> dict:
         "total_salidas": resumen["total_salidas"],
         "neto": resumen["neto"],
         "fecha_hora_registro": timestamp.isoformat(),
-    }
+    }, entrada.fecha)
 
 
 def obtener_registros(fecha: date) -> dict:
@@ -78,7 +91,7 @@ def actualizar_ultimo_movimiento(entrada: MovimientoEntrada) -> dict:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
     resumen = _resumen_de_items(items)
-    return {
+    return _sincronizar_cuadre({
         "ok": True,
         "mensaje": "Último movimiento actualizado correctamente",
         "fecha": str(entrada.fecha),
@@ -90,7 +103,7 @@ def actualizar_ultimo_movimiento(entrada: MovimientoEntrada) -> dict:
         "total_salidas": resumen["total_salidas"],
         "neto": resumen["neto"],
         "fecha_hora_registro": timestamp.isoformat(),
-    }
+    }, entrada.fecha)
 
 
 def eliminar_ultimo_movimiento(fecha: date) -> dict:
@@ -102,7 +115,7 @@ def eliminar_ultimo_movimiento(fecha: date) -> dict:
         return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
 
     resumen = _resumen_de_items(items)
-    return {
+    return _sincronizar_cuadre({
         "ok": True,
         "mensaje": "Último movimiento eliminado correctamente",
         "fecha": str(fecha),
@@ -110,4 +123,4 @@ def eliminar_ultimo_movimiento(fecha: date) -> dict:
         "total_salidas": resumen["total_salidas"],
         "neto": resumen["neto"],
         "fecha_hora_registro": datetime.now().replace(microsecond=0).isoformat(),
-    }
+    }, fecha)

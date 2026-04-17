@@ -4,6 +4,19 @@ from app.models.caja_models import PrestamoEntrada
 from app.services import excel_service, nombres_service
 
 
+def _sincronizar_cuadre(resultado: dict, fecha: date) -> dict:
+    from app.services import cuadre_service
+    sync = cuadre_service.sincronizar_cuadre_afectado(fecha)
+    if sync is None:
+        return resultado
+    fecha_fmt = fecha.strftime("%d-%m-%Y")
+    if sync.get("ok"):
+        resultado["mensaje"] += f". Tus cambios han afectado el Cuadre del {fecha_fmt}"
+    else:
+        resultado["mensaje"] += ". Tus cambios podrían no reflejarse en el Cuadre de inmediato"
+    return resultado
+
+
 def guardar_prestamo(entrada: PrestamoEntrada) -> dict:
     hoy = date.today()
     if entrada.fecha != hoy and not entrada.forzar:
@@ -52,7 +65,7 @@ def guardar_prestamo(entrada: PrestamoEntrada) -> dict:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
     mensaje = "Préstamo registrado correctamente" if tipo == "prestamo" else "Pago registrado correctamente"
-    return {
+    return _sincronizar_cuadre({
         "ok": True,
         "mensaje": mensaje,
         "fecha": str(entrada.fecha),
@@ -63,7 +76,7 @@ def guardar_prestamo(entrada: PrestamoEntrada) -> dict:
         "total_pagado": resumen["total_pagado"],
         "saldo_pendiente": resumen["saldo_pendiente"],
         "fecha_hora_registro": timestamp.isoformat(),
-    }
+    }, entrada.fecha)
 
 
 def obtener_registros() -> dict:
@@ -112,7 +125,7 @@ def actualizar_ultimo_prestamo(entrada: PrestamoEntrada) -> dict:
 
     resumen = excel_service.obtener_resumen_prestamos(persona=persona, fecha_hasta=entrada.fecha)
     mensaje = "Último préstamo actualizado correctamente" if tipo == "prestamo" else "Último pago actualizado correctamente"
-    return {
+    return _sincronizar_cuadre({
         "ok": True,
         "mensaje": mensaje,
         "fecha": str(entrada.fecha),
@@ -123,7 +136,7 @@ def actualizar_ultimo_prestamo(entrada: PrestamoEntrada) -> dict:
         "total_pagado": resumen["total_pagado"],
         "saldo_pendiente": resumen["saldo_pendiente"],
         "fecha_hora_registro": timestamp.isoformat(),
-    }
+    }, entrada.fecha)
 
 
 def eliminar_ultimo_prestamo(fecha: date) -> dict:
@@ -140,7 +153,7 @@ def eliminar_ultimo_prestamo(fecha: date) -> dict:
         return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
 
     resumen = excel_service.obtener_resumen_prestamos(persona=persona_eliminada, fecha_hasta=fecha)
-    return {
+    return _sincronizar_cuadre({
         "ok": True,
         "mensaje": "Último movimiento de préstamos eliminado correctamente",
         "fecha": str(fecha),
@@ -148,4 +161,4 @@ def eliminar_ultimo_prestamo(fecha: date) -> dict:
         "total_pagado": resumen["total_pagado"],
         "saldo_pendiente": resumen["saldo_pendiente"],
         "fecha_hora_registro": datetime.now().replace(microsecond=0).isoformat(),
-    }
+    }, fecha)

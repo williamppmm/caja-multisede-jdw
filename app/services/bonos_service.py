@@ -4,6 +4,19 @@ from app.models.caja_models import BonoEntrada
 from app.services import nombres_service, excel_service
 
 
+def _sincronizar_cuadre(resultado: dict, fecha: date) -> dict:
+    from app.services import cuadre_service
+    sync = cuadre_service.sincronizar_cuadre_afectado(fecha)
+    if sync is None:
+        return resultado
+    fecha_fmt = fecha.strftime("%d-%m-%Y")
+    if sync.get("ok"):
+        resultado["mensaje"] += f". Tus cambios han afectado el Cuadre del {fecha_fmt}"
+    else:
+        resultado["mensaje"] += ". Tus cambios podrían no reflejarse en el Cuadre de inmediato"
+    return resultado
+
+
 def guardar_bono(entrada: BonoEntrada) -> dict:
     hoy = date.today()
     if entrada.fecha != hoy and not entrada.forzar:
@@ -25,7 +38,7 @@ def guardar_bono(entrada: BonoEntrada) -> dict:
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
-    return {
+    return _sincronizar_cuadre({
         "ok": True,
         "mensaje": "Bono registrado correctamente",
         "fecha": str(entrada.fecha),
@@ -34,7 +47,7 @@ def guardar_bono(entrada: BonoEntrada) -> dict:
         "valor": entrada.valor,
         "total_dia": total_dia,
         "fecha_hora_registro": timestamp.isoformat(),
-    }
+    }, entrada.fecha)
 
 
 def obtener_registros(fecha: date) -> dict:
@@ -52,7 +65,7 @@ def actualizar_ultimo_bono(fecha: date, cliente: str, valor: float) -> dict:
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
 
-    return {
+    return _sincronizar_cuadre({
         "ok": True,
         "mensaje": "Último bono actualizado correctamente",
         "fecha": str(fecha),
@@ -61,7 +74,7 @@ def actualizar_ultimo_bono(fecha: date, cliente: str, valor: float) -> dict:
         "valor": valor,
         "total_dia": registro["total_dia"],
         "fecha_hora_registro": timestamp.isoformat(),
-    }
+    }, fecha)
 
 
 def eliminar_ultimo_bono(fecha: date) -> dict:
@@ -72,7 +85,7 @@ def eliminar_ultimo_bono(fecha: date) -> dict:
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
 
-    return {
+    return _sincronizar_cuadre({
         "ok": True,
         "mensaje": "Último bono eliminado correctamente",
         "fecha": str(fecha),
@@ -81,4 +94,4 @@ def eliminar_ultimo_bono(fecha: date) -> dict:
         "valor": 0,
         "total_dia": total_dia,
         "fecha_hora_registro": datetime.now().replace(microsecond=0).isoformat(),
-    }
+    }, fecha)

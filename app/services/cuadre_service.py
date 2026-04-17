@@ -587,3 +587,72 @@ def autoguardar_cuadre_si_listo(fecha: date) -> dict | None:
         forzar=excel_service.fecha_existe_modulo("cuadre", fecha, year),
     )
     return guardar_cuadre(entrada, float(preconds["base_anterior"] or 0))
+
+
+def sincronizar_cuadre_afectado(fecha: date) -> dict | None:
+    """Wrapper semántico sobre autoguardar_cuadre_si_listo para módulos auxiliares.
+
+    Retorna None si no hay cuadre que sincronizar (sin Caja/Contadores o sin base).
+    Retorna dict con ok=True/False según el resultado del guardado.
+    """
+    return autoguardar_cuadre_si_listo(fecha)
+
+
+def obtener_siguiente_fecha_cuadre(fecha: date) -> date | None:
+    """Retorna la fecha del cuadre guardado más próxima posterior a `fecha`."""
+    siguiente = None
+    for year in [fecha.year, fecha.year + 1]:
+        for fecha_str in excel_service.obtener_fechas_modulo_año("cuadre", year):
+            try:
+                d = date.fromisoformat(fecha_str)
+            except ValueError:
+                continue
+            if d > fecha and (siguiente is None or d < siguiente):
+                siguiente = d
+    return siguiente
+
+
+def sincronizar_cadena_caja(fecha: date) -> dict | None:
+    """Re-sincroniza el cuadre de `fecha` y propaga hacia adelante si base_nueva cambia.
+
+    Se detiene cuando:
+    - No hay siguiente cuadre
+    - base_nueva no cambió tras la resincronización (el siguiente no se ve afectado)
+    - La resincronización falla o no aplica (sin Caja/Contadores)
+    - Se alcanza la guardia técnica de max_iter=20
+    - Se detecta un ciclo (fecha ya visitada)
+    """
+    visitadas: set[date] = set()
+    fecha_actual = fecha
+    ultimo_resultado: dict | None = None
+
+    for _ in range(20):
+        if fecha_actual in visitadas:
+            break
+        visitadas.add(fecha_actual)
+
+        datos_antes = excel_service.obtener_datos_cuadre_fecha(fecha_actual, fecha_actual.year)
+        base_antes = float(datos_antes["base_nueva"]) if datos_antes and datos_antes.get("base_nueva") is not None else None
+
+        resultado = autoguardar_cuadre_si_listo(fecha_actual)
+        if resultado is None:
+            break
+
+        ultimo_resultado = resultado
+
+        if not resultado.get("ok"):
+            break
+
+        siguiente = obtener_siguiente_fecha_cuadre(fecha_actual)
+        if siguiente is None:
+            break
+
+        datos_despues = excel_service.obtener_datos_cuadre_fecha(fecha_actual, fecha_actual.year)
+        base_despues = float(datos_despues["base_nueva"]) if datos_despues and datos_despues.get("base_nueva") is not None else None
+
+        if base_antes is not None and base_despues is not None and abs(base_antes - base_despues) < 0.01:
+            break
+
+        fecha_actual = siguiente
+
+    return ultimo_resultado

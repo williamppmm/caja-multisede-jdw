@@ -381,10 +381,13 @@ def guardar_contadores(entrada: ContadoresEntrada) -> dict:
     total = sum(float(item["resultado_monetario"]) for item in filas_guardadas)
     from app.services import cuadre_service
 
-    sync_result = cuadre_service.autoguardar_cuadre_si_listo(entrada.fecha)
+    sync_result = cuadre_service.sincronizar_cuadre_afectado(entrada.fecha)
+    fecha_fmt = entrada.fecha.strftime("%d-%m-%Y")
     mensaje = "Contadores guardados correctamente"
     if sync_result and sync_result.get("ok"):
-        mensaje += " y Cuadre sincronizado automaticamente"
+        mensaje += f". Tus cambios han afectado el Cuadre del {fecha_fmt}"
+    elif sync_result and not sync_result.get("ok"):
+        mensaje += ". Tus cambios podrían no reflejarse en el Cuadre de inmediato"
     return {
         "ok": True,
         "mensaje": mensaje,
