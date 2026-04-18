@@ -1033,6 +1033,12 @@ table.contadores-tabla th {
   border-left: 4px solid #f1c40f;
 }
 
+.mensaje-confirm-acciones {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 /* Gastos */
 .gastos-form {
   display: grid;

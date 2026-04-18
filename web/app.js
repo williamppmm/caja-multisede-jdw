@@ -235,7 +235,18 @@ function formatHoraVisual(dateObj = new Date()) {
 }
 
 function ocultarMensaje() {
-  document.getElementById('mensaje').className = 'mensaje oculto';
+  const el = document.getElementById('mensaje');
+  el.className = 'mensaje oculto';
+  el.textContent = '';
+}
+
+function mostrarConfirmacion(texto, onConfirm) {
+  const el = document.getElementById('mensaje');
+  el.className = 'mensaje advertencia';
+  el.innerHTML = `<div>${texto}</div><div class="mensaje-confirm-acciones"><button class="btn btn-primary confirm-ok">Sí, guardar corrección</button><button class="btn btn-secondary confirm-cancel">Cancelar</button></div>`;
+  el.querySelector('.confirm-ok').addEventListener('click', () => { ocultarMensaje(); onConfirm(); }, { once: true });
+  el.querySelector('.confirm-cancel').addEventListener('click', () => { ocultarMensaje(); }, { once: true });
+  el.querySelector('.confirm-ok').focus();
 }
 
 function previewExcelAnual() {
@@ -339,9 +350,9 @@ function obtenerEstadoModulo(modulo, fecha) {
 
 function requiereAutorizacionParaFecha(modulo, fecha, data = null) {
   if (!modulo || !fecha || fecha > hoyStr() || isOverrideActive(modulo, fecha)) return false;
+  if (fecha === hoyStr() && ['caja', 'plataformas', 'contadores'].includes(modulo)) return false;
   if (modulo === 'caja') {
-    const fechaLibre = fecha === hoyStr() || fecha === ayerStr();
-    if (fechaLibre && !data?.existe) return false;
+    if (fecha === ayerStr() && !data?.existe) return false;
     return true;
   }
   if (modulo === 'contadores' || modulo === 'cuadre') {
@@ -1831,7 +1842,7 @@ function validarPlataformas() {
   const deportVal = isNaN(deport) ? 0 : deport;
   const fecha = document.getElementById('fecha')?.value || '';
   if (practiVal < 0) return 'La venta de Practisistemas no puede ser negativa.';
-  if (practiVal === 0 && deportVal === 0 && !isOverrideActive('plataformas', fecha)) {
+  if (practiVal === 0 && deportVal === 0 && fecha !== hoyStr() && !isOverrideActive('plataformas', fecha)) {
     return 'Debes ingresar al menos un valor en Plataformas.';
   }
   return null;
@@ -2114,37 +2125,47 @@ async function verificarFechaActual() {
     }
 
     if (currentModule === 'contadores') {
+      if (fecha === hoyStr()) {
+        estado.textContent = data.existe
+          ? 'Puedes seguir corrigiendo contadores hoy.'
+          : 'Fecha disponible para capturar contadores.';
+        estado.className = 'fecha-estado libre';
+        return;
+      }
       if (data.existe && !isOverrideActive('contadores', fecha)) {
         estado.textContent = `Contadores de ${formatFechaVisual(fecha)} ya existen.`;
         estado.className = 'fecha-estado existe';
         return;
       }
-
       if (isOverrideActive('contadores', fecha)) {
         estado.textContent = `Corrección de contadores autorizada para ${formatFechaVisual(fecha)}.`;
         estado.className = 'fecha-estado advertencia-fecha';
         return;
       }
-
       estado.textContent = 'Fecha disponible para capturar contadores.';
       estado.className = 'fecha-estado libre';
       return;
     }
 
     if (currentModule === 'caja') {
-      const cajaLibre = fecha === hoyStr() || fecha === ayerStr();
+      if (fecha === hoyStr()) {
+        estado.textContent = data.existe
+          ? 'Puedes seguir corrigiendo caja hoy.'
+          : 'Puedes registrar caja libremente hoy.';
+        estado.className = 'fecha-estado libre';
+        return;
+      }
+      const cajaLibre = fecha === ayerStr();
       if (data.existe && !isOverrideActive('caja', fecha)) {
         estado.textContent = `La caja de ${formatFechaVisual(fecha)} ya existe y requiere admin para corregirse.`;
         estado.className = 'fecha-estado existe';
         return;
       }
-
       if (isOverrideActive('caja', fecha)) {
         estado.textContent = `Corrección de caja autorizada para ${formatFechaVisual(fecha)}.`;
         estado.className = 'fecha-estado advertencia-fecha';
         return;
       }
-
       estado.textContent = cajaLibre
         ? 'Fecha disponible para capturar caja.'
         : `Caja en ${formatFechaVisual(fecha)} requiere admin.`;
@@ -2226,7 +2247,7 @@ async function cargarDatosCaja(fecha) {
     setNumeroInputValue('billetes_viejos', data.billetes_viejos || '');
     calcularCaja();
     eliminarDraftCaja(fecha);
-    setCajaEditable(Boolean(isOverrideActive('caja', fecha)));
+    setCajaEditable(fecha === hoyStr() || Boolean(isOverrideActive('caja', fecha)));
   } catch {
     if (!aplicarDraftCaja(fecha)) limpiarCaja();
     setCajaEditable(cajaLibre || isOverrideActive('caja', fecha));
@@ -2292,7 +2313,7 @@ async function cargarDatosContadores(fecha) {
       setContadoresEditable(true);
       applyContadoresDraft(fecha);
     } else {
-      setContadoresEditable(Boolean(isOverrideActive('contadores', fecha)) || !data.existe);
+      setContadoresEditable(fecha === hoyStr() || Boolean(isOverrideActive('contadores', fecha)) || !data.existe);
       if (!data.existe) applyContadoresDraft(fecha);
     }
   } catch {
@@ -2727,7 +2748,7 @@ async function guardarContadores() {
   const res = await fetch('/api/modulos/contadores/guardar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, items, forzar: isOverrideActive('contadores', fecha) || items.some(i => i.usar_referencia_critica) }),
+    body: JSON.stringify({ fecha, items, forzar: fecha === hoyStr() || isOverrideActive('contadores', fecha) || items.some(i => i.usar_referencia_critica) }),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -3101,7 +3122,7 @@ function validarModuloItems(modulo) {
   return null;
 }
 
-async function guardar() {
+async function guardar({ confirmado = false } = {}) {
   ocultarMensaje();
   const fecha = document.getElementById('fecha').value;
   if (!fecha) {
@@ -3123,6 +3144,18 @@ async function guardar() {
   if (error) {
     mostrarMensaje(error, 'error');
     return;
+  }
+
+  if (!confirmado && ['caja', 'plataformas', 'contadores'].includes(currentModule) && fecha === hoyStr()) {
+    const estadoActual = obtenerEstadoModulo(currentModule, fecha);
+    if (estadoActual?.existe) {
+      const label = MODULE_META[currentModule]?.label || currentModule;
+      mostrarConfirmacion(
+        `Ya guardaste ${label} hoy. ¿Deseas guardar una corrección?`,
+        () => guardar({ confirmado: true }),
+      );
+      return;
+    }
   }
 
   const btn = document.getElementById('btn-guardar');
@@ -3150,7 +3183,7 @@ async function guardar() {
           billetes,
           total_monedas: parsePositivo('total_monedas'),
           billetes_viejos: parsePositivo('billetes_viejos'),
-          forzar: isOverrideActive('caja', fecha),
+          forzar: fecha === hoyStr() || isOverrideActive('caja', fecha),
         }),
       });
     } else if (currentModule === 'plataformas') {
@@ -3161,7 +3194,7 @@ async function guardar() {
           fecha,
           venta_practisistemas: parsePositivo('venta_practisistemas'),
           venta_deportivas: parseNumeroInput('venta_deportivas', true) || 0,
-          forzar: isOverrideActive('plataformas', fecha),
+          forzar: fecha === hoyStr() || isOverrideActive('plataformas', fecha),
         }),
       });
     } else if (currentModule === 'contadores') {
