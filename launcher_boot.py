@@ -1,6 +1,7 @@
 import ctypes
 import json
 import socket
+import sys
 import threading
 import time
 import webbrowser
@@ -18,6 +19,11 @@ except Exception:
 
 HOST = "127.0.0.1"
 ERROR_ALREADY_EXISTS = 183
+
+
+def _resource_path(relative_path: str) -> Path:
+    base_path = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    return base_path / relative_path
 
 
 def _puerto_en_uso(port: int) -> bool:
@@ -87,27 +93,78 @@ class StartupSplash:
     def __init__(self, titulo: str, subtitulo: str):
         self.titulo = titulo
         self.subtitulo = subtitulo
+        self.root = None
+        self._photo = None
+        self._ready = False
 
     def start(self) -> None:
-        return None
+        try:
+            import tkinter as tk
+        except Exception:
+            return
+
+        try:
+            root = tk.Tk()
+            root.overrideredirect(True)
+            root.attributes("-topmost", True)
+            root.configure(bg="#f5f7fb")
+
+            image_path = _resource_path("web/assets/launcher_splash.png")
+            photo = tk.PhotoImage(file=str(image_path))
+
+            width = photo.width()
+            height = photo.height() + 56
+            screen_w = root.winfo_screenwidth()
+            screen_h = root.winfo_screenheight()
+            pos_x = int((screen_w - width) / 2)
+            pos_y = int((screen_h - height) / 2)
+            root.geometry(f"{width}x{height}+{pos_x}+{pos_y}")
+
+            frame = tk.Frame(root, bg="#f5f7fb", bd=0, highlightthickness=0)
+            frame.pack(fill="both", expand=True)
+
+            img_label = tk.Label(frame, image=photo, bg="#f5f7fb", bd=0, highlightthickness=0)
+            img_label.pack(padx=0, pady=(0, 8))
+
+            text = self.subtitulo or self.titulo or "Iniciando..."
+            text_label = tk.Label(
+                frame,
+                text=text,
+                bg="#f5f7fb",
+                fg="#2f3b52",
+                font=("Segoe UI", 10),
+                bd=0,
+                highlightthickness=0,
+            )
+            text_label.pack(pady=(0, 12))
+
+            self.root = root
+            self._photo = photo
+            self._ready = True
+        except Exception:
+            self.root = None
+            self._photo = None
+            self._ready = False
+
+    def run(self) -> None:
+        if not self.root:
+            return
+        try:
+            self.root.mainloop()
+        except Exception:
+            pass
 
     def close(self) -> None:
+        if self.root is not None and self._ready:
+            try:
+                self.root.after(0, self.root.destroy)
+            except Exception:
+                pass
         try:
             if pyi_splash is not None:
                 pyi_splash.close()
         except Exception:
             pass
-
-
-def _esperar_url_instancia(app_id: str, fallback_url: str, timeout_s: float = 10.0) -> str:
-    """Espera hasta que la instancia primaria escriba su URL en el state file."""
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
-        url = _leer_state(app_id)
-        if url:
-            return url
-        time.sleep(0.2)
-    return fallback_url
 
 
 def _esperar_servidor_y_abrir(
@@ -130,6 +187,14 @@ def _esperar_servidor_y_abrir(
         splash.close()
 
 
+def _run_server(app, port: int, splash: StartupSplash | None = None) -> None:
+    try:
+        uvicorn.run(app, host=HOST, port=port)
+    finally:
+        if splash is not None:
+            splash.close()
+
+
 def launch_app(
     app,
     *,
@@ -140,11 +205,8 @@ def launch_app(
     splash_subtitle: str,
 ) -> None:
     mutex_handle, already_running = _adquirir_mutex(mutex_name)
-    fallback_url = f"http://{HOST}:{default_port}"
 
     if already_running:
-        # Ya hay una instancia corriendo o arrancando — ignorar este click.
-        # La instancia primaria se encarga de abrir el navegador cuando esté lista.
         return
 
     port = _encontrar_puerto_libre(default_port)
@@ -153,14 +215,23 @@ def launch_app(
 
     splash = StartupSplash(splash_title, splash_subtitle)
     splash.start()
+
     threading.Thread(
         target=_esperar_servidor_y_abrir,
         args=(url, splash),
         daemon=True,
     ).start()
 
+    server_thread = threading.Thread(
+        target=_run_server,
+        args=(app, port, splash),
+        daemon=False,
+    )
+    server_thread.start()
+
     try:
-        uvicorn.run(app, host=HOST, port=port)
+        splash.run()
+        server_thread.join()
     finally:
         splash.close()
         _limpiar_state(app_id)
