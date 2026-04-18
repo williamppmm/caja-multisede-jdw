@@ -841,9 +841,10 @@ function applyContadoresDraft(fecha) {
   draft.items.forEach(item => {
     const row = document.querySelector(`#contadores-body tr[data-item-id="${item.item_id}"]`);
     if (!row) return;
+    if (row.dataset.pausado === '1') return;
     ['entradas', 'salidas', 'jackpot'].forEach(role => {
       const input = row.querySelector(`[data-role="${role}"]`);
-      if (input) input.value = item[role] || '';
+      if (input && !input.readOnly) input.value = item[role] || '';
     });
     row.dataset.criticaAutorizada = item.critica_autorizada ? '1' : '0';
     actualizarSummaryCritica(row);
