@@ -921,22 +921,167 @@ function filaContadorCompleta(row) {
   return ['entradas', 'salidas'].every(role => valorTextoContador(row, role) !== '');
 }
 
-function camposPrincipalesContadores() {
-  const selector = [
-    '#contadores-body tr[data-item-id] [data-role="entradas"]',
-    '#contadores-body tr[data-item-id] [data-role="salidas"]',
-    '#contadores-body tr[data-item-id] [data-role="jackpot"]',
-  ].join(', ');
-  return [...document.querySelectorAll(selector)];
+const CONTADORES_ROLES_OPERATIVOS = ['entradas', 'salidas'];
+const CONTADORES_ROLES_GRID = ['entradas', 'salidas', 'jackpot'];
+
+function filasContadores() {
+  return [...document.querySelectorAll('#contadores-body tr[data-item-id]')];
 }
 
-function moverSiguienteCampoContador(inputActual) {
-  const campos = camposPrincipalesContadores().filter(input => !input.readOnly);
-  const idx = campos.indexOf(inputActual);
-  if (idx !== -1 && idx < campos.length - 1) {
-    campos[idx + 1].focus();
-    campos[idx + 1].select();
+function camposOperativosContadores() {
+  return filasContadores().flatMap(row =>
+    CONTADORES_ROLES_OPERATIVOS
+      .map(role => row.querySelector(`[data-role="${role}"]`))
+      .filter(input => input && !input.readOnly)
+  );
+}
+
+function obtenerCampoContador(row, role) {
+  if (!row) return null;
+  const input = row.querySelector(`[data-role="${role}"]`);
+  return input instanceof HTMLInputElement ? input : null;
+}
+
+function enfocarCampoContador(input, { select = true } = {}) {
+  if (!input) return;
+  input.focus();
+  if (select && typeof input.select === 'function' && !input.readOnly) {
+    input.select();
   }
+  asegurarCampoContadorVisible(input);
+}
+
+function asegurarCampoContadorVisible(input) {
+  if (!input) return;
+  const viewportTop = window.scrollY || document.documentElement.scrollTop || 0;
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+  const viewportBottom = viewportTop + viewportHeight;
+  const row = input.closest('tr[data-item-id]');
+  const target = row || input;
+  const rect = target.getBoundingClientRect();
+  const absoluteTop = rect.top + viewportTop;
+  const absoluteBottom = rect.bottom + viewportTop;
+  const upperMargin = 120;
+  const lowerMargin = 180;
+
+  if (absoluteTop < viewportTop + upperMargin || absoluteBottom > viewportBottom - lowerMargin) {
+    target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+  }
+}
+
+function moverCampoOperativoContador(inputActual, direction = 1) {
+  const campos = camposOperativosContadores();
+  if (!campos.length) return;
+  let idx = campos.indexOf(inputActual);
+  if (idx === -1 && inputActual?.matches?.('.contador-campo')) {
+    const row = inputActual.closest('tr[data-item-id]');
+    const role = inputActual.dataset.role;
+    const rows = filasContadores();
+    const rowIndex = rows.indexOf(row);
+    if (role === 'jackpot' && rowIndex !== -1) {
+      const candidato = direction > 0
+        ? campos.findIndex(input => rows.indexOf(input.closest('tr[data-item-id]')) > rowIndex)
+        : (() => {
+          const mismaFilaSalidas = obtenerCampoContador(row, 'salidas');
+          if (mismaFilaSalidas && !mismaFilaSalidas.readOnly) {
+            return campos.indexOf(mismaFilaSalidas);
+          }
+          for (let i = campos.length - 1; i >= 0; i -= 1) {
+            const filaCampo = rows.indexOf(campos[i].closest('tr[data-item-id]'));
+            if (filaCampo < rowIndex) return i;
+          }
+          return -1;
+        })();
+      if (candidato !== -1) idx = candidato - direction;
+    }
+  }
+  const next = campos[idx + direction];
+  if (next) {
+    enfocarCampoContador(next);
+  } else if (direction > 0) {
+    document.getElementById('btn-guardar')?.focus();
+  }
+}
+
+function moverCampoGridContador(inputActual, key) {
+  if (!inputActual?.matches?.('.contador-campo')) return;
+  const row = inputActual.closest('tr[data-item-id]');
+  const rows = filasContadores();
+  const rowIndex = rows.indexOf(row);
+  const colIndex = CONTADORES_ROLES_GRID.indexOf(inputActual.dataset.role);
+  if (rowIndex === -1 || colIndex === -1) return;
+
+  const role = CONTADORES_ROLES_GRID[colIndex];
+
+  if (key === 'ArrowUp' || key === 'ArrowDown') {
+    const step = key === 'ArrowUp' ? -1 : 1;
+    for (let i = rowIndex + step; i >= 0 && i < rows.length; i += step) {
+      const target = obtenerCampoContador(rows[i], role);
+      if (target && !target.readOnly) {
+        enfocarCampoContador(target);
+        return;
+      }
+    }
+    return;
+  }
+
+  if (key === 'ArrowLeft') {
+    if (role === 'jackpot') {
+      const target = obtenerCampoContador(row, 'salidas');
+      if (target && !target.readOnly) {
+        enfocarCampoContador(target);
+        return;
+      }
+    }
+    if (role === 'salidas') {
+      const target = obtenerCampoContador(row, 'entradas');
+      if (target && !target.readOnly) {
+        enfocarCampoContador(target);
+        return;
+      }
+    }
+    for (let i = rowIndex - 1; i >= 0; i -= 1) {
+      const target = obtenerCampoContador(rows[i], 'salidas');
+      if (target && !target.readOnly) {
+        enfocarCampoContador(target);
+        return;
+      }
+    }
+    return;
+  }
+
+  if (key === 'ArrowRight') {
+    if (role === 'entradas') {
+      const target = obtenerCampoContador(row, 'salidas');
+      if (target && !target.readOnly) {
+        enfocarCampoContador(target);
+        return;
+      }
+    }
+    for (let i = rowIndex + 1; i < rows.length; i += 1) {
+      const target = obtenerCampoContador(rows[i], 'entradas');
+      if (target && !target.readOnly) {
+        enfocarCampoContador(target);
+        return;
+      }
+    }
+  }
+}
+
+function debeInterceptarFlechaContador(input, key) {
+  if (!input?.matches?.('.contador-campo')) return false;
+  if (key === 'ArrowUp' || key === 'ArrowDown') return true;
+  const value = input.value || '';
+  const start = input.selectionStart ?? value.length;
+  const end = input.selectionEnd ?? value.length;
+  const allSelected = start === 0 && end === value.length;
+  if (key === 'ArrowLeft') {
+    return allSelected || start === 0;
+  }
+  if (key === 'ArrowRight') {
+    return allSelected || end === value.length;
+  }
+  return false;
 }
 
 
@@ -1134,17 +1279,14 @@ function bindContadoresInputs() {
       };
       input.addEventListener('input', refrescar);
       input.addEventListener('change', refrescar);
-      input.addEventListener('focus', () => limpiarFormatoInputNumerico(input));
+      input.addEventListener('focus', () => {
+        input.dataset.originalValue = input.value;
+        limpiarFormatoInputNumerico(input);
+      });
       input.addEventListener('blur', () => {
         formatearInputNumerico(input, false, false);
         recalcularContadores();
         guardarDraftContadores();
-      });
-      input.addEventListener('keydown', e => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          moverSiguienteCampoContador(input);
-        }
       });
     } else {
       input.addEventListener('input', () => {
@@ -3555,12 +3697,48 @@ async function init() {
       return;
     }
 
-    // Tab / Enter en campos principales (entradas, salidas, jackpot)
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && e.target.matches('.contador-campo')) {
+      if (!debeInterceptarFlechaContador(e.target, e.key)) return;
+      e.preventDefault();
+      moverCampoGridContador(e.target, e.key);
+      manejarEventoContadores(e.target);
+      return;
+    }
+
+    // Escape: restaura el valor que tenía el campo al recibir foco.
+    if (e.key === 'Escape' && e.target.matches('.contador-campo')) {
+      e.preventDefault();
+      e.target.value = e.target.dataset.originalValue ?? '';
+      e.target.select?.();
+      return;
+    }
+
+    // Tab / Enter en campos principales: flujo operativo solo por Entradas y Salidas.
     if ((e.key === 'Enter' || e.key === 'Tab') && e.target.matches('.contador-campo')) {
       e.preventDefault();
-      moverSiguienteCampoContador(e.target);
+      moverCampoOperativoContador(e.target, e.shiftKey ? -1 : 1);
       manejarEventoContadores(e.target);
     }
+  });
+  document.getElementById('contadores-body').addEventListener('focusin', e => {
+    const row = e.target.closest?.('tr[data-item-id]');
+    if (!row) return;
+    document.querySelectorAll('#contadores-body tr.contador-fila-activa').forEach(tr => {
+      if (tr !== row) tr.classList.remove('contador-fila-activa');
+    });
+    row.classList.add('contador-fila-activa');
+    if (e.target.matches?.('.contador-campo')) {
+      asegurarCampoContadorVisible(e.target);
+    }
+  });
+  document.getElementById('contadores-body').addEventListener('focusout', e => {
+    const row = e.target.closest?.('tr[data-item-id]');
+    if (!row) return;
+    requestAnimationFrame(() => {
+      if (!row.contains(document.activeElement)) {
+        row.classList.remove('contador-fila-activa');
+      }
+    });
   });
   ['bono-valor', 'gasto-valor', 'prestamo-valor', 'movimiento-valor'].forEach(id => {
     const el = document.getElementById(id);
