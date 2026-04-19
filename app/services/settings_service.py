@@ -5,6 +5,7 @@ from pathlib import Path
 
 from app.config import BASE_DIR
 from app.services.local_data_service import get_local_data_path
+from app.services.operativa_config_service import get_operativa_config, save_operativa_config
 
 SETTINGS_PATH = get_local_data_path("settings.json")
 
@@ -35,18 +36,26 @@ def _normalizar_data_dir(value: str | None) -> str:
 
 def _resolver_settings() -> dict:
     if not SETTINGS_PATH.exists():
-        return _DEFAULTS.copy()
+        data = _DEFAULTS.copy()
+    else:
+        with open(SETTINGS_PATH, encoding="utf-8") as f:
+            data = {**_DEFAULTS, **json.load(f)}
+            if "enabled_modules" not in data:
+                data["enabled_modules"] = ["caja", "gastos"] if data.get("mostrar_gastos") else ["caja"]
+            data["enabled_modules"] = _normalizar_modulos(data.get("enabled_modules"))
+            data["default_module"] = _normalizar_modulo_default(
+                data.get("default_module"),
+                data["enabled_modules"],
+            )
 
-    with open(SETTINGS_PATH, encoding="utf-8") as f:
-        data = {**_DEFAULTS, **json.load(f)}
-        if "enabled_modules" not in data:
-            data["enabled_modules"] = ["caja", "gastos"] if data.get("mostrar_gastos") else ["caja"]
-        data["enabled_modules"] = _normalizar_modulos(data.get("enabled_modules"))
-        data["default_module"] = _normalizar_modulo_default(
-            data.get("default_module"),
-            data["enabled_modules"],
+    operativa = get_operativa_config(data.get("data_dir"))
+    data["excluir_monedas_viejos_base"] = bool(
+        operativa.get(
+            "excluir_monedas_viejos_base",
+            data.get("excluir_monedas_viejos_base", False),
         )
-        return data
+    )
+    return data
 
 
 def get_settings() -> dict:
@@ -86,6 +95,21 @@ def save_settings(data: dict) -> None:
     enabled_modules = _normalizar_modulos(cleaned.get("enabled_modules"))
     cleaned["enabled_modules"] = enabled_modules
     cleaned["default_module"] = _normalizar_modulo_default(cleaned.get("default_module"), enabled_modules)
+    data_dir_destino = cleaned.get("data_dir")
+    if not data_dir_destino and SETTINGS_PATH.exists():
+        try:
+            with open(SETTINGS_PATH, encoding="utf-8") as f:
+                existente = json.load(f)
+            data_dir_destino = existente.get("data_dir")
+        except Exception:
+            data_dir_destino = None
+
+    if "excluir_monedas_viejos_base" in cleaned:
+        save_operativa_config(
+            data_dir_destino,
+            {"excluir_monedas_viejos_base": cleaned["excluir_monedas_viejos_base"]},
+        )
+
     with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
         json.dump(cleaned, f, indent=2, ensure_ascii=False)
     _settings_cache = None
