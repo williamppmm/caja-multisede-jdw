@@ -358,10 +358,12 @@ def verificar_precondiciones(fecha_cuadre: date) -> dict:
 
 def calcular_cuadre(fecha_cuadre: date, base_anterior: float) -> dict:
     from app.services.contadores_service import obtener_catalogo
+    from app.services.settings_service import get_settings
 
     periodo = calcular_periodo(fecha_cuadre)
     datos_periodo = _cargar_datos_periodo(periodo)
     catalogo_map = {item["item_id"]: item for item in obtener_catalogo()}
+    excluir_monedas_viejos_base = bool(get_settings().get("excluir_monedas_viejos_base"))
 
     total_contadores = 0.0
     total_practisistemas = 0.0
@@ -454,6 +456,10 @@ def calcular_cuadre(fecha_cuadre: date, base_anterior: float) -> dict:
 
     neto_prestamos = total_prestamos_entrada - total_prestamos_salida
     neto_movimientos = total_mov_ingresos - total_mov_salidas
+    base_nueva = round(
+        caja_fisica - caja_desglose["total_monedas"] - caja_desglose["billetes_viejos"],
+        2,
+    ) if excluir_monedas_viejos_base else caja_fisica
 
     caja_teorica = round(
         base_anterior
@@ -514,7 +520,7 @@ def calcular_cuadre(fecha_cuadre: date, base_anterior: float) -> dict:
         "caja_fisica": caja_fisica,
         "caja_teorica": caja_teorica,
         "diferencia": diferencia,
-        "base_nueva": caja_fisica,
+        "base_nueva": base_nueva,
     }
 
 
@@ -595,64 +601,99 @@ def sincronizar_cuadre_afectado(fecha: date) -> dict | None:
     Retorna None si no hay cuadre que sincronizar (sin Caja/Contadores o sin base).
     Retorna dict con ok=True/False según el resultado del guardado.
     """
-    return autoguardar_cuadre_si_listo(fecha)
-
-
-def obtener_siguiente_fecha_cuadre(fecha: date) -> date | None:
-    """Retorna la fecha del cuadre guardado más próxima posterior a `fecha`."""
-    siguiente = None
-    for year in [fecha.year, fecha.year + 1]:
-        for fecha_str in excel_service.obtener_fechas_modulo_año("cuadre", year):
-            try:
-                d = date.fromisoformat(fecha_str)
-            except ValueError:
-                continue
-            if d > fecha and (siguiente is None or d < siguiente):
-                siguiente = d
-    return siguiente
-
+    cuadre = excel_service.obtener_cuadre_que_contiene_fecha(fecha)
+    if not cuadre:
+        return None
+    try:
+        fecha_cierre = date.fromisoformat(cuadre["fecha"])
+    except ValueError:
+        return None
+    return autoguardar_cuadre_si_listo(fecha_cierre)
 
 def sincronizar_cadena_caja(fecha: date) -> dict | None:
-    """Re-sincroniza el cuadre de `fecha` y propaga hacia adelante si base_nueva cambia.
+    cuadre = excel_service.obtener_cuadre_que_contiene_fecha(fecha)
+    if not cuadre:
+        return None
 
-    Se detiene cuando:
-    - No hay siguiente cuadre
-    - base_nueva no cambió tras la resincronización (el siguiente no se ve afectado)
-    - La resincronización falla o no aplica (sin Caja/Contadores)
-    - Se alcanza la guardia técnica de max_iter=20
-    - Se detecta un ciclo (fecha ya visitada)
-    """
-    visitadas: set[date] = set()
-    fecha_actual = fecha
-    ultimo_resultado: dict | None = None
+    try:
+        fecha_cierre = date.fromisoformat(cuadre["fecha"])
+    except ValueError:
+        return None
 
-    for _ in range(20):
-        if fecha_actual in visitadas:
-            break
-        visitadas.add(fecha_actual)
+    mensajes: list[str] = []
 
-        datos_antes = excel_service.obtener_datos_cuadre_fecha(fecha_actual, fecha_actual.year)
-        base_antes = float(datos_antes["base_nueva"]) if datos_antes and datos_antes.get("base_nueva") is not None else None
+    datos_antes = excel_service.obtener_datos_cuadre_fecha(fecha_cierre, fecha_cierre.year)
+    base_nueva_antes = (
+        float(datos_antes["base_nueva"])
+        if datos_antes and datos_antes.get("base_nueva") is not None
+        else None
+    )
 
-        resultado = autoguardar_cuadre_si_listo(fecha_actual)
-        if resultado is None:
-            break
+    sync_result = autoguardar_cuadre_si_listo(fecha_cierre)
+    if sync_result and sync_result.get("mensaje"):
+        mensajes.append(sync_result["mensaje"])
+    if not sync_result or not sync_result.get("ok"):
+        return {
+            "ok": False,
+            "recalculado": False,
+            "fecha_cuadre": str(fecha_cierre),
+            "mensaje": " ".join(mensajes).strip(),
+        }
 
-        ultimo_resultado = resultado
+    datos_despues = excel_service.obtener_datos_cuadre_fecha(fecha_cierre, fecha_cierre.year)
+    base_nueva_despues = (
+        float(datos_despues["base_nueva"])
+        if datos_despues and datos_despues.get("base_nueva") is not None
+        else None
+    )
 
-        if not resultado.get("ok"):
-            break
+    cambio_base = (
+        base_nueva_antes is None
+        or base_nueva_despues is None
+        or abs(base_nueva_despues - base_nueva_antes) >= 0.01
+    )
+    if not cambio_base:
+        return {
+            "ok": True,
+            "recalculado": True,
+            "fecha_cuadre": str(fecha_cierre),
+            "mensaje": " ".join(mensajes).strip(),
+        }
 
-        siguiente = obtener_siguiente_fecha_cuadre(fecha_actual)
-        if siguiente is None:
-            break
+    siguiente = excel_service.obtener_siguiente_cuadre(fecha_cierre)
+    if not siguiente:
+        return {
+            "ok": True,
+            "recalculado": True,
+            "fecha_cuadre": str(fecha_cierre),
+            "mensaje": " ".join(mensajes).strip(),
+        }
 
-        datos_despues = excel_service.obtener_datos_cuadre_fecha(fecha_actual, fecha_actual.year)
-        base_despues = float(datos_despues["base_nueva"]) if datos_despues and datos_despues.get("base_nueva") is not None else None
+    try:
+        fecha_siguiente = date.fromisoformat(siguiente["fecha"])
+    except ValueError:
+        return {
+            "ok": True,
+            "recalculado": True,
+            "fecha_cuadre": str(fecha_cierre),
+            "mensaje": " ".join(mensajes).strip(),
+        }
 
-        if base_antes is not None and base_despues is not None and abs(base_antes - base_despues) < 0.01:
-            break
+    sync_siguiente = autoguardar_cuadre_si_listo(fecha_siguiente)
+    if sync_siguiente and sync_siguiente.get("mensaje"):
+        mensajes.append(sync_siguiente["mensaje"])
 
-        fecha_actual = siguiente
+    if not sync_siguiente or not sync_siguiente.get("ok"):
+        return {
+            "ok": False,
+            "recalculado": True,
+            "fecha_cuadre": str(fecha_siguiente),
+            "mensaje": " ".join(mensajes).strip(),
+        }
 
-    return ultimo_resultado
+    return {
+        "ok": True,
+        "recalculado": True,
+        "fecha_cuadre": str(fecha_cierre),
+        "mensaje": " ".join(mensajes).strip(),
+    }

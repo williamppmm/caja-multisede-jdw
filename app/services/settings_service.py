@@ -19,6 +19,7 @@ _DEFAULTS = {
     "data_dir": str(BASE_DIR),
     "enabled_modules": ["caja", "gastos"],
     "default_module": "caja",
+    "excluir_monedas_viejos_base": False,
 }
 
 _settings_cache: dict | None = None
@@ -67,12 +68,21 @@ def get_settings() -> dict:
 def save_settings(data: dict) -> None:
     global _settings_cache, _settings_cache_mtime
 
-    allowed = {"modo_entrada", "sede", "data_dir", "enabled_modules", "default_module"}
+    allowed = {
+        "modo_entrada",
+        "sede",
+        "data_dir",
+        "enabled_modules",
+        "default_module",
+        "excluir_monedas_viejos_base",
+    }
     cleaned = {k: v for k, v in data.items() if k in allowed}
     if "sede" in cleaned:
         cleaned["sede"] = str(cleaned["sede"]).strip()
     if "data_dir" in cleaned:
         cleaned["data_dir"] = _normalizar_data_dir(cleaned["data_dir"])
+    if "excluir_monedas_viejos_base" in cleaned:
+        cleaned["excluir_monedas_viejos_base"] = bool(cleaned["excluir_monedas_viejos_base"])
     enabled_modules = _normalizar_modulos(cleaned.get("enabled_modules"))
     cleaned["enabled_modules"] = enabled_modules
     cleaned["default_module"] = _normalizar_modulo_default(cleaned.get("default_module"), enabled_modules)

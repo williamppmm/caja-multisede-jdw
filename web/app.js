@@ -17,6 +17,7 @@ const MODULE_META = {
 let configModoEntrada = 'cantidad';
 let configSede = 'Principal';
 let configDataDir = '';
+let configExcluirMonedasViejosBase = false;
 let enabledModules = ['caja', 'gastos'];
 let defaultModule = 'caja';
 let currentModule = 'caja';
@@ -3374,6 +3375,7 @@ async function ingresarAdmin() {
     document.getElementById('admin-default-module').value = settings.default_module || 'caja';
     document.getElementById('admin-sede').value = settings.sede || '';
     document.getElementById('admin-data-dir').value = settings.data_dir || '';
+    document.getElementById('admin-excluir-monedas-viejos-base').checked = Boolean(settings.excluir_monedas_viejos_base);
     actualizarPreviewRutaAdmin();
     actualizarPreviewHojasAdmin();
   } catch { /* defaults */ }
@@ -3398,6 +3400,7 @@ async function guardarAdmin() {
     default_module: document.getElementById('admin-default-module').value || enabled[0],
     sede: document.getElementById('admin-sede').value.trim(),
     data_dir: document.getElementById('admin-data-dir').value.trim(),
+    excluir_monedas_viejos_base: document.getElementById('admin-excluir-monedas-viejos-base')?.checked || false,
   };
 
   try {
@@ -3447,6 +3450,7 @@ async function guardarAdmin() {
     defaultModule = body.default_module;
     configSede = body.sede || 'Principal';
     configDataDir = body.data_dir;
+    configExcluirMonedasViejosBase = Boolean(body.excluir_monedas_viejos_base);
     await cargarBonusNames();
     await cargarLoanNames();
     await cargarExpenseConcepts();
@@ -3529,6 +3533,7 @@ async function init() {
     configModoEntrada = settings.modo_entrada || 'cantidad';
     configSede = settings.sede || 'Principal';
     configDataDir = settings.data_dir || '';
+    configExcluirMonedasViejosBase = Boolean(settings.excluir_monedas_viejos_base);
     enabledModules = settings.enabled_modules || ['caja', 'gastos'];
     defaultModule = settings.default_module || enabledModules[0];
   } catch { /* defaults */ }
