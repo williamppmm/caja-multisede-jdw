@@ -727,6 +727,14 @@ table.contadores-tabla th {
   border-color: #2F5496;
 }
 
+.contador-fila-activa td {
+  background: #eef4ff;
+}
+
+.contador-pausado.contador-fila-activa td {
+  background: #e8edf4;
+}
+
 .contador-yield,
 .contador-resultado {
   font-weight: 600;
