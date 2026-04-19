@@ -97,6 +97,27 @@ h2 {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(245, 249, 255, 0.98) 100%);
 }
 
+.recaudo-ultima-entrega {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+  color: #2d7d46;
+  font-weight: 600;
+}
+
+.recaudo-entrega-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(45, 125, 70, 0.12);
+}
+
 /* Fecha */
 .fecha-row {
   display: flex;

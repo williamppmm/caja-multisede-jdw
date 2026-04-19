@@ -77,7 +77,7 @@
         </details>
       </section>
 
-      <section class="card card-resumen modulo-resumen-card modulo-span-2">
+      <section class="card card-resumen modulo-resumen-card">
         <h2>Resumen Caja</h2>
         <div class="resumen-grid">
           <div class="resumen-item">
@@ -96,6 +96,40 @@
             <span class="resumen-label">TOTAL CAJA FÍSICA</span>
             <span id="resumen-total" class="resumen-valor">$ 0</span>
           </div>
+        </div>
+      </section>
+
+      <section id="recaudo-panel" class="card modulo-secundario-card oculto">
+        <div class="cuadre-seccion-header">
+          <h2>Billetes viejos y monedas</h2>
+          <span id="recaudo-pendiente" class="cuadre-total-badge"></span>
+        </div>
+        <p class="modulo-ayuda">Dinero guardado de billetes y monedas no entregados a la fecha.</p>
+        <div class="resumen-grid resumen-grid-simple">
+          <div class="resumen-item">
+            <span class="resumen-label">Desde</span>
+            <span id="recaudo-desde" class="resumen-valor">-</span>
+          </div>
+          <div class="resumen-item">
+            <span class="resumen-label">Hoy</span>
+            <span id="recaudo-hoy" class="resumen-valor">$ 0</span>
+          </div>
+          <div class="resumen-item">
+            <span class="resumen-label">Acumulado</span>
+            <span id="recaudo-acumulado" class="resumen-valor">$ 0</span>
+          </div>
+          <div class="resumen-item">
+            <span class="resumen-label">Entregado</span>
+            <span id="recaudo-entregado" class="resumen-valor">$ 0</span>
+          </div>
+          <div class="resumen-item resumen-total">
+            <span class="resumen-label">PENDIENTE</span>
+            <span id="recaudo-pendiente-total" class="resumen-valor">$ 0</span>
+          </div>
+        </div>
+        <div id="recaudo-ultima-entrega" class="recaudo-ultima-entrega oculto">
+          <span class="recaudo-entrega-check">✓</span>
+          <span id="recaudo-ultima-entrega-texto">Último cierre: $ 0</span>
         </div>
       </section>
     </section>

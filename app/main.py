@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.runtime_paths import get_web_dir
-from app.routers import modules, settings as settings_router
+from app.routers import modules, recaudo as recaudo_router, settings as settings_router
 
 app = FastAPI(title="ContabilidadJDW")
 
@@ -29,6 +29,7 @@ app.add_middleware(NoCacheMiddleware)
 
 app.include_router(modules.router)
 app.include_router(settings_router.router)
+app.include_router(recaudo_router.router)
 
 
 @app.get("/")

@@ -2280,10 +2280,12 @@ async function cargarDatosCaja(fecha) {
     setNumeroInputValue('total_monedas', data.total_monedas || '');
     setNumeroInputValue('billetes_viejos', data.billetes_viejos || '');
     calcularCaja();
+    await cargarRecaudoResumen(fecha);
     eliminarDraftCaja(fecha);
     setCajaEditable(fecha === hoyStr() || Boolean(isOverrideActive('caja', fecha)));
   } catch {
     if (!aplicarDraftCaja(fecha)) limpiarCaja();
+    await cargarRecaudoResumen(fecha);
     setCajaEditable(cajaLibre || isOverrideActive('caja', fecha));
   }
 }
@@ -2417,6 +2419,71 @@ async function cargarVistaModulo(modulo, fecha) {
     return;
   }
   await cargarDatosModuloItems(modulo, fecha);
+}
+
+function limpiarRecaudoResumen() {
+  document.getElementById('recaudo-panel').classList.add('oculto');
+  document.getElementById('recaudo-pendiente').textContent = '';
+  document.getElementById('recaudo-desde').textContent = '-';
+  document.getElementById('recaudo-hoy').textContent = '$ 0';
+  document.getElementById('recaudo-acumulado').textContent = '$ 0';
+  document.getElementById('recaudo-entregado').textContent = '$ 0';
+  document.getElementById('recaudo-pendiente-total').textContent = '$ 0';
+  document.getElementById('recaudo-ultima-entrega').classList.add('oculto');
+  document.getElementById('recaudo-ultima-entrega-texto').textContent = 'Último cierre: $ 0';
+}
+
+function renderRecaudoResumen(data) {
+  if (!data?.enabled || !configExcluirMonedasViejosBase) {
+    limpiarRecaudoResumen();
+    return;
+  }
+
+  const panel = document.getElementById('recaudo-panel');
+  const ciclo = data.ciclo_actual || {};
+  const totales = data.totales || {};
+  const diarios = data.diarios || [];
+  const fechaCorte = data.fecha_corte || null;
+  const hoy = diarios.find(item => item.fecha === fechaCorte) || diarios[diarios.length - 1] || null;
+  const ultimoCierre = data.ultimo_cierre || null;
+
+  panel.classList.remove('oculto');
+  document.getElementById('recaudo-pendiente').textContent = fmt(totales.pendiente ?? 0);
+  document.getElementById('recaudo-pendiente-total').textContent = fmt(totales.pendiente ?? 0);
+  document.getElementById('recaudo-desde').textContent = ciclo.desde ? formatFechaVisual(ciclo.desde) : '-';
+  document.getElementById('recaudo-hoy').textContent = fmt(hoy?.total ?? 0);
+  document.getElementById('recaudo-acumulado').textContent = fmt(totales.recaudado ?? 0);
+  document.getElementById('recaudo-entregado').textContent = fmt(totales.entregado ?? 0);
+
+  const entregaWrap = document.getElementById('recaudo-ultima-entrega');
+  const entregaTexto = document.getElementById('recaudo-ultima-entrega-texto');
+  if (!ultimoCierre) {
+    entregaWrap.classList.add('oculto');
+    entregaTexto.textContent = 'Último cierre: $ 0';
+    return;
+  }
+
+  entregaWrap.classList.remove('oculto');
+  entregaTexto.textContent = `Último cierre: entregado ${fmt(ultimoCierre.total_entregado ?? 0)} (${formatFechaVisual(ultimoCierre.desde)} a ${formatFechaVisual(ultimoCierre.hasta)})`;
+}
+
+async function cargarRecaudoResumen(fecha = null) {
+  if (!configExcluirMonedasViejosBase) {
+    limpiarRecaudoResumen();
+    return;
+  }
+  try {
+    const query = fecha ? `?fecha=${encodeURIComponent(fecha)}` : '';
+    const res = await fetch(`/api/recaudo${query}`);
+    if (!res.ok) {
+      limpiarRecaudoResumen();
+      return;
+    }
+    const data = await res.json();
+    renderRecaudoResumen(data);
+  } catch {
+    limpiarRecaudoResumen();
+  }
 }
 
 async function registrarBono() {
@@ -3289,6 +3356,7 @@ async function guardar({ confirmado = false } = {}) {
       document.getElementById('fecha').value = fecha;
       eliminarDraftCaja(fecha);
       await cargarDatosCaja(fecha);
+      await cargarRecaudoResumen(fecha);
       mostrarMensaje(`✓ ${data.mensaje} — Total caja física: ${fmt(data.total_caja_fisica)} — ${formatFechaHoraVisual(data.fecha_hora_registro) || `${formatFechaVisual(fecha)} ${hora12}`}`, 'ok');
     } else if (currentModule === 'plataformas') {
       setSharedModuleDate(fecha);
