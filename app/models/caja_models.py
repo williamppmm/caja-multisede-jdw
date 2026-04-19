@@ -4,14 +4,14 @@ from typing import Dict, List
 from pydantic import BaseModel, field_validator
 
 
-def _validar_texto_no_numerico_puro(value: str, nombre_campo: str, obligatorio: bool = True) -> str:
+def _validar_texto_descriptivo(value: str, nombre_campo: str, obligatorio: bool = True) -> str:
     texto = str(value or "").strip()
     if not texto:
         if obligatorio:
             raise ValueError(f"El campo {nombre_campo} es obligatorio")
         return ""
-    if texto.isdigit():
-        raise ValueError(f"El campo {nombre_campo} no puede contener solo números")
+    if not any(char.isalpha() for char in texto):
+        raise ValueError(f"El campo {nombre_campo} debe incluir texto descriptivo")
     return texto
 
 
@@ -22,7 +22,7 @@ class ConceptoValorItem(BaseModel):
     @field_validator("concepto")
     @classmethod
     def validar_concepto(cls, v):
-        return _validar_texto_no_numerico_puro(v, "concepto")
+        return _validar_texto_descriptivo(v, "concepto")
 
 
 class CajaEntrada(BaseModel):
@@ -82,7 +82,7 @@ class BonoEntrada(BaseModel):
     @field_validator("cliente")
     @classmethod
     def validar_cliente(cls, v):
-        return _validar_texto_no_numerico_puro(v, "nombre del cliente")
+        return _validar_texto_descriptivo(v, "nombre del cliente")
 
     @field_validator("valor")
     @classmethod
@@ -102,7 +102,7 @@ class PrestamoEntrada(BaseModel):
     @field_validator("persona")
     @classmethod
     def validar_persona(cls, v):
-        return _validar_texto_no_numerico_puro(v, "nombre de la persona")
+        return _validar_texto_descriptivo(v, "nombre de la persona")
 
     @field_validator("tipo_movimiento")
     @classmethod
@@ -139,12 +139,12 @@ class MovimientoEntrada(BaseModel):
     @field_validator("concepto")
     @classmethod
     def validar_concepto(cls, v):
-        return _validar_texto_no_numerico_puro(v, "concepto")
+        return _validar_texto_descriptivo(v, "concepto")
 
     @field_validator("observacion")
     @classmethod
     def validar_observacion(cls, v):
-        return _validar_texto_no_numerico_puro(v, "observación", obligatorio=False)
+        return _validar_texto_descriptivo(v, "observación", obligatorio=False)
 
     @field_validator("valor")
     @classmethod
@@ -168,7 +168,7 @@ class BonoRegistroEditarEntrada(BaseModel):
     @field_validator("cliente")
     @classmethod
     def validar_cliente(cls, v):
-        return _validar_texto_no_numerico_puro(v, "nombre del cliente")
+        return _validar_texto_descriptivo(v, "nombre del cliente")
 
     @field_validator("valor")
     @classmethod
@@ -187,7 +187,7 @@ class GastoRegistroEditarEntrada(BaseModel):
     @field_validator("concepto")
     @classmethod
     def validar_concepto(cls, v):
-        return _validar_texto_no_numerico_puro(v, "concepto")
+        return _validar_texto_descriptivo(v, "concepto")
 
     @field_validator("valor")
     @classmethod
@@ -207,7 +207,7 @@ class PrestamoRegistroEditarEntrada(BaseModel):
     @field_validator("persona")
     @classmethod
     def validar_persona(cls, v):
-        return _validar_texto_no_numerico_puro(v, "nombre de la persona")
+        return _validar_texto_descriptivo(v, "nombre de la persona")
 
     @field_validator("tipo_movimiento")
     @classmethod
@@ -244,12 +244,12 @@ class MovimientoRegistroEditarEntrada(BaseModel):
     @field_validator("concepto")
     @classmethod
     def validar_concepto(cls, v):
-        return _validar_texto_no_numerico_puro(v, "concepto")
+        return _validar_texto_descriptivo(v, "concepto")
 
     @field_validator("observacion")
     @classmethod
     def validar_observacion(cls, v):
-        return _validar_texto_no_numerico_puro(v, "observación", obligatorio=False)
+        return _validar_texto_descriptivo(v, "observación", obligatorio=False)
 
     @field_validator("valor")
     @classmethod
