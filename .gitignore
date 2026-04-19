@@ -15,7 +15,6 @@ build/
 dist/
 *.spec
 !CajaSuperAdmin.spec
-!CajaJDW.spec
 
 # Local data and settings
 data/
