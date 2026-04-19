@@ -3113,8 +3113,7 @@ async function guardar() {
       setSharedModuleDate(fecha);
       document.getElementById('fecha').value = fecha;
       eliminarDraftCaja(fecha);
-      limpiarCaja();
-      setCajaEditable(false);
+      await cargarDatosCaja(fecha);
       mostrarMensaje(`✓ ${data.mensaje} — Total caja física: ${fmt(data.total_caja_fisica)} — ${formatFechaHoraVisual(data.fecha_hora_registro) || `${formatFechaVisual(fecha)} ${hora12}`}`, 'ok');
     } else if (currentModule === 'plataformas') {
       limpiarDestinoExcelModulo(currentModule, fecha);

@@ -646,38 +646,75 @@ def sincronizar_cadena_caja(fecha_operacion: date) -> dict | None:
         return None
 
     mensajes: list[str] = []
-    recursiones = 0
-    actual = fecha_cierre
 
-    while actual is not None and recursiones < 10:
-        anterior = excel_service.obtener_datos_cuadre_fecha(actual, actual.year)
-        base_nueva_anterior = float(anterior.get("base_nueva", 0)) if anterior else None
+    datos_antes = excel_service.obtener_datos_cuadre_fecha(fecha_cierre, fecha_cierre.year)
+    base_nueva_antes = (
+        float(datos_antes["base_nueva"])
+        if datos_antes and datos_antes.get("base_nueva") is not None
+        else None
+    )
 
-        sync_result = sincronizar_cuadre_guardado(actual)
-        if sync_result and sync_result.get("mensaje"):
-            mensajes.append(sync_result["mensaje"])
-        if not sync_result or not sync_result.get("ok"):
-            return {
-                "ok": False,
-                "recalculado": any("recalculado" in msg.lower() for msg in mensajes),
-                "fecha_cuadre": str(actual),
-                "mensaje": " ".join(mensajes).strip(),
-            }
+    sync_result = sincronizar_cuadre_guardado(fecha_cierre)
+    if sync_result and sync_result.get("mensaje"):
+        mensajes.append(sync_result["mensaje"])
+    if not sync_result or not sync_result.get("ok"):
+        return {
+            "ok": False,
+            "recalculado": False,
+            "fecha_cuadre": str(fecha_cierre),
+            "mensaje": " ".join(mensajes).strip(),
+        }
 
-        actualizado = excel_service.obtener_datos_cuadre_fecha(actual, actual.year)
-        base_nueva_actual = float(actualizado.get("base_nueva", 0)) if actualizado else None
+    datos_despues = excel_service.obtener_datos_cuadre_fecha(fecha_cierre, fecha_cierre.year)
+    base_nueva_despues = (
+        float(datos_despues["base_nueva"])
+        if datos_despues and datos_despues.get("base_nueva") is not None
+        else None
+    )
 
-        if base_nueva_anterior is not None and base_nueva_actual == base_nueva_anterior:
-            break
+    cambio_base = (
+        base_nueva_antes is None
+        or base_nueva_despues is None
+        or abs(base_nueva_despues - base_nueva_antes) >= 0.01
+    )
+    if not cambio_base:
+        return {
+            "ok": True,
+            "recalculado": True,
+            "fecha_cuadre": str(fecha_cierre),
+            "mensaje": " ".join(mensajes).strip(),
+        }
 
-        siguiente = excel_service.obtener_siguiente_cuadre(actual)
-        if not siguiente:
-            break
-        try:
-            actual = date.fromisoformat(siguiente["fecha"])
-        except ValueError:
-            break
-        recursiones += 1
+    siguiente = excel_service.obtener_siguiente_cuadre(fecha_cierre)
+    if not siguiente:
+        return {
+            "ok": True,
+            "recalculado": True,
+            "fecha_cuadre": str(fecha_cierre),
+            "mensaje": " ".join(mensajes).strip(),
+        }
+
+    try:
+        fecha_siguiente = date.fromisoformat(siguiente["fecha"])
+    except ValueError:
+        return {
+            "ok": True,
+            "recalculado": True,
+            "fecha_cuadre": str(fecha_cierre),
+            "mensaje": " ".join(mensajes).strip(),
+        }
+
+    sync_siguiente = sincronizar_cuadre_guardado(fecha_siguiente)
+    if sync_siguiente and sync_siguiente.get("mensaje"):
+        mensajes.append(sync_siguiente["mensaje"])
+
+    if not sync_siguiente or not sync_siguiente.get("ok"):
+        return {
+            "ok": False,
+            "recalculado": True,
+            "fecha_cuadre": str(fecha_siguiente),
+            "mensaje": " ".join(mensajes).strip(),
+        }
 
     return {
         "ok": True,
