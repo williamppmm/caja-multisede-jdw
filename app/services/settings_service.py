@@ -85,6 +85,14 @@ def save_settings(data: dict) -> None:
         "default_module",
         "excluir_monedas_viejos_base",
     }
+    existing: dict = {}
+    if SETTINGS_PATH.exists():
+        try:
+            with open(SETTINGS_PATH, encoding="utf-8") as f:
+                existing = json.load(f)
+        except Exception:
+            existing = {}
+
     cleaned = {k: v for k, v in data.items() if k in allowed}
     if "sede" in cleaned:
         cleaned["sede"] = str(cleaned["sede"]).strip()
@@ -92,17 +100,21 @@ def save_settings(data: dict) -> None:
         cleaned["data_dir"] = _normalizar_data_dir(cleaned["data_dir"])
     if "excluir_monedas_viejos_base" in cleaned:
         cleaned["excluir_monedas_viejos_base"] = bool(cleaned["excluir_monedas_viejos_base"])
-    enabled_modules = _normalizar_modulos(cleaned.get("enabled_modules"))
-    cleaned["enabled_modules"] = enabled_modules
-    cleaned["default_module"] = _normalizar_modulo_default(cleaned.get("default_module"), enabled_modules)
-    data_dir_destino = cleaned.get("data_dir")
-    if not data_dir_destino and SETTINGS_PATH.exists():
-        try:
-            with open(SETTINGS_PATH, encoding="utf-8") as f:
-                existente = json.load(f)
-            data_dir_destino = existente.get("data_dir")
-        except Exception:
-            data_dir_destino = None
+
+    merged = {**existing, **cleaned}
+
+    if "enabled_modules" in cleaned:
+        merged["enabled_modules"] = _normalizar_modulos(cleaned["enabled_modules"])
+    elif "enabled_modules" in merged:
+        merged["enabled_modules"] = _normalizar_modulos(merged.get("enabled_modules"))
+
+    if "enabled_modules" in merged:
+        merged["default_module"] = _normalizar_modulo_default(
+            cleaned.get("default_module", merged.get("default_module")),
+            merged["enabled_modules"],
+        )
+
+    data_dir_destino = merged.get("data_dir")
 
     if "excluir_monedas_viejos_base" in cleaned:
         save_operativa_config(
@@ -111,7 +123,7 @@ def save_settings(data: dict) -> None:
         )
 
     with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
-        json.dump(cleaned, f, indent=2, ensure_ascii=False)
+        json.dump(merged, f, indent=2, ensure_ascii=False)
     _settings_cache = None
     _settings_cache_mtime = None
 
