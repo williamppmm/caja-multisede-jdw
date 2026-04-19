@@ -375,10 +375,12 @@ def verificar_precondiciones(fecha_cuadre: date) -> dict:
 
 def calcular_cuadre(fecha_cuadre: date, base_anterior: float) -> dict:
     from app.services.contadores_service import obtener_catalogo
+    from app.services.operativa_config_service import get_operativa_config
 
     periodo = calcular_periodo(fecha_cuadre)
     datos_periodo = _cargar_datos_periodo(periodo)
     catalogo_map = {item["item_id"]: item for item in obtener_catalogo()}
+    excluir_monedas_viejos_base = bool(get_operativa_config().get("excluir_monedas_viejos_base"))
 
     total_contadores = 0.0
     total_practisistemas = 0.0
@@ -479,6 +481,10 @@ def calcular_cuadre(fecha_cuadre: date, base_anterior: float) -> dict:
 
     neto_prestamos = total_prestamos_entrada - total_prestamos_salida
     neto_movimientos = total_mov_ingresos - total_mov_salidas
+    base_nueva = round(
+        caja_fisica - caja_desglose["total_monedas"] - caja_desglose["billetes_viejos"],
+        2,
+    ) if excluir_monedas_viejos_base else caja_fisica
 
     caja_teorica = round(
         base_anterior
@@ -539,7 +545,7 @@ def calcular_cuadre(fecha_cuadre: date, base_anterior: float) -> dict:
         "caja_fisica": caja_fisica,
         "caja_teorica": caja_teorica,
         "diferencia": diferencia,
-        "base_nueva": caja_fisica,
+        "base_nueva": base_nueva,
     }
 
 
