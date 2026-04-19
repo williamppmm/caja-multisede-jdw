@@ -6,15 +6,15 @@ Documento de referencia funcional del comportamiento actual del sistema.
 
 Al ejecutar el `.exe` o el launcher Python:
 
-1. Se muestra splash de inicio.
-2. El launcher garantiza instancia única.
-3. Si la app ya está arrancando, los clics extra no deben abrir pestañas duplicadas.
-4. Cuando el servidor local responde, se abre el navegador.
+1. se muestra splash de inicio
+2. el launcher garantiza instancia única
+3. si la app ya está arrancando, los clics extra no deben abrir pestañas duplicadas
+4. cuando el servidor local responde, se abre el navegador
 
 Además:
 
-- el navegador envía heartbeat cada 30 segundos
-- si el proceso no recibe heartbeat por 75 segundos, se apaga solo
+- el navegador envía heartbeat periódico
+- si el proceso no recibe heartbeat durante el tiempo de gracia, se apaga solo
 
 ## 2. Configuración base
 
@@ -30,7 +30,7 @@ El estado inicial (`startup_state.json`) permite definir:
 
 - fecha de inicio
 - caja inicial
-- referencias iniciales por ítem de Contadores
+- referencias iniciales por ítem de `Contadores`
 
 ## 3. Reglas transversales
 
@@ -41,12 +41,16 @@ En general la sesión usa una fecha compartida entre módulos.
 Excepción:
 
 - en `respaldo-version-especial`, durante la primera interacción:
-  - `Caja` y `Resumen` pueden abrir en `ayer()`
-  - al pasar a otro módulo, la sesión vuelve a `hoy()`
+  - `Caja`
+  - `Plataformas`
+  - `Contadores`
+  - `Resumen`
+  pueden abrir en `ayer()`
+- al pasar a módulos fuera de ese grupo, la sesión vuelve a `hoy()`
 
 ### Borradores
 
-Los módulos con borrador de sesión más delicado son:
+Los borradores de sesión más sensibles hoy son:
 
 - `Caja`
 - `Contadores`
@@ -64,6 +68,15 @@ En `Contadores`, los paneles de:
 - pausa / reactivación
 
 se confirman con `OK`, sin contraseña dentro del propio panel.
+
+### Naturaleza de las contraseñas
+
+Las contraseñas visibles en el frontend deben entenderse como:
+
+- restricción operativa básica
+- aviso de que se intenta editar en una fecha no prevista
+
+No son autenticación fuerte ni un modelo de seguridad robusto de backend.
 
 ## 4. Módulos
 
@@ -102,20 +115,14 @@ Persistencia:
 
 - hoja `Plataformas` de `Contadores_{sede}_{año}.xlsx`
 
-#### Referencias externas (solo super admin con sede activa)
+#### Referencias externas (solo super admin)
 
-En el build super admin, al abrir el módulo se consultan dos archivos externos de solo lectura:
+En `main`, si hay sede activa configurada, el módulo puede leer referencias de archivos externos de solo lectura:
 
-- `Ventas_dia_Practisistemas.xlsx` (hoja `Resumen`, columna configurable por sede)
-- `Ventas_dia_Bet.xlsm` (hoja `xDias`, columna configurable por sede)
+- `Ventas_dia_Practisistemas.xlsx`
+- `Ventas_dia_Bet.xlsm`
 
-Los valores aparecen como referencia visual debajo del formulario de captura. Se comparan contra lo ingresado mostrando `Coincide` o `Difiere Δ`. No se guardan en ningún Excel propio.
-
-Condiciones para que aparezca el panel:
-
-- build super admin activo (`CAJA_SUPER_ADMIN=1`)
-- sede activa seleccionada explícitamente
-- rutas y columnas configuradas en el panel de administración
+Esos valores se usan como referencia visual y de contraste, no como fuente de guardado propia.
 
 ### Gastos
 
@@ -171,7 +178,7 @@ Cada ítem tiene:
 - `nombre`
 - `denominacion`
 
-El estado de pausa ya no vive como booleano persistente del catálogo. La fuente de verdad temporal es:
+La pausa ya no vive como booleano persistente del catálogo. La fuente de verdad temporal es:
 
 - `contadores_pausas.json`
 
@@ -195,7 +202,7 @@ Regla base:
 
 Se usa cuando hubo reset o incoherencia real de contadores.
 
-Hoy el flujo es:
+Flujo:
 
 1. se abre el panel del ítem
 2. se ingresan los valores de referencia crítica
@@ -210,22 +217,31 @@ La pausa actual es por fecha.
 Reglas:
 
 - solo afecta al ítem pausado
-- no debe modificar otros ítems
+- no modifica otros ítems
 - la fila sigue visible
-- `Entradas` y `Salidas` se apoyan en la referencia vigente
-- `Jackpot` sigue su propia lógica normal
+- `Entradas` y `Salidas` pueden apoyarse en la referencia vigente
+- `Jackpot` sigue su propia lógica
 
-La pausa sirve para no bloquear el guardado cuando una máquina está temporalmente fuera de captura, sin perder la estructura del formulario.
+#### Navegación de teclado
 
-#### Guardado
+`Contadores` ya no se comporta como un formulario lineal simple.
 
-`Contadores` se guarda en:
+Reglas actuales:
 
-- hoja `Contadores` de `Consolidado_{sede}_{año}.xlsx`
+- `Tab` y `Enter` recorren solo:
+  - `Entradas`
+  - `Salidas`
+- `Jackpot` queda fuera del flujo operativo diario
+- `Jackpot` sigue siendo editable por clic directo
+- las flechas permiten navegación tipo grilla
+- `Escape` restaura el valor original del campo enfocado
 
 ### Resumen
 
-Disponible en la versión usuario y en la versión especial.
+`Resumen` existe como módulo formal en:
+
+- `version-usuario`
+- `respaldo-version-especial`
 
 Propósito:
 
@@ -233,6 +249,8 @@ Propósito:
 - exponer totales y detalle operativo
 
 No hace balance contable completo.
+
+En `main`, hoy no se usa como módulo operativo equivalente al de la rama usuario.
 
 ### Cuadre
 
@@ -265,8 +283,8 @@ Además, si la corrección es en `Caja` y cambia la `base_nueva` del cuadre reca
 
 Esto existe porque:
 
-- `base_nueva` del cierre actual
-- es la `base_anterior` del siguiente cierre
+- la `base_nueva` de un cierre
+- es la `base_anterior` del siguiente
 
 ## 6. Archivos de datos
 
@@ -274,6 +292,20 @@ Esto existe porque:
 
 - `Contadores_{sede}_{año}.xlsx`
 - `Consolidado_{sede}_{año}.xlsx`
+
+Distribución actual:
+
+- `Contadores_{sede}_{año}.xlsx`
+  - Caja
+  - Plataformas
+  - Gastos
+  - Bonos
+  - Préstamos
+  - Movimientos
+
+- `Consolidado_{sede}_{año}.xlsx`
+  - Contadores
+  - Cuadre
 
 ### Auxiliares por sede
 
@@ -289,41 +321,61 @@ Esto existe porque:
 - `data/prestamos_personas.json`
 - `data/movimientos_conceptos.json`
 
-## 7. API relevante
+## 7. Arranque, splash y build
 
-Algunos endpoints importantes:
+Archivos clave:
 
-- `POST /api/modulos/caja/guardar`
-- `POST /api/modulos/plataformas/guardar`
-- `GET  /api/modulos/plataformas/fecha/{fecha}/datos`
-- `GET  /api/modulos/plataformas/fecha/{fecha}/referencias` — valores de archivos externos (solo super admin)
-- `POST /api/modulos/contadores/guardar`
-- `POST /api/modulos/cuadre/guardar`
-- `GET  /api/modulos/cuadre/calcular/{fecha}`
-- `POST /api/modulos/contadores/catalogo/{item_id}/pausar`
-- `GET  /api/settings` — retorna configuración incluyendo `is_super_admin_build`
-- `POST /api/settings` — guarda configuración, retorna `active_site`
-- `POST /api/settings/remote-sites` — guarda lista de sedes, retorna `sites` y `active_site`
-- `POST /api/settings/active-site` — cambia sede activa
-- `POST /api/settings/remote-sites/validate` — verifica carpeta y detecta sede
-- `POST /api/app/heartbeat`
-- `POST /api/app/shutdown`
+- `launcher_boot.py`
+- `launcher.py`
+- `launcher_super_admin.py`
 
-## 8. Diferencias entre ramas
+Comportamiento del launcher:
+
+- instancia única
+- splash de inicio
+- espera del servidor antes de abrir navegador
+- reducción de clics duplicados
+
+### `.spec` por rama
+
+La rama `main` usa:
+
+- `CajaSuperAdmin.spec`
+
+Las ramas operativas usan:
+
+- `CajaJDW.spec`
+
+Cada rama debe transportar el `.spec` correspondiente a su ejecutable.
+
+## 8. Riesgo operativo con Excel
+
+La aplicación ya tiene mitigaciones de locking y validación, pero el riesgo estructural sigue siendo:
+
+- Excel compartido no es una base de datos
+- no hay concurrencia fuerte distribuida
+- Dropbox / OneDrive no sustituyen una capa transaccional
+
+Esto no invalida la app; solo define su límite operativo real.
+
+## 9. Diferencias entre ramas
 
 ### `main`
 
 - super admin
 - multisede
 - respaldos
-- referencias de plataformas
+- referencias externas de plataformas
+- `CajaSuperAdmin.spec`
 
 ### `version-usuario`
 
 - operación diaria
 - `Resumen`
+- `CajaJDW.spec`
 
 ### `respaldo-version-especial`
 
-- misma base de usuario
-- `Caja` y `Resumen` arrancan en `ayer()` al inicio de la sesión
+- base de usuario
+- arranque inicial en `ayer()` para módulos de cierre
+- `CajaJDW.spec`

@@ -1,115 +1,54 @@
 # CajaJDW
 
-Aplicación local para registrar operación diaria de caja por sede, persistirla en libros Excel anuales y consolidar cierres con una interfaz mucho más manejable que trabajar directo sobre Excel.
+Aplicación local para registrar operación diaria de caja por sede, persistirla en libros Excel anuales y reducir la edición manual directa sobre Excel.
 
-El sistema sigue usando Excel como fuente de verdad operativa, pero ya resuelve buena parte de la captura, validación, consolidación y corrección desde la propia app. Ese salto ya es importante: la operación deja de depender de fórmulas manuales y de edición directa de hojas, aunque el archivo siga siendo el respaldo natural y la salida analítica para Power Query.
+La app sigue usando Excel como fuente de verdad operativa, pero ya centraliza captura, validación, consolidación, corrección y cierre desde una interfaz web local mucho más controlada.
 
-## Estado actual
+## Estado actual por ramas
 
-- `main` es la versión super admin.
-- `version-usuario` es la versión operativa de sede.
-- `respaldo-version-especial` parte de `version-usuario`, pero arranca `Caja` y `Resumen` en `ayer()` durante la primera interacción de la sesión.
+| Rama | Rol principal | Ejecutable | Launcher | Spec versionado en esa rama |
+|---|---|---|---|---|
+| `main` | super admin / multisede | `CajaSuperAdmin.exe` | `launcher_super_admin.py` | `CajaSuperAdmin.spec` |
+| `version-usuario` | operación diaria por sede | `CajaJDW.exe` | `launcher.py` | `CajaJDW.spec` |
+| `respaldo-version-especial` | variante operativa con arranque en `ayer()` | `CajaJDW.exe` | `launcher.py` | `CajaJDW.spec` |
 
-## Ejecutables por rama
-
-| Rama | Ejecutable final | Puerto | Uso |
-|---|---|---:|---|
-| `main` | `CajaSuperAdmin.exe` | 8001 | supervisión, auditoría, multisede, respaldos |
-| `version-usuario` | `CajaJDW.exe` | 8000 | captura operativa diaria |
-| `respaldo-version-especial` | `CajaJDW.exe` | 8000 | cierre en la mañana del día anterior |
-
-La convención actual es mantener **un solo `.exe` final por rama**.
+La convención actual es mantener **un solo `.spec` y un solo `.exe` final por rama**.
 
 ## Qué resuelve hoy
 
 - Captura diaria de `Caja`, `Plataformas`, `Gastos`, `Bonos`, `Préstamos`, `Movimientos` y `Contadores`.
 - Cálculo y guardado de `Cuadre`.
-- `Resumen` operativo en la versión usuario.
+- `Resumen` operativo en `version-usuario` y `respaldo-version-especial`.
 - Catálogos editables desde la propia aplicación.
-- Arranque amigable con:
+- Arranque refinado con:
   - instancia única
   - splash de inicio
-  - espera correcta antes de abrir el navegador
+  - espera correcta antes de abrir navegador
   - sin pestañas duplicadas por múltiples clics
-- Persistencia en Excel por sede y año.
+- Persistencia anual por sede.
 - Soporte multisede, referencias externas de plataformas y respaldos automáticos en `main`.
 
-## Cambios importantes ya incorporados
-
-### 1. Launcher refinado
+## Arranque y launcher
 
 Los builds actuales ya no dependen del arranque “ciego” original.
 
-El launcher ahora:
+El launcher compartido:
 
 - evita doble instancia real con mutex de Windows
-- evita pestañas duplicadas durante el arranque
-- espera a que el servidor esté listo antes de abrir el navegador
-- usa splash nativo de PyInstaller
+- muestra splash de inicio
+- espera a que el servidor local esté listo antes de abrir el navegador
+- reduce clics repetidos sin sentido durante el arranque
 
-Archivo compartido:
+Archivo central:
 
 - [launcher_boot.py](launcher_boot.py)
 
-Entrypoints:
+Entrypoints por variante:
 
 - [launcher.py](launcher.py)
 - [launcher_super_admin.py](launcher_super_admin.py)
 
-## 2. Contadores más operable
-
-`Contadores` dejó de ser un formulario rígido y se volvió más fiel a la operación real.
-
-### Pausa por fecha
-
-La pausa ya no es un booleano global del catálogo. Ahora se guarda por fecha en:
-
-- `contadores_pausas.json`
-
-Eso permite:
-
-- múltiples pausas por ítem
-- no contaminar fechas pasadas
-- no afectar otros ítems
-
-### Semántica actual de pausa
-
-La pausa no “elimina” la fila.
-
-Mientras un ítem está pausado en una fecha:
-
-- la fila sigue visible
-- `Entradas` y `Salidas` se cargan con la referencia vigente
-- `Jackpot` sigue su lógica normal
-- el resultado cae por aritmética natural
-- el resto de la tabla no se toca
-
-### Referencia crítica y pausa con confirmación simple
-
-Los microflujos de:
-
-- referencia crítica
-- pausa / reactivación
-
-ya no exigen contraseña dentro del panel. La confirmación es con `OK`. La autorización general por fecha sigue siendo un flujo aparte cuando aplica.
-
-## 3. Cuadre más consistente
-
-El `Cuadre` ya no se queda congelado cuando una corrección cambia datos clave del período.
-
-Hoy el sistema resincroniza:
-
-- el `Cuadre` cuyo período contiene la fecha corregida
-
-Y además, si una corrección en `Caja` cambia la `base_nueva` de ese cuadre:
-
-- también resincroniza el siguiente `Cuadre`, porque esa base es la `base_anterior` del siguiente cierre
-
-Eso cubre el caso contable más delicado:
-
-- una corrección en caja de un cierre previo puede mover la base del cierre siguiente
-
-## Estructura de datos
+## Persistencia y archivos por sede
 
 Por sede y año se generan dos libros:
 
@@ -144,13 +83,14 @@ Catálogos locales del equipo:
 - `data/prestamos_personas.json`
 - `data/movimientos_conceptos.json`
 
-## Diferencia entre `Resumen` y `Cuadre`
+## Resumen y Cuadre
 
 `Resumen`:
 
 - consolida y expone los datos del período
-- sirve para revisar qué pasó por módulo
-- no hace el balance físico vs teórico
+- sirve para lectura operativa
+- no hace balance físico vs teórico
+- hoy está disponible en `version-usuario` y `respaldo-version-especial`
 
 `Cuadre`:
 
@@ -161,54 +101,92 @@ Catálogos locales del equipo:
 - genera `diferencia`
 - define `base_nueva`
 
-Y esa `base_nueva` es la que alimenta el siguiente cierre.
+Y esa `base_nueva` alimenta el siguiente cierre.
 
-## Flujo por ramas
+## Contadores y pausa por fecha
 
-### `main`
+`Contadores` dejó de manejar la pausa como un booleano global del catálogo.
 
-Pensada para supervisión:
+Hoy la pausa se guarda por fecha en:
 
-- multisede
-- super admin sin contraseña operativa
-- edición y eliminación por registro
-- referencias de plataformas
-- respaldos automáticos
+- `contadores_pausas.json`
 
-### `version-usuario`
+Eso permite:
 
-Pensada para captura controlada:
+- múltiples ciclos de pausa por ítem
+- no contaminar fechas pasadas
+- no afectar otros ítems
 
-- operación diaria
-- `Resumen`
-- `Cuadre`
-- menos superficie administrativa
+Semántica actual:
 
-### `respaldo-version-especial`
+- la fila sigue visible
+- `Entradas` y `Salidas` pueden apoyarse en la referencia vigente
+- `Jackpot` mantiene su propia lógica
+- el ítem no desaparece de la tabla
 
-Base de usuario con una diferencia concreta:
+## Seguridad y contraseñas
 
-- en el primer arranque de la sesión, `Caja` y `Resumen` inician en `ayer()`
-- al pasar a cualquier otro módulo, la sesión vuelve a `hoy()`
+Las contraseñas del frontend **no son seguridad fuerte**.
+
+Su propósito actual es:
+
+- restricción operativa básica
+- alertar que se está intentando corregir en una fecha que no corresponde
+- reducir edición accidental fuera del flujo esperado
+
+No deben interpretarse como autenticación robusta de nivel backend o corporativo.
+
+## Riesgo operativo real: Excel y locking
+
+La app usa locking local y validaciones para reducir choques de escritura, pero el backend sigue dependiendo de Excel como fuente operativa.
+
+Eso implica límites reales:
+
+- no hay transacciones como en una base de datos
+- Dropbox / OneDrive no resuelven concurrencia fuerte por sí solos
+- si dos equipos de la misma sede escriben el mismo libro casi al mismo tiempo, sigue existiendo riesgo operativo
+
+En otras palabras:
+
+- la app ya mitiga parte del problema
+- pero Excel compartido sigue siendo un backend frágil bajo concurrencia real
+
+## Build y `.spec`
+
+El `.spec` forma parte del proceso oficial de empaquetado y **debe existir en la rama que produce ese ejecutable**.
+
+### En `main`
+
+- [CajaSuperAdmin.spec](CajaSuperAdmin.spec)
+- build esperado: `CajaSuperAdmin.exe`
+
+### En `version-usuario` y `respaldo-version-especial`
+
+- `CajaJDW.spec`
+- build esperado: `CajaJDW.exe`
+
+Si se clona una rama en otro equipo, el `.spec` correcto de esa rama debe venir ya en el repositorio y no recrearse a mano.
 
 ## Instalación y desarrollo
 
 ### Desarrollo
 
-Versión usuario:
+Super admin (`main`):
+
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+python launcher_super_admin.py
+```
+
+Usuario (`version-usuario`):
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 python launcher.py
-```
-
-Versión super admin (puerto 8001):
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-$env:CAJA_SUPER_ADMIN='1'; uvicorn app.main:app --reload --port 8001
 ```
 
 ### Instalación rápida
@@ -219,54 +197,53 @@ Instalar Caja.bat
 
 ### Builds
 
-Usuario:
-
-```powershell
-.\.venv\Scripts\pyinstaller.exe CajaJDW.spec --noconfirm
-```
-
 Super admin:
 
 ```powershell
-.\.venv\Scripts\pyinstaller.exe CajaSuperAdmin.spec --noconfirm
+.\.venv\Scripts\python.exe -m PyInstaller CajaSuperAdmin.spec --clean
+```
+
+Usuario:
+
+```powershell
+.\.venv\Scripts\python.exe -m PyInstaller CajaJDW.spec --clean
 ```
 
 ## Scripts principales
 
 | Archivo | Función |
 |---|---|
+| `launcher_boot.py` | arranque compartido |
 | `launcher.py` | arranque de usuario |
 | `launcher_super_admin.py` | arranque de super admin |
-| `launcher_boot.py` | lógica compartida de arranque |
-| `CajaJDW.spec` | build usuario |
-| `CajaSuperAdmin.spec` | build super admin |
+| `CajaSuperAdmin.spec` | build de `main` |
 | `Instalar Caja.bat` | instalación rápida |
-| `Construir EXE.bat` | build rápido de usuario |
+| `Construir EXE.bat` | build rápido disponible en la variante operativa |
 
 ## Limitaciones actuales
 
 - Excel sigue siendo la fuente de verdad operativa.
-- Dropbox no resuelve concurrencia real entre dos equipos escribiendo el mismo libro al mismo tiempo.
-- No hay transacciones reales como en una base de datos.
-- La seguridad sigue siendo operativa, no de nivel corporativo.
+- La concurrencia distribuida sigue siendo limitada.
+- La seguridad sigue siendo operativa, no robusta.
+- `app.js` y `excel_service.py` todavía concentran bastante responsabilidad.
 
-## Siguiente evolución natural
+## Evolución natural
 
-Hoy la app ya justificó el salto de trabajar directo en Excel a trabajar sobre una aplicación.  
+La app ya justificó el salto de trabajar directo en Excel a trabajar sobre una aplicación.
+
 El siguiente salto lógico, si crece la operación, es:
 
 - dejar Excel como respaldo o salida analítica
-- y pasar la operación central a una base de datos
+- y mover la operación central a una base de datos
 
-Probablemente eso tendrá sentido cuando:
+Eso tendrá sentido cuando:
 
 - aumente la concurrencia por sede
-- haga falta más trazabilidad
-- Dropbox deje de ser suficiente como mecanismo de sincronización
+- haga falta mejor trazabilidad
+- Excel compartido deje de ser suficiente
 
 ## Documentación adicional
 
-- [docs/contexto-proyecto.md](docs/contexto-proyecto.md)
 - [docs/especificacion-funcional.md](docs/especificacion-funcional.md)
 - [docs/analisis-tecnico.md](docs/analisis-tecnico.md)
 - [docs/plan-pruebas.md](docs/plan-pruebas.md)
