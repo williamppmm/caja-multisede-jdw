@@ -40,6 +40,7 @@ let expenseDayItems = [];
 let loanItems = [];
 let movementItems = [];
 let quickEditMode = { bonos: false, gastos: false, prestamos: false, movimientos: false };
+let quickSubmitState = { bonos: false, gastos: false, prestamos: false, movimientos: false };
 let cajaLocked = false;
 let _cerrando = false;
 let cajaDrafts = {};
@@ -247,6 +248,20 @@ function mostrarConfirmacion(texto, onConfirm) {
   el.querySelector('.confirm-ok').addEventListener('click', () => { ocultarMensaje(); onConfirm(); }, { once: true });
   el.querySelector('.confirm-cancel').addEventListener('click', () => { ocultarMensaje(); }, { once: true });
   el.querySelector('.confirm-ok').focus();
+}
+
+function requiereConfirmacionCorreccionHoy(modulo, fecha) {
+  if (!['caja', 'plataformas', 'contadores'].includes(modulo) || fecha !== hoyStr()) return false;
+  const estadoActual = obtenerEstadoModulo(modulo, fecha);
+  return Boolean(estadoActual?.existe);
+}
+
+function mostrarConfirmacionCorreccionHoy(modulo, fecha, onConfirm) {
+  const label = MODULE_META[modulo]?.label || modulo;
+  mostrarConfirmacion(
+    `Ya guardaste ${label} hoy. ¿Deseas guardar una corrección?`,
+    onConfirm,
+  );
 }
 
 function previewExcelAnual() {
@@ -599,6 +614,16 @@ function moverAlSiguiente(inputActual) {
   if (idx !== -1 && idx < campos.length - 1) {
     campos[idx + 1].focus();
     campos[idx + 1].select();
+    return;
+  }
+
+  if (inputActual?.id === 'billetes_viejos') {
+    const fecha = document.getElementById('fecha')?.value || '';
+    if (currentModule === 'caja' && requiereConfirmacionCorreccionHoy('caja', fecha)) {
+      mostrarConfirmacionCorreccionHoy('caja', fecha, () => guardar({ confirmado: true }));
+      return;
+    }
+    document.getElementById('btn-guardar')?.focus();
   }
 }
 
@@ -1449,12 +1474,20 @@ function actualizarBotonPrincipalModulo(modulo) {
   };
   const btn = document.getElementById(botones[modulo]);
   if (!btn) return;
-  btn.textContent = quickEditMode[modulo] ? 'Guardar corrección' : 'Registrar';
+  const guardando = Boolean(quickSubmitState[modulo]);
+  btn.disabled = guardando;
+  btn.textContent = guardando ? 'Guardando...' : (quickEditMode[modulo] ? 'Guardar corrección' : 'Registrar');
 }
 
 function setQuickEditMode(modulo, activo) {
   if (!(modulo in quickEditMode)) return;
   quickEditMode[modulo] = Boolean(activo);
+  actualizarBotonPrincipalModulo(modulo);
+}
+
+function setQuickSubmitMode(modulo, activo) {
+  if (!(modulo in quickSubmitState)) return;
+  quickSubmitState[modulo] = Boolean(activo);
   actualizarBotonPrincipalModulo(modulo);
 }
 
@@ -2386,6 +2419,7 @@ async function cargarVistaModulo(modulo, fecha) {
 }
 
 async function registrarBono() {
+  if (quickSubmitState.bonos) return;
   if (quickEditMode.bonos) {
     const error = validarBono();
     if (error) {
@@ -2396,6 +2430,7 @@ async function registrarBono() {
     const cliente = document.getElementById('bono-cliente').value.trim();
     const valor = parseNumeroInput('bono-valor');
     try {
+      setQuickSubmitMode('bonos', true);
       const res = await fetch('/api/modulos/bonos/ultimo/editar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2417,6 +2452,8 @@ async function registrarBono() {
       document.getElementById('bono-cliente').focus();
     } catch {
       mostrarMensaje('Error de conexión con el servidor.', 'error');
+    } finally {
+      setQuickSubmitMode('bonos', false);
     }
     return;
   }
@@ -2429,6 +2466,7 @@ async function registrarBono() {
   const cliente = document.getElementById('bono-cliente').value.trim();
   const valor = parseNumeroInput('bono-valor');
   try {
+    setQuickSubmitMode('bonos', true);
     const res = await fetch('/api/modulos/bonos/registrar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2449,10 +2487,13 @@ async function registrarBono() {
     document.getElementById('bono-cliente').focus();
   } catch {
     mostrarMensaje('Error de conexión con el servidor.', 'error');
+  } finally {
+    setQuickSubmitMode('bonos', false);
   }
 }
 
 async function registrarPrestamo() {
+  if (quickSubmitState.prestamos) return;
   if (quickEditMode.prestamos) {
     const error = validarPrestamo();
     if (error) {
@@ -2464,6 +2505,7 @@ async function registrarPrestamo() {
     const tipo_movimiento = obtenerTipoPrestamoSeleccionado();
     const valor = parseNumeroInput('prestamo-valor');
     try {
+      setQuickSubmitMode('prestamos', true);
       const res = await fetch('/api/modulos/prestamos/ultimo/editar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2485,6 +2527,8 @@ async function registrarPrestamo() {
       document.getElementById('prestamo-persona').focus();
     } catch {
       mostrarMensaje('Error de conexión con el servidor.', 'error');
+    } finally {
+      setQuickSubmitMode('prestamos', false);
     }
     return;
   }
@@ -2498,6 +2542,7 @@ async function registrarPrestamo() {
   const tipo_movimiento = obtenerTipoPrestamoSeleccionado();
   const valor = parseNumeroInput('prestamo-valor');
   try {
+    setQuickSubmitMode('prestamos', true);
     const res = await fetch('/api/modulos/prestamos/registrar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2518,10 +2563,13 @@ async function registrarPrestamo() {
     document.getElementById('prestamo-persona').focus();
   } catch {
     mostrarMensaje('Error de conexión con el servidor.', 'error');
+  } finally {
+    setQuickSubmitMode('prestamos', false);
   }
 }
 
 async function registrarMovimiento() {
+  if (quickSubmitState.movimientos) return;
   if (quickEditMode.movimientos) {
     const error = validarMovimiento();
     if (error) {
@@ -2533,6 +2581,7 @@ async function registrarMovimiento() {
     const concepto = document.getElementById('movimiento-concepto').value.trim();
     const valor = parseNumeroInput('movimiento-valor');
     try {
+      setQuickSubmitMode('movimientos', true);
       const res = await fetch('/api/modulos/movimientos/ultimo/editar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2554,6 +2603,8 @@ async function registrarMovimiento() {
       document.getElementById('movimiento-concepto').focus();
     } catch {
       mostrarMensaje('Error de conexión con el servidor.', 'error');
+    } finally {
+      setQuickSubmitMode('movimientos', false);
     }
     return;
   }
@@ -2567,6 +2618,7 @@ async function registrarMovimiento() {
   const concepto = document.getElementById('movimiento-concepto').value.trim();
   const valor = parseNumeroInput('movimiento-valor');
   try {
+    setQuickSubmitMode('movimientos', true);
     const res = await fetch('/api/modulos/movimientos/registrar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2587,6 +2639,8 @@ async function registrarMovimiento() {
     document.getElementById('movimiento-concepto').focus();
   } catch {
     mostrarMensaje('Error de conexión con el servidor.', 'error');
+  } finally {
+    setQuickSubmitMode('movimientos', false);
   }
 }
 
@@ -2608,6 +2662,7 @@ function validarGasto() {
 }
 
 async function registrarGasto() {
+  if (quickSubmitState.gastos) return;
   if (quickEditMode.gastos) {
     const error = validarGasto();
     if (error) {
@@ -2618,6 +2673,7 @@ async function registrarGasto() {
     const concepto = document.getElementById('gasto-concepto').value.trim();
     const valor = parseNumeroInput('gasto-valor');
     try {
+      setQuickSubmitMode('gastos', true);
       const res = await fetch('/api/modulos/gastos/ultimo/editar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2638,6 +2694,8 @@ async function registrarGasto() {
       document.getElementById('gasto-concepto').focus();
     } catch {
       mostrarMensaje('Error de conexión con el servidor.', 'error');
+    } finally {
+      setQuickSubmitMode('gastos', false);
     }
     return;
   }
@@ -2650,6 +2708,7 @@ async function registrarGasto() {
   const concepto = document.getElementById('gasto-concepto').value.trim();
   const valor = parseNumeroInput('gasto-valor');
   try {
+    setQuickSubmitMode('gastos', true);
     const res = await fetch('/api/modulos/gastos/guardar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2669,6 +2728,8 @@ async function registrarGasto() {
     document.getElementById('gasto-concepto').focus();
   } catch {
     mostrarMensaje('Error de conexión con el servidor.', 'error');
+  } finally {
+    setQuickSubmitMode('gastos', false);
   }
 }
 
@@ -3146,16 +3207,13 @@ async function guardar({ confirmado = false } = {}) {
     return;
   }
 
-  if (!confirmado && ['caja', 'plataformas', 'contadores'].includes(currentModule) && fecha === hoyStr()) {
-    const estadoActual = obtenerEstadoModulo(currentModule, fecha);
-    if (estadoActual?.existe) {
-      const label = MODULE_META[currentModule]?.label || currentModule;
-      mostrarConfirmacion(
-        `Ya guardaste ${label} hoy. ¿Deseas guardar una corrección?`,
-        () => guardar({ confirmado: true }),
-      );
-      return;
-    }
+  if (!confirmado && requiereConfirmacionCorreccionHoy(currentModule, fecha)) {
+    mostrarConfirmacionCorreccionHoy(
+      currentModule,
+      fecha,
+      () => guardar({ confirmado: true }),
+    );
+    return;
   }
 
   const btn = document.getElementById('btn-guardar');
@@ -3531,7 +3589,7 @@ async function init() {
     });
     inp.addEventListener('input', () => guardarDraftCaja());
     inp.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !inp.readOnly) {
+      if ((e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) && !inp.readOnly) {
         e.preventDefault();
         moverAlSiguiente(inp);
       }
@@ -3547,7 +3605,7 @@ async function init() {
     el.addEventListener('blur', () => formatearInputNumerico(el, false));
     el.addEventListener('input', () => guardarDraftCaja());
     el.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
         e.preventDefault();
         moverAlSiguiente(el);
       }
@@ -3824,7 +3882,7 @@ async function init() {
     }
   }, true);
   document.getElementById('gasto-valor').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
       e.preventDefault();
       document.getElementById('btn-gasto-registrar').focus();
     }
@@ -3855,13 +3913,13 @@ async function init() {
     }
   });
   document.getElementById('bono-valor').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
       e.preventDefault();
       document.getElementById('btn-bono-registrar').focus();
     }
   });
   document.getElementById('prestamo-valor').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
       e.preventDefault();
       document.getElementById('btn-prestamo-registrar').focus();
     }

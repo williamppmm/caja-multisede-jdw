@@ -1,4 +1,7 @@
+import json
 import os
+import socket
+import time
 from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import date, datetime
@@ -13,6 +16,11 @@ from app.services.settings_service import get_settings
 
 class ArchivoCajaOcupadoError(Exception):
     pass
+
+
+_LOCK_TTL = 60
+_LOCK_WAIT_SECONDS = 4.0
+_LOCK_RETRY_INTERVAL = 0.25
 
 
 SECTION_PREFIXES = {
@@ -189,30 +197,79 @@ def _fila_es_modulo(modulo: str, row) -> bool:
     return False
 
 
+def _lock_metadata() -> bytes:
+    return json.dumps({
+        "ts": time.time(),
+        "pid": os.getpid(),
+        "host": socket.gethostname(),
+    }).encode()
+
+
+def _lock_host(lock_path: Path) -> str:
+    try:
+        return json.loads(lock_path.read_bytes()).get("host", "")
+    except Exception:
+        return ""
+
+
+def _lock_age_seconds(lock_path: Path) -> float:
+    try:
+        data = json.loads(lock_path.read_bytes())
+        ts = float(data.get("ts"))
+        return max(0.0, time.time() - ts)
+    except Exception:
+        try:
+            return max(0.0, time.time() - lock_path.stat().st_mtime)
+        except OSError:
+            return 0.0
+
+
 @contextmanager
 def _bloqueo_escritura(path: Path):
+    owner_path = path.parent / f"~${path.name}"
+    if owner_path.exists():
+        raise ArchivoCajaOcupadoError(
+            "El libro esta siendo usado por Excel en este equipo o en otro equipo sincronizado. "
+            "Cierra el archivo en Excel antes de guardar."
+        )
+
     lock_path = path.with_suffix(path.suffix + ".lock")
     fd = None
+    lock_creado = False
+    deadline = time.monotonic() + _LOCK_WAIT_SECONDS
     try:
-        try:
-            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_RDWR)
-        except FileExistsError as exc:
-            raise ArchivoCajaOcupadoError(
-                "Otro guardado esta en curso. Vuelve a presionar Guardar en unos segundos."
-            ) from exc
-        except PermissionError as exc:
-            raise ArchivoCajaOcupadoError(
-                "No se pudo guardar porque el libro esta abierto o sincronizandose. Cierra Excel y vuelve a intentarlo."
-            ) from exc
-        except OSError as exc:
-            raise ArchivoCajaOcupadoError(
-                "No se pudo bloquear el libro para guardar. Vuelve a intentarlo en unos segundos."
-            ) from exc
+        while True:
+            try:
+                fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_RDWR)
+                os.write(fd, _lock_metadata())
+                lock_creado = True
+                break
+            except FileExistsError as exc:
+                age = _lock_age_seconds(lock_path)
+                if age > _LOCK_TTL:
+                    lock_path.unlink(missing_ok=True)
+                    continue
+                if time.monotonic() >= deadline:
+                    host = _lock_host(lock_path)
+                    suffix = f" desde el equipo '{host}'" if host else ""
+                    raise ArchivoCajaOcupadoError(
+                        f"Hay otro guardado en curso{suffix}. Vuelve a intentarlo en unos segundos."
+                    ) from exc
+                time.sleep(_LOCK_RETRY_INTERVAL)
+                continue
+            except PermissionError as exc:
+                raise ArchivoCajaOcupadoError(
+                    "No se pudo guardar porque el libro esta abierto o sincronizandose. Cierra Excel y vuelve a intentarlo."
+                ) from exc
+            except OSError as exc:
+                raise ArchivoCajaOcupadoError(
+                    "No se pudo bloquear el libro para guardar. Vuelve a intentarlo en unos segundos."
+                ) from exc
         yield
     finally:
         if fd is not None:
             os.close(fd)
-        if lock_path.exists():
+        if lock_creado and lock_path.exists():
             lock_path.unlink(missing_ok=True)
 
 
