@@ -147,8 +147,8 @@ function parsePositivo(id) {
   return isNaN(v) || v < 0 ? 0 : v;
 }
 
-function textoContieneNumeros(texto) {
-  return /\d/.test(String(texto || '').trim());
+function textoTieneLetras(texto) {
+  return /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(String(texto || '').trim());
 }
 
 function dateToStr(d) {
@@ -1824,9 +1824,9 @@ function validarBono() {
     marcarCampoInvalido('bono-cliente');
     return 'Debes ingresar el nombre del cliente.';
   }
-  if (textoContieneNumeros(cliente)) {
+  if (!textoTieneLetras(cliente)) {
     marcarCampoInvalido('bono-cliente');
-    return 'El nombre del cliente no puede contener números.';
+    return 'El nombre del cliente debe incluir texto descriptivo.';
   }
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de bono mayor que cero.';
   return null;
@@ -1840,9 +1840,9 @@ function validarPrestamo() {
     marcarCampoInvalido('prestamo-persona');
     return 'Debes ingresar el nombre de la persona.';
   }
-  if (textoContieneNumeros(persona)) {
+  if (!textoTieneLetras(persona)) {
     marcarCampoInvalido('prestamo-persona');
-    return 'El nombre de la persona no puede contener números.';
+    return 'El nombre de la persona debe incluir texto descriptivo.';
   }
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de préstamo mayor que cero.';
   if (obtenerTipoPrestamoSeleccionado() === 'pago') {
@@ -1861,9 +1861,9 @@ function validarMovimiento() {
     marcarCampoInvalido('movimiento-concepto');
     return 'Debes ingresar el concepto del movimiento.';
   }
-  if (textoContieneNumeros(concepto)) {
+  if (!textoTieneLetras(concepto)) {
     marcarCampoInvalido('movimiento-concepto');
-    return 'El concepto del movimiento no puede contener números.';
+    return 'El concepto del movimiento debe incluir texto descriptivo.';
   }
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de movimiento mayor que cero.';
   return null;
@@ -2654,9 +2654,9 @@ function validarGasto() {
     marcarCampoInvalido('gasto-concepto');
     return 'Debes ingresar la descripción del gasto.';
   }
-  if (textoContieneNumeros(concepto)) {
+  if (!textoTieneLetras(concepto)) {
     marcarCampoInvalido('gasto-concepto');
-    return 'La descripción del gasto no puede contener números.';
+    return 'La descripción del gasto debe incluir texto descriptivo.';
   }
   if (isNaN(valor) || valor <= 0) return 'Debes ingresar un valor de gasto mayor que cero.';
   return null;
