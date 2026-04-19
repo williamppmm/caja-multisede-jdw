@@ -24,7 +24,7 @@ _DEFAULTS = {
 }
 
 _settings_cache: dict | None = None
-_settings_cache_mtime: float | None = None
+_settings_cache_mtime: tuple[float | None, float | None] | None = None
 
 
 def _normalizar_data_dir(value: str | None) -> str:
@@ -32,6 +32,14 @@ def _normalizar_data_dir(value: str | None) -> str:
     if not raw:
         return str(BASE_DIR)
     return str(Path(raw).expanduser())
+
+
+def _get_operativa_mtime(data_dir: str | None) -> float | None:
+    path = Path(_normalizar_data_dir(data_dir)) / "config_operativa.json"
+    try:
+        return path.stat().st_mtime if path.exists() else None
+    except Exception:
+        return None
 
 
 def _resolver_settings() -> dict:
@@ -63,12 +71,16 @@ def get_settings() -> dict:
 
     try:
         current_mtime = SETTINGS_PATH.stat().st_mtime if SETTINGS_PATH.exists() else None
-        if _settings_cache is not None and current_mtime == _settings_cache_mtime:
+        current_operativa_mtime = _get_operativa_mtime(
+            _settings_cache.get("data_dir") if _settings_cache is not None else None
+        )
+        current_signature = (current_mtime, current_operativa_mtime)
+        if _settings_cache is not None and current_signature == _settings_cache_mtime:
             return _settings_cache.copy()
 
         data = _resolver_settings()
         _settings_cache = data
-        _settings_cache_mtime = current_mtime
+        _settings_cache_mtime = (current_mtime, _get_operativa_mtime(data.get("data_dir")))
         return data.copy()
     except Exception:
         return _DEFAULTS.copy()
