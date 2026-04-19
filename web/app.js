@@ -43,6 +43,7 @@ let gastosItems = [];
 let loanItems = [];
 let loanSaldos = {};
 let movementItems = [];
+let quickSubmitState = { bonos: false, gastos: false, prestamos: false, movimientos: false };
 let cajaLocked = false;
 let _cerrando = false;
 let cajaDrafts = {};
@@ -230,6 +231,25 @@ function formatFechaHoraVisual(valor) {
 
 function formatHoraVisual(dateObj = new Date()) {
   return dateObj.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function esCampoRestaurableConEscape(control) {
+  if (!control || control.disabled || control.readOnly) return false;
+  if (control.matches('.contador-campo')) return false;
+  if (control.matches('textarea')) return true;
+  if (!control.matches('input')) return false;
+  const tipo = String(control.type || '').toLowerCase();
+  return ['text', 'search', 'tel', 'url', 'email', 'number'].includes(tipo);
+}
+
+function restaurarCampoConEscape(control) {
+  if (!esCampoRestaurableConEscape(control)) return false;
+  const original = control.dataset.originalValue;
+  if (original === undefined || control.value === original) return false;
+  control.value = original;
+  control.dispatchEvent(new Event('input', { bubbles: true }));
+  control.select?.();
+  return true;
 }
 
 function ocultarMensaje() {
@@ -587,6 +607,11 @@ function moverAlSiguiente(inputActual) {
   if (idx !== -1 && idx < campos.length - 1) {
     campos[idx + 1].focus();
     campos[idx + 1].select();
+    return;
+  }
+
+  if (inputActual?.id === 'billetes_viejos') {
+    document.getElementById('btn-guardar')?.focus();
   }
 }
 
@@ -1378,6 +1403,26 @@ function limpiarFormularioMovimientos() {
   const valor = document.getElementById('movimiento-valor');
   if (concepto) concepto.value = '';
   if (valor) valor.value = '';
+}
+
+function actualizarBotonRegistroRapido(modulo) {
+  const botones = {
+    bonos: 'btn-bono-registrar',
+    gastos: 'btn-gasto-registrar',
+    prestamos: 'btn-prestamo-registrar',
+    movimientos: 'btn-movimiento-registrar',
+  };
+  const btn = document.getElementById(botones[modulo]);
+  if (!btn) return;
+  const guardando = Boolean(quickSubmitState[modulo]);
+  btn.disabled = guardando;
+  btn.textContent = guardando ? 'Guardando...' : 'Registrar';
+}
+
+function setQuickSubmitMode(modulo, activo) {
+  if (!(modulo in quickSubmitState)) return;
+  quickSubmitState[modulo] = Boolean(activo);
+  actualizarBotonRegistroRapido(modulo);
 }
 
 function obtenerAcumuladoClienteBonos(cliente) {
@@ -2516,6 +2561,7 @@ async function cargarVistaModulo(modulo, fecha) {
 }
 
 async function registrarBono() {
+  if (quickSubmitState.bonos) return;
   const error = validarBono();
   if (error) {
     mostrarMensaje(error, 'error');
@@ -2525,27 +2571,33 @@ async function registrarBono() {
   const cliente = document.getElementById('bono-cliente').value.trim();
   const valor = parseNumeroInput('bono-valor');
 
-  const res = await fetch('/api/modulos/bonos/registrar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, cliente, valor, forzar: puedeForzarModulo('bonos', fecha) }),
-  });
-  const data = await res.json();
-  if (!data.ok) {
-    mostrarMensaje(data.mensaje, 'advertencia');
-    return;
+  try {
+    setQuickSubmitMode('bonos', true);
+    const res = await fetch('/api/modulos/bonos/registrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha, cliente, valor, forzar: puedeForzarModulo('bonos', fecha) }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      mostrarMensaje(data.mensaje, 'advertencia');
+      return;
+    }
+    limpiarFormularioBonos();
+    bonusNames = Array.from(new Set([...bonusNames, cliente])).sort((a, b) => a.localeCompare(b, 'es'));
+    renderBonusNames();
+    await cargarBonosDelDia(fecha);
+    actualizarBonosVisuales();
+    mostrarMensaje(`✓ ${data.mensaje} — ${data.cliente}: ${fmt(data.valor)} — Total día: ${fmt(data.total_dia)}`, 'ok');
+    await verificarFechaActual();
+    document.getElementById('bono-cliente').focus();
+  } finally {
+    setQuickSubmitMode('bonos', false);
   }
-  limpiarFormularioBonos();
-  bonusNames = Array.from(new Set([...bonusNames, cliente])).sort((a, b) => a.localeCompare(b, 'es'));
-  renderBonusNames();
-  await cargarBonosDelDia(fecha);
-  actualizarBonosVisuales();
-  mostrarMensaje(`✓ ${data.mensaje} — ${data.cliente}: ${fmt(data.valor)} — Total día: ${fmt(data.total_dia)}`, 'ok');
-  await verificarFechaActual();
-  document.getElementById('bono-cliente').focus();
 }
 
 async function registrarPrestamo() {
+  if (quickSubmitState.prestamos) return;
   const error = validarPrestamo();
   if (error) {
     mostrarMensaje(error, 'error');
@@ -2556,27 +2608,33 @@ async function registrarPrestamo() {
   const tipo_movimiento = obtenerTipoPrestamoSeleccionado();
   const valor = parseNumeroInput('prestamo-valor');
 
-  const res = await fetch('/api/modulos/prestamos/registrar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, persona, tipo_movimiento, valor, forzar: puedeForzarModulo('prestamos', fecha) }),
-  });
-  const data = await res.json();
-  if (!data.ok) {
-    mostrarMensaje(data.mensaje, 'advertencia');
-    return;
+  try {
+    setQuickSubmitMode('prestamos', true);
+    const res = await fetch('/api/modulos/prestamos/registrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha, persona, tipo_movimiento, valor, forzar: puedeForzarModulo('prestamos', fecha) }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      mostrarMensaje(data.mensaje, 'advertencia');
+      return;
+    }
+    limpiarFormularioPrestamos();
+    loanNames = Array.from(new Set([...loanNames, persona])).sort((a, b) => a.localeCompare(b, 'es'));
+    renderLoanNames();
+    await cargarPrestamosDelDia(fecha);
+    actualizarPrestamosVisuales();
+    mostrarMensaje(`✓ ${data.mensaje} — ${data.persona}: ${fmt(data.valor)} — Saldo pendiente: ${fmt(data.saldo_pendiente)}`, 'ok');
+    await verificarFechaActual();
+    document.getElementById('prestamo-persona').focus();
+  } finally {
+    setQuickSubmitMode('prestamos', false);
   }
-  limpiarFormularioPrestamos();
-  loanNames = Array.from(new Set([...loanNames, persona])).sort((a, b) => a.localeCompare(b, 'es'));
-  renderLoanNames();
-  await cargarPrestamosDelDia(fecha);
-  actualizarPrestamosVisuales();
-  mostrarMensaje(`✓ ${data.mensaje} — ${data.persona}: ${fmt(data.valor)} — Saldo pendiente: ${fmt(data.saldo_pendiente)}`, 'ok');
-  await verificarFechaActual();
-  document.getElementById('prestamo-persona').focus();
 }
 
 async function registrarMovimiento() {
+  if (quickSubmitState.movimientos) return;
   const error = validarMovimiento();
   if (error) {
     mostrarMensaje(error, 'error');
@@ -2587,24 +2645,29 @@ async function registrarMovimiento() {
   const concepto = document.getElementById('movimiento-concepto').value.trim();
   const valor = parseNumeroInput('movimiento-valor');
 
-  const res = await fetch('/api/modulos/movimientos/registrar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, tipo_movimiento, concepto, valor, observacion: '', forzar: puedeForzarModulo('movimientos', fecha) }),
-  });
-  const data = await res.json();
-  if (!data.ok) {
-    mostrarMensaje(data.mensaje, 'advertencia');
-    return;
+  try {
+    setQuickSubmitMode('movimientos', true);
+    const res = await fetch('/api/modulos/movimientos/registrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha, tipo_movimiento, concepto, valor, observacion: '', forzar: puedeForzarModulo('movimientos', fecha) }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      mostrarMensaje(data.mensaje, 'advertencia');
+      return;
+    }
+    limpiarFormularioMovimientos();
+    movementConcepts = Array.from(new Set([...movementConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
+    renderMovementConcepts();
+    await cargarMovimientosDelDia(fecha);
+    actualizarMovimientosVisuales();
+    mostrarMensaje(`✓ ${data.mensaje} — ${data.concepto}: ${fmt(data.valor)} — Neto día: ${fmt(data.neto)}`, 'ok');
+    await verificarFechaActual();
+    document.getElementById('movimiento-concepto').focus();
+  } finally {
+    setQuickSubmitMode('movimientos', false);
   }
-  limpiarFormularioMovimientos();
-  movementConcepts = Array.from(new Set([...movementConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
-  renderMovementConcepts();
-  await cargarMovimientosDelDia(fecha);
-  actualizarMovimientosVisuales();
-  mostrarMensaje(`✓ ${data.mensaje} — ${data.concepto}: ${fmt(data.valor)} — Neto día: ${fmt(data.neto)}`, 'ok');
-  await verificarFechaActual();
-  document.getElementById('movimiento-concepto').focus();
 }
 
 function validarGasto() {
@@ -2618,6 +2681,7 @@ function validarGasto() {
 }
 
 async function registrarGasto() {
+  if (quickSubmitState.gastos) return;
   const error = validarGasto();
   if (error) {
     mostrarMensaje(error, 'error');
@@ -2627,23 +2691,28 @@ async function registrarGasto() {
   const concepto = document.getElementById('gasto-concepto').value.trim();
   const valor = parseNumeroInput('gasto-valor');
 
-  const res = await fetch('/api/modulos/gastos/guardar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, items: [{ concepto, valor }], forzar: puedeForzarModulo('gastos', fecha) }),
-  });
-  const data = await res.json();
-  if (!data.ok) {
-    mostrarMensaje(data.mensaje, 'advertencia');
-    return;
+  try {
+    setQuickSubmitMode('gastos', true);
+    const res = await fetch('/api/modulos/gastos/guardar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha, items: [{ concepto, valor }], forzar: puedeForzarModulo('gastos', fecha) }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      mostrarMensaje(data.mensaje, 'advertencia');
+      return;
+    }
+    limpiarFormularioGastos();
+    expenseConcepts = Array.from(new Set([...expenseConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
+    renderExpenseConcepts();
+    await cargarDatosModuloItems('gastos', fecha);
+    mostrarMensaje(`✓ ${data.mensaje} — ${concepto}: ${fmt(valor)} — Total día: ${fmt(data.total)}`, 'ok');
+    await verificarFechaActual();
+    document.getElementById('gasto-concepto').focus();
+  } finally {
+    setQuickSubmitMode('gastos', false);
   }
-  limpiarFormularioGastos();
-  expenseConcepts = Array.from(new Set([...expenseConcepts, concepto])).sort((a, b) => a.localeCompare(b, 'es'));
-  renderExpenseConcepts();
-  await cargarDatosModuloItems('gastos', fecha);
-  mostrarMensaje(`✓ ${data.mensaje} — ${concepto}: ${fmt(valor)} — Total día: ${fmt(data.total)}`, 'ok');
-  await verificarFechaActual();
-  document.getElementById('gasto-concepto').focus();
 }
 
 function validarContadores() {
@@ -3706,7 +3775,7 @@ async function init() {
     inp.addEventListener('blur', () => formatearInputNumerico(inp, false, true));
     inp.addEventListener('input', () => guardarDraftCaja());
     inp.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !inp.readOnly) {
+      if ((e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) && !inp.readOnly) {
         e.preventDefault();
         moverAlSiguiente(inp);
       }
@@ -4056,7 +4125,7 @@ async function init() {
     }
   }, true);
   document.getElementById('gasto-valor').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
       e.preventDefault();
       document.getElementById('btn-gasto-registrar').focus();
     }
@@ -4087,13 +4156,13 @@ async function init() {
     }
   });
   document.getElementById('bono-valor').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
       e.preventDefault();
       document.getElementById('btn-bono-registrar').focus();
     }
   });
   document.getElementById('prestamo-valor').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
       e.preventDefault();
       document.getElementById('btn-prestamo-registrar').focus();
     }
@@ -4121,6 +4190,19 @@ async function init() {
   });
   window.addEventListener('resize', posicionarTarjetaAuth);
   window.addEventListener('scroll', posicionarTarjetaAuth, true);
+  document.addEventListener('focus', e => {
+    const control = e.target;
+    if (!esCampoRestaurableConEscape(control)) return;
+    control.dataset.originalValue = control.value;
+  }, true);
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (restaurarCampoConEscape(e.target)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+    }
+  }, true);
   const interceptarIntentoEdicion = e => {
     const control = e.target?.closest?.('input, textarea, select, button, summary');
     if (!control || !esControlEdicionActual(control)) return;
