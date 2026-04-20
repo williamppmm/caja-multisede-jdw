@@ -60,7 +60,7 @@ def guardar_prestamo(entrada: PrestamoEntrada) -> dict:
                 "total_pagado": float(resumen_actual["total_pagado"] or 0),
                 "saldo_pendiente": float(resumen_actual["saldo_pendiente"] or 0) + valor,
             }
-        nombres_service.agregar_item_catalogo("prestamos", persona)
+        nombres_service.agregar_persona(persona)
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
@@ -119,7 +119,7 @@ def actualizar_ultimo_prestamo(entrada: PrestamoEntrada) -> dict:
         )
         if items is None:
             return {"ok": False, "mensaje": "No hay un último movimiento de préstamos para corregir.", "fecha": str(entrada.fecha)}
-        nombres_service.agregar_item_catalogo("prestamos", persona)
+        nombres_service.agregar_persona(persona)
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 

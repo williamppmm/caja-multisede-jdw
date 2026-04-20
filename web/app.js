@@ -1555,6 +1555,19 @@ function actualizarAcumuladoBonoCliente() {
     : 'Sin bonos previos para este cliente en la fecha actual.';
 }
 
+function _similitudFuzzy(a, b) {
+  const s = a.toLocaleLowerCase('es-CO');
+  const t = b.toLocaleLowerCase('es-CO');
+  if (!s.length || !t.length) return 0;
+  const d = Array.from({length: s.length + 1}, (_, i) =>
+    Array.from({length: t.length + 1}, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= s.length; i++)
+    for (let j = 1; j <= t.length; j++)
+      d[i][j] = s[i-1] === t[j-1] ? d[i-1][j-1] : 1 + Math.min(d[i-1][j], d[i][j-1], d[i-1][j-1]);
+  return 1 - d[s.length][t.length] / Math.max(s.length, t.length);
+}
+
 function autocompletarClienteBono() {
   const input = document.getElementById('bono-cliente');
   const texto = input?.value.trim() || '';
@@ -1567,12 +1580,27 @@ function autocompletarClienteBono() {
     return true;
   }
 
-  const coincidencia = bonusNames.find(nombre => nombre.toLocaleLowerCase('es-CO').startsWith(texto.toLocaleLowerCase('es-CO')));
-  if (!coincidencia) return false;
+  const prefijo = bonusNames.find(nombre => nombre.toLocaleLowerCase('es-CO').startsWith(texto.toLocaleLowerCase('es-CO')));
+  if (prefijo) {
+    input.value = prefijo;
+    actualizarAcumuladoBonoCliente();
+    return true;
+  }
 
-  input.value = coincidencia;
-  actualizarAcumuladoBonoCliente();
-  return true;
+  if (texto.length >= 4) {
+    let mejorNombre = null, mejorSimilitud = 0.6;
+    for (const nombre of bonusNames) {
+      const s = _similitudFuzzy(texto, nombre);
+      if (s > mejorSimilitud) { mejorSimilitud = s; mejorNombre = nombre; }
+    }
+    if (mejorNombre) {
+      input.value = mejorNombre;
+      actualizarAcumuladoBonoCliente();
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function autocompletarPersonaPrestamo() {
@@ -1586,11 +1614,25 @@ function autocompletarPersonaPrestamo() {
     return true;
   }
 
-  const coincidencia = loanNames.find(nombre => nombre.toLocaleLowerCase('es-CO').startsWith(texto.toLocaleLowerCase('es-CO')));
-  if (!coincidencia) return false;
+  const prefijo = loanNames.find(nombre => nombre.toLocaleLowerCase('es-CO').startsWith(texto.toLocaleLowerCase('es-CO')));
+  if (prefijo) {
+    input.value = prefijo;
+    return true;
+  }
 
-  input.value = coincidencia;
-  return true;
+  if (texto.length >= 4) {
+    let mejorNombre = null, mejorSimilitud = 0.6;
+    for (const nombre of loanNames) {
+      const s = _similitudFuzzy(texto, nombre);
+      if (s > mejorSimilitud) { mejorSimilitud = s; mejorNombre = nombre; }
+    }
+    if (mejorNombre) {
+      input.value = mejorNombre;
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function obtenerTipoPrestamoSeleccionado() {
@@ -1640,11 +1682,25 @@ function autocompletarConceptoGasto() {
     return true;
   }
 
-  const coincidencia = expenseConcepts.find(concepto => concepto.toLocaleLowerCase('es-CO').startsWith(texto.toLocaleLowerCase('es-CO')));
-  if (!coincidencia) return false;
+  const prefijo = expenseConcepts.find(concepto => concepto.toLocaleLowerCase('es-CO').startsWith(texto.toLocaleLowerCase('es-CO')));
+  if (prefijo) {
+    input.value = prefijo;
+    return true;
+  }
 
-  input.value = coincidencia;
-  return true;
+  if (texto.length >= 4) {
+    let mejorConcepto = null, mejorSimilitud = 0.6;
+    for (const concepto of expenseConcepts) {
+      const s = _similitudFuzzy(texto, concepto);
+      if (s > mejorSimilitud) { mejorSimilitud = s; mejorConcepto = concepto; }
+    }
+    if (mejorConcepto) {
+      input.value = mejorConcepto;
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function autocompletarConceptoMovimiento() {
@@ -1658,11 +1714,25 @@ function autocompletarConceptoMovimiento() {
     return true;
   }
 
-  const coincidencia = movementConcepts.find(concepto => concepto.toLocaleLowerCase('es-CO').startsWith(texto.toLocaleLowerCase('es-CO')));
-  if (!coincidencia) return false;
+  const prefijo = movementConcepts.find(concepto => concepto.toLocaleLowerCase('es-CO').startsWith(texto.toLocaleLowerCase('es-CO')));
+  if (prefijo) {
+    input.value = prefijo;
+    return true;
+  }
 
-  input.value = coincidencia;
-  return true;
+  if (texto.length >= 4) {
+    let mejorConcepto = null, mejorSimilitud = 0.6;
+    for (const concepto of movementConcepts) {
+      const s = _similitudFuzzy(texto, concepto);
+      if (s > mejorSimilitud) { mejorSimilitud = s; mejorConcepto = concepto; }
+    }
+    if (mejorConcepto) {
+      input.value = mejorConcepto;
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function obtenerTipoMovimientoSeleccionado() {

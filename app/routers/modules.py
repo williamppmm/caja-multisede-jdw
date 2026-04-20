@@ -226,7 +226,7 @@ def gastos_conceptos():
 
 @router.get("/prestamos/personas")
 def prestamos_personas():
-    return {"personas": nombres_service.obtener_catalogo("prestamos")}
+    return {"personas": nombres_service.obtener_personas()}
 
 
 @router.get("/movimientos/conceptos")
