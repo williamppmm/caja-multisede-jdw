@@ -350,49 +350,78 @@ La aplicacion ya tiene mitigaciones de locking y validacion, pero el riesgo estr
 
 ### `main`
 
-- super admin
-- multisede
-- respaldos
-- referencias externas de plataformas
-- administracion de recaudo por sede
-- `CajaSuperAdmin.spec`
+- super admin con acceso a multisede
+- respaldos automaticos programados (10 min arranque, cada 4 h, retencion 3 dias)
+- referencias externas de plataformas por sede
+- administracion de recaudo (registrar entregas, cerrar ciclos)
+- port 8001, mutex independiente del usuario
+- `CajaSuperAdmin.spec` / `CajaSuperAdmin.exe`
 
 ### `version-usuario`
 
-- operacion diaria
-- `Resumen`
-- panel de recaudo informativo
-- `CajaJDW.spec`
+- operacion diaria por sede
+- modulo `Resumen`
+- panel de recaudo solo lectura
+- port 8000
+- `CajaJDW.spec` / `CajaJDW.exe`
 
 ### `respaldo-version-especial`
 
-- base de usuario
-- arranque inicial en `ayer()` para modulos de cierre
-- `CajaJDW.spec`
+- base de `version-usuario`
+- en la primera interaccion del dia, `Caja`, `Plataformas`, `Contadores` y `Resumen` abren en `ayer()`
+- util como variante de cierre nocturno
+- port 8000
+- `CajaJDW.spec` / `CajaJDW.exe`
 
 ## 10. API REST de referencia
 
 ### Configuracion y ciclo de vida
 
-- `GET /api/settings`
-- `POST /api/settings`
-- `GET /api/settings/startup`
-- `POST /api/settings/startup`
-- `POST /api/settings/browse-directory`
-- `POST /api/app/heartbeat`
-- `POST /api/app/shutdown`
+- `GET /api/settings` — configuracion actual
+- `POST /api/settings` — guardar configuracion
+- `GET /api/settings/startup` — estado de inicio
+- `POST /api/settings/startup` — guardar estado de inicio
+- `POST /api/settings/browse-directory` — abrir selector de carpeta
+- `GET /api/settings/remote-sites` — sedes remotas registradas (super admin)
+- `POST /api/settings/remote-sites` — guardar sedes remotas (super admin)
+- `POST /api/app/heartbeat` — ping del navegador
+- `POST /api/app/shutdown` — apagar el servidor
 
 ### Modulos operativos
 
+- `GET /api/modulos/{modulo}/fecha/{fecha}/estado`
+- `GET /api/modulos/{modulo}/fecha/{fecha}/datos`
+- `GET /api/modulos/{modulo}/ultima-fecha`
+- `POST /api/modulos/{modulo}/guardar`
 - `POST /api/modulos/caja/guardar`
 - `POST /api/modulos/plataformas/guardar`
 - `POST /api/modulos/contadores/guardar`
 - `POST /api/modulos/cuadre/guardar`
 - `GET /api/modulos/cuadre/calcular/{fecha}`
-- endpoints de consulta por fecha y ultimo registro
+- `GET /api/modulos/cuadre/fecha/{fecha}/estado`
+- `GET /api/modulos/cuadre/fecha/{fecha}/datos`
+- `POST /api/modulos/bonos/editar-ultimo`
+- `POST /api/modulos/bonos/eliminar-ultimo`
+- `GET /api/modulos/contadores/catalogo`
+- `POST /api/modulos/contadores/catalogo`
+- `POST /api/modulos/contadores/pausa`
+- `GET /api/modulos/contadores/fecha/{fecha}`
+
+### Catalogos de autocompletado
+
+- `GET /api/modulos/bonos/nombres`
+- `GET /api/modulos/gastos/conceptos`
+- `GET /api/modulos/prestamos/personas`
+- `GET /api/modulos/movimientos/conceptos`
+- `POST /api/modulos/bonos/nombres/importar`
 
 ### Recaudo
 
-- `GET /api/recaudo`
-- `POST /api/recaudo/registrar-entrega`
-- `POST /api/recaudo/cerrar-ciclo`
+- `GET /api/recaudo` — resumen del ciclo activo (`?fecha=YYYY-MM-DD` opcional)
+- `POST /api/recaudo/registrar-entrega` — registrar entrega parcial
+- `POST /api/recaudo/cerrar-ciclo` — cerrar ciclo activo
+
+### Respaldos (solo super admin)
+
+- `GET /api/backup/status` — estado del ultimo respaldo por sede
+- `POST /api/backup/run-now` — disparar respaldo inmediato

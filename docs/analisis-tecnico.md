@@ -90,8 +90,8 @@ Distribucion actual:
   - Bonos
   - Prestamos
   - Movimientos
-- `Consolidado_{sede}_{ano}.xlsx`
   - Contadores
+- `Consolidado_{sede}_{ano}.xlsx`
   - Cuadre
 
 JSON auxiliares por sede:
@@ -138,11 +138,14 @@ Agrupa endpoints para guardar registros, consultar estado por fecha, consultar d
 
 Responsabilidades:
 
-- leer settings
-- guardar settings
-- abrir selector de carpeta
-- apagar la app
-- recibir heartbeat del navegador
+- leer y guardar settings (`GET/POST /api/settings`)
+- gestionar estado de inicio (`/api/settings/startup`)
+- abrir selector de carpeta (`/api/settings/browse-directory`)
+- gestionar sedes remotas (`/api/settings/remote-sites`) — solo super admin
+- apagar la app (`/api/app/shutdown`)
+- recibir heartbeat del navegador (`/api/app/heartbeat`)
+- exponer estado de respaldos (`/api/backup/status`) — solo super admin
+- disparar respaldo manual (`/api/backup/run-now`) — solo super admin
 
 ### Router de recaudo
 
@@ -227,6 +230,48 @@ Responsabilidades:
 Punto tecnico importante:
 
 - si una correccion en `Caja` cambia `base_nueva`, se resincroniza el siguiente cierre afectado
+
+### Referencias externas de plataformas
+
+- [plataformas_referencia_service.py](C:\Users\User\Desktop\Caja\app\services\plataformas_referencia_service.py)
+
+Responsabilidades:
+
+- mantener referencias por sede de los encabezados de plataformas externas (Practisistemas, Bet)
+- el super admin puede configurar referencias distintas por sede remota
+
+### Respaldos automaticos
+
+- [backup_service.py](C:\Users\User\Desktop\Caja\app\services\backup_service.py)
+
+Disponible solo en super admin (`is_super_admin_build()`).
+
+Responsabilidades:
+
+- copiar periodicamente los Excel y JSON auxiliares de cada sede remota a una carpeta de backup
+- validar cada archivo antes de copiarlo (openpyxl + JSON parse)
+- conservar solo los ultimos 3 dias por sede (retencio RETENTION_DAYS = 3)
+- registrar cada operacion en `backup_log.jsonl`
+
+Programacion:
+
+- se dispara 10 minutos despues del arranque (DELAY_SECONDS = 600)
+- se repite cada 4 horas (REPEAT_SECONDS = 14400)
+- tambien ejecutable manualmente via `/api/backup/run-now`
+
+Estructura del backup:
+
+```text
+backup_root/
+  {sede}/
+    {YYYY-MM-DD}/
+      Contadores_*.xlsx
+      Consolidado_*.xlsx
+      contadores_items.json
+      startup_state.json
+      manifest.json
+  backup_log.jsonl
+```
 
 ### Recaudo
 

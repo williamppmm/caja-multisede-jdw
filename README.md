@@ -49,12 +49,15 @@ docs/
   especificacion-funcional.md
   analisis-tecnico.md
   plan-pruebas.md
-data/                        <- archivos locales del equipo (no versionados)
+data/                         <- archivos locales del equipo (no versionados)
 launcher.py
 launcher_boot.py
 launcher_super_admin.py
 CajaJDW.spec
 CajaSuperAdmin.spec
+Instalar Caja.bat
+Iniciar Caja.bat
+Construir EXE.bat
 README.md
 requirements.txt
 ```
@@ -93,9 +96,9 @@ Distribucion actual:
   - Bonos
   - Prestamos
   - Movimientos
+  - Contadores
 
 - `Consolidado_{sede}_{ano}.xlsx`
-  - Contadores
   - Cuadre
 
 Archivos auxiliares por sede:
@@ -154,6 +157,17 @@ En `main`, super admin puede:
 
 - registrar entregas
 - cerrar ciclos
+
+## Respaldos automaticos
+
+Solo en `main` (super admin). Cuando se configura una carpeta de backup:
+
+- se dispara automaticamente 10 minutos despues del arranque
+- se repite cada 4 horas
+- por cada sede remota registrada copia los `.xlsx` y los JSON auxiliares
+- conserva los ultimos 3 dias por sede (elimina lo anterior)
+- los archivos se validan antes de copiar (openpyxl + JSON parse)
+- tambien se puede disparar manualmente desde la interfaz
 
 ## Contadores y pausa por fecha
 
