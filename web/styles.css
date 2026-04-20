@@ -2321,3 +2321,35 @@ body.super-admin-active {
 .plataformas-ref-estado.coincide { color: #1a7a45; }
 .plataformas-ref-estado.difiere  { color: #c0392b; font-weight: 600; }
 .plataformas-ref-estado.sin-dato { color: #8a8a8a; }
+
+/* ── Recaudo de monedas y billetes viejos ─────────────────────────────────── */
+
+.recaudo-ultima-entrega {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+  color: #2d7d46;
+  font-weight: 600;
+}
+
+.recaudo-entrega-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(45, 125, 70, 0.12);
+}
+
+.recaudo-acciones {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+  flex-wrap: wrap;
+}

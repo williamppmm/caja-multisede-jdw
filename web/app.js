@@ -20,6 +20,7 @@ let enabledModules = ['caja', 'gastos'];
 let defaultModule = 'caja';
 let configSuperAdminMode = false;
 let configSuperAdminBuild = false;   // true cuando el proceso es CajaSuperAdmin.exe
+let configExcluirMonedasViejosBase = false;
 let configRemoteSites = [];
 let configActiveSite = null;
 let currentModule = 'caja';
@@ -2036,6 +2037,14 @@ function aplicarDraftCaja(fecha) {
   return true;
 }
 
+function puedeAplicarDraftCaja(fecha) {
+  // En super admin con sede activa prima el estado real del backend/Excel.
+  // Evita que una Caja borrada o corregida fuera de la interfaz reaparezca
+  // por un draft local viejo de la sesión.
+  if (configSuperAdminMode && configActiveSite) return false;
+  return !!cajaDrafts[fecha];
+}
+
 async function limpiarModuloActual() {
   if (currentModule === 'caja') {
     eliminarDraftCaja(document.getElementById('fecha').value);
@@ -2376,7 +2385,13 @@ async function cargarDatosCaja(fecha) {
 
     if (!estado.existe) {
       setCajaEditable(cajaLibre || isOverrideActive('caja', fecha));
-      if (!aplicarDraftCaja(fecha)) limpiarCaja();
+      if (puedeAplicarDraftCaja(fecha) && aplicarDraftCaja(fecha)) {
+        // Draft aplicado
+      } else {
+        eliminarDraftCaja(fecha);
+        limpiarCaja();
+      }
+      await cargarRecaudoResumen(fecha);
       return;
     }
 
@@ -2385,6 +2400,7 @@ async function cargarDatosCaja(fecha) {
     if (!res.ok) {
       limpiarCaja();
       setCajaEditable(cajaLibre || isOverrideActive('caja', fecha));
+      await cargarRecaudoResumen(fecha);
       return;
     }
     const data = await res.json();
@@ -2398,8 +2414,16 @@ async function cargarDatosCaja(fecha) {
     calcularCaja();
     eliminarDraftCaja(fecha);
     setCajaEditable(cajaLibre || isOverrideActive('caja', fecha));
+    await cargarRecaudoResumen(fecha);
   } catch {
-    if (!aplicarDraftCaja(fecha)) limpiarCaja();
+    if (puedeAplicarDraftCaja(fecha) && aplicarDraftCaja(fecha)) {
+      // Draft aplicado
+    } else {
+      if (configSuperAdminMode && configActiveSite) {
+        eliminarDraftCaja(fecha);
+      }
+      limpiarCaja();
+    }
     setCajaEditable(cajaLibre || isOverrideActive('caja', fecha));
   }
 }
@@ -2558,6 +2582,112 @@ async function cargarVistaModulo(modulo, fecha) {
     return;
   }
   await cargarDatosModuloItems(modulo, fecha);
+}
+
+// ── Recaudo de monedas y billetes viejos ──────────────────────────────────────
+
+function limpiarRecaudoResumen() {
+  document.getElementById('recaudo-panel').classList.add('oculto');
+  document.getElementById('recaudo-pendiente').textContent = '';
+  document.getElementById('recaudo-desde').textContent = '-';
+  document.getElementById('recaudo-hoy').textContent = '$ 0';
+  document.getElementById('recaudo-acumulado').textContent = '$ 0';
+  document.getElementById('recaudo-entregado').textContent = '$ 0';
+  document.getElementById('recaudo-pendiente-total').textContent = '$ 0';
+  document.getElementById('recaudo-ultima-entrega').classList.add('oculto');
+  document.getElementById('recaudo-ultima-entrega-texto').textContent = 'Último cierre: $ 0';
+  document.getElementById('recaudo-acciones-admin').classList.add('oculto');
+}
+
+function renderRecaudoResumen(data) {
+  if (!data?.enabled || !configExcluirMonedasViejosBase) {
+    limpiarRecaudoResumen();
+    return;
+  }
+
+  const panel = document.getElementById('recaudo-panel');
+  const ciclo = data.ciclo_actual || {};
+  const totales = data.totales || {};
+  const diarios = data.diarios || [];
+  const fechaCorte = data.fecha_corte || null;
+  const hoy = diarios.find(item => item.fecha === fechaCorte) || diarios[diarios.length - 1] || null;
+  const ultimoCierre = data.ultimo_cierre || null;
+
+  panel.classList.remove('oculto');
+  document.getElementById('recaudo-pendiente').textContent = fmt(totales.pendiente ?? 0);
+  document.getElementById('recaudo-pendiente-total').textContent = fmt(totales.pendiente ?? 0);
+  document.getElementById('recaudo-desde').textContent = ciclo.desde ? formatFechaVisual(ciclo.desde) : '-';
+  document.getElementById('recaudo-hoy').textContent = fmt(hoy?.total ?? 0);
+  document.getElementById('recaudo-acumulado').textContent = fmt(totales.recaudado ?? 0);
+  document.getElementById('recaudo-entregado').textContent = fmt(totales.entregado ?? 0);
+
+  const entregaWrap = document.getElementById('recaudo-ultima-entrega');
+  const entregaTexto = document.getElementById('recaudo-ultima-entrega-texto');
+  if (!ultimoCierre) {
+    entregaWrap.classList.add('oculto');
+    entregaTexto.textContent = 'Último cierre: $ 0';
+  } else {
+    entregaWrap.classList.remove('oculto');
+    entregaTexto.textContent = `Último cierre: entregado ${fmt(ultimoCierre.total_entregado ?? 0)} (${formatFechaVisual(ultimoCierre.desde)} a ${formatFechaVisual(ultimoCierre.hasta)})`;
+  }
+
+  document.getElementById('recaudo-acciones-admin').classList.toggle('oculto', !configSuperAdminMode);
+}
+
+async function cargarRecaudoResumen(fecha = null) {
+  if (!configExcluirMonedasViejosBase) {
+    limpiarRecaudoResumen();
+    return;
+  }
+  try {
+    const query = fecha ? `?fecha=${encodeURIComponent(fecha)}` : '';
+    const res = await fetch(`/api/recaudo${query}`);
+    if (!res.ok) { limpiarRecaudoResumen(); return; }
+    renderRecaudoResumen(await res.json());
+  } catch {
+    limpiarRecaudoResumen();
+  }
+}
+
+async function registrarEntregaRecaudo() {
+  const fechaStr = prompt('Fecha de entrega (YYYY-MM-DD):', hoyStr());
+  if (!fechaStr) return;
+  const montoStr = prompt('Monto entregado:');
+  if (!montoStr) return;
+  const monto = parseNumeroTexto(montoStr);
+  if (!monto || monto <= 0) { mostrarMensaje('Monto inválido.', 'error'); return; }
+  const nota = prompt('Nota (opcional):') || '';
+  try {
+    const res = await fetch('/api/recaudo/registrar-entrega', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha: fechaStr, monto, nota }),
+    });
+    const data = await res.json();
+    if (!res.ok) { mostrarMensaje(data.detail || 'Error al registrar entrega.', 'error'); return; }
+    mostrarMensaje('Entrega registrada.', 'ok');
+    await cargarRecaudoResumen(moduleDates[currentModule]);
+  } catch {
+    mostrarMensaje('Error de conexión con el servidor.', 'error');
+  }
+}
+
+async function cerrarCicloRecaudo() {
+  const ok = confirm('¿Confirmas cerrar el ciclo de recaudo actual?\nEsto archivará los totales del ciclo vigente y abrirá uno nuevo.');
+  if (!ok) return;
+  try {
+    const res = await fetch('/api/recaudo/cerrar-ciclo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const data = await res.json();
+    if (!res.ok) { mostrarMensaje(data.detail || 'Error al cerrar ciclo.', 'error'); return; }
+    mostrarMensaje('Ciclo de recaudo cerrado. Nuevo ciclo iniciado.', 'ok');
+    await cargarRecaudoResumen(moduleDates[currentModule]);
+  } catch {
+    mostrarMensaje('Error de conexión con el servidor.', 'error');
+  }
 }
 
 async function registrarBono() {
@@ -3211,6 +3341,7 @@ async function ingresarAdmin() {
     actualizarPreviewHojasAdmin();
     document.getElementById('admin-super-admin-mode').checked = !!settings.super_admin_mode;
     toggleSedesPanel(!!settings.super_admin_mode);
+    document.getElementById('admin-excluir-monedas-viejos-base').checked = !!settings.excluir_monedas_viejos_base;
     document.getElementById('admin-practi-path').value = settings.plataformas_ref_practi_path || '';
     document.getElementById('admin-bet-path').value = settings.plataformas_ref_bet_path || '';
     document.getElementById('admin-backup-enabled').checked = !!settings.backup_enabled;
@@ -3223,6 +3354,7 @@ async function ingresarAdmin() {
   document.getElementById('admin-section-archivo-anual').classList.toggle('oculto', configSuperAdminMode);
   document.getElementById('admin-section-startup').classList.toggle('oculto', configSuperAdminMode);
   document.getElementById('admin-super-admin-toggle').classList.toggle('oculto', esBuildSA);
+  document.getElementById('admin-section-operativa').classList.toggle('oculto', !configSuperAdminMode);
   document.getElementById('admin-section-plataformas-ref').classList.toggle('oculto', !configSuperAdminMode);
   document.getElementById('admin-section-backup').classList.toggle('oculto', !configSuperAdminMode);
   if (configSuperAdminMode) cargarBackupStatus();
@@ -3257,6 +3389,7 @@ async function guardarAdmin() {
     sede: document.getElementById('admin-sede').value.trim(),
     data_dir: document.getElementById('admin-data-dir').value.trim(),
     super_admin_mode: document.getElementById('admin-super-admin-mode')?.checked || false,
+    excluir_monedas_viejos_base: document.getElementById('admin-excluir-monedas-viejos-base')?.checked || false,
     plataformas_ref_practi_path: document.getElementById('admin-practi-path').value.trim(),
     plataformas_ref_bet_path: document.getElementById('admin-bet-path').value.trim(),
     backup_enabled: document.getElementById('admin-backup-enabled')?.checked || false,
@@ -3315,6 +3448,7 @@ async function guardarAdmin() {
     configSede = body.sede || 'Principal';
     configDataDir = body.data_dir;
     configSuperAdminMode = !!body.super_admin_mode;
+    configExcluirMonedasViejosBase = !!body.excluir_monedas_viejos_base;
     renderSuperAdminSedeBanner();
     await cargarBonusNames();
     await cargarLoanNames();
@@ -3429,6 +3563,11 @@ async function cambiarSedeActiva(siteId) {
     contadoresDrafts = {};
     try { sessionStorage.removeItem('cajaDrafts'); } catch {}
     try { sessionStorage.removeItem('contadoresDrafts'); } catch {}
+    // Refrescar config operativa de la nueva sede activa
+    try {
+      const sRes = await fetch('/api/settings');
+      if (sRes.ok) { const s = await sRes.json(); configExcluirMonedasViejosBase = !!s.excluir_monedas_viejos_base; }
+    } catch { /* mantener valor anterior */ }
     await cargarVistaModulo(currentModule, moduleDates[currentModule]);
     await verificarFechaActual();
     mostrarMensaje(`Sede activa: ${configActiveSite?.label || siteId}`, 'ok');
@@ -3724,6 +3863,7 @@ async function init() {
     defaultModule = settings.default_module || enabledModules[0];
     configSuperAdminMode = !!settings.super_admin_mode;
     configSuperAdminBuild = !!settings.is_super_admin_build;
+    configExcluirMonedasViejosBase = !!settings.excluir_monedas_viejos_base;
     configRemoteSites = settings.remote_sites || [];
     configActiveSite = settings.active_site || null;
   } catch { /* defaults */ }
@@ -3880,6 +4020,8 @@ async function init() {
   document.getElementById('btn-admin-cerrar').addEventListener('click', cerrarAdmin);
   document.getElementById('btn-admin-ingresar').addEventListener('click', ingresarAdmin);
   document.getElementById('btn-admin-guardar').addEventListener('click', guardarAdmin);
+  document.getElementById('btn-recaudo-registrar-entrega').addEventListener('click', registrarEntregaRecaudo);
+  document.getElementById('btn-recaudo-cerrar-ciclo').addEventListener('click', cerrarCicloRecaudo);
   document.getElementById('btn-admin-buscar-carpeta').addEventListener('click', buscarCarpetaDatos);
   document.getElementById('btn-admin-practi-browse').addEventListener('click', buscarCarpetaPracti);
   document.getElementById('btn-admin-bet-browse').addEventListener('click', buscarCarpetaBet);

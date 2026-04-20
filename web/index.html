@@ -86,7 +86,7 @@
         </details>
       </section>
 
-      <section class="card card-resumen modulo-resumen-card modulo-span-2">
+      <section class="card card-resumen modulo-resumen-card">
         <h2>Resumen Caja</h2>
         <div class="resumen-grid">
           <div class="resumen-item">
@@ -105,6 +105,44 @@
             <span class="resumen-label">TOTAL CAJA FÍSICA</span>
             <span id="resumen-total" class="resumen-valor">$ 0</span>
           </div>
+        </div>
+      </section>
+
+      <section id="recaudo-panel" class="card modulo-secundario-card oculto">
+        <div class="cuadre-seccion-header">
+          <h2>Billetes viejos y monedas</h2>
+          <span id="recaudo-pendiente" class="cuadre-total-badge"></span>
+        </div>
+        <p class="modulo-ayuda">Dinero guardado de billetes y monedas no entregados a la fecha.</p>
+        <div class="resumen-grid resumen-grid-simple">
+          <div class="resumen-item">
+            <span class="resumen-label">Desde</span>
+            <span id="recaudo-desde" class="resumen-valor">-</span>
+          </div>
+          <div class="resumen-item">
+            <span class="resumen-label">Hoy</span>
+            <span id="recaudo-hoy" class="resumen-valor">$ 0</span>
+          </div>
+          <div class="resumen-item">
+            <span class="resumen-label">Acumulado</span>
+            <span id="recaudo-acumulado" class="resumen-valor">$ 0</span>
+          </div>
+          <div class="resumen-item">
+            <span class="resumen-label">Entregado</span>
+            <span id="recaudo-entregado" class="resumen-valor">$ 0</span>
+          </div>
+          <div class="resumen-item resumen-total">
+            <span class="resumen-label">PENDIENTE</span>
+            <span id="recaudo-pendiente-total" class="resumen-valor">$ 0</span>
+          </div>
+        </div>
+        <div id="recaudo-ultima-entrega" class="recaudo-ultima-entrega oculto">
+          <span class="recaudo-entrega-check">✓</span>
+          <span id="recaudo-ultima-entrega-texto">Último cierre: $ 0</span>
+        </div>
+        <div id="recaudo-acciones-admin" class="recaudo-acciones oculto">
+          <button type="button" id="btn-recaudo-registrar-entrega" class="btn btn-secondary">Registrar entrega</button>
+          <button type="button" id="btn-recaudo-cerrar-ciclo" class="btn btn-secondary">Cerrar ciclo</button>
         </div>
       </section>
     </section>
@@ -764,6 +802,13 @@
               <p class="modal-desc" style="margin-top:8px">ID corto (ej. <strong>M01</strong>), nombre visible y denominación en pesos.</p>
             </div>
           </details>
+        </section>
+        <section class="admin-section admin-section-super-admin" id="admin-section-operativa">
+          <h4 class="admin-section-title admin-section-title-super">Configuración operativa</h4>
+          <div class="campo-config">
+            <label><input type="checkbox" id="admin-excluir-monedas-viejos-base" /> Excluir monedas y billetes viejos de la base del siguiente período</label>
+            <p class="modal-desc">Úsalo en locales donde esos valores se apartan y no deben entrar a la caja operativa del día siguiente.</p>
+          </div>
         </section>
         <section class="admin-section admin-section-super-admin" id="admin-section-plataformas-ref">
           <h4 class="admin-section-title admin-section-title-super">Referencias Plataformas</h4>

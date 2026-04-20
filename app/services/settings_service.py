@@ -6,6 +6,11 @@ from pathlib import Path
 
 from app.config import BASE_DIR
 from app.services.local_data_service import get_local_data_path
+from app.services.operativa_config_service import (
+    CONFIG_OPERATIVA_FILENAME,
+    get_operativa_config,
+    save_operativa_config,
+)
 
 SETTINGS_PATH = get_local_data_path("settings.json")
 
@@ -34,7 +39,7 @@ _DEFAULTS = {
 }
 
 _settings_cache: dict | None = None
-_settings_cache_mtime: float | None = None
+_settings_cache_mtime: tuple[float | None, float | None] | None = None
 
 
 def _normalizar_data_dir(value: str | None) -> str:
@@ -52,6 +57,27 @@ def _normalizar_path_absoluto(value: str | None) -> str:
     if not raw:
         return ""
     return str(Path(raw).expanduser().resolve())
+
+
+def _resolver_data_dir_activo(settings_data: dict | None) -> str:
+    if not isinstance(settings_data, dict):
+        return str(BASE_DIR)
+
+    if settings_data.get("super_admin_mode"):
+        active_id = str(settings_data.get("active_site_id") or "").strip()
+        for site in _normalizar_remote_sites(settings_data.get("remote_sites", [])):
+            if site["id"] == active_id:
+                return _normalizar_data_dir(site.get("data_dir"))
+
+    return _normalizar_data_dir(settings_data.get("data_dir"))
+
+
+def _get_operativa_mtime(settings_data: dict | None) -> float | None:
+    path = Path(_resolver_data_dir_activo(settings_data)) / CONFIG_OPERATIVA_FILENAME
+    try:
+        return path.stat().st_mtime if path.exists() else None
+    except Exception:
+        return None
 
 
 def _slug(text: str) -> str:
@@ -128,6 +154,7 @@ def _resolver_settings() -> dict:
     data["backup_enabled"] = bool(data.get("backup_enabled", False))
     data["backup_root"] = _normalizar_data_dir(data.get("backup_root")) if data.get("backup_root") else ""
     # El build dedicado siempre opera en super admin, independiente de lo que diga settings.json
+    data["excluir_monedas_viejos_base"] = bool(get_operativa_config().get("excluir_monedas_viejos_base"))
     if is_super_admin_build():
         data["super_admin_mode"] = True
         # Todos los módulos disponibles para poder completar cualquier sede
@@ -146,12 +173,14 @@ def get_settings() -> dict:
 
     try:
         current_mtime = SETTINGS_PATH.stat().st_mtime if SETTINGS_PATH.exists() else None
-        if _settings_cache is not None and current_mtime == _settings_cache_mtime:
+        current_operativa_mtime = _get_operativa_mtime(_settings_cache)
+        current_signature = (current_mtime, current_operativa_mtime)
+        if _settings_cache is not None and current_signature == _settings_cache_mtime:
             return _settings_cache.copy()
 
         data = _resolver_settings()
         _settings_cache = data
-        _settings_cache_mtime = current_mtime
+        _settings_cache_mtime = (current_mtime, _get_operativa_mtime(data))
         return data.copy()
     except Exception:
         return _DEFAULTS.copy()
@@ -189,9 +218,6 @@ def save_settings(data: dict) -> None:
         cleaned["backup_enabled"] = bool(cleaned["backup_enabled"])
     if "backup_root" in cleaned:
         cleaned["backup_root"] = _normalizar_data_dir(cleaned["backup_root"]) if cleaned.get("backup_root") else ""
-    enabled_modules = _normalizar_modulos(cleaned.get("enabled_modules"))
-    cleaned["enabled_modules"] = enabled_modules
-    cleaned["default_module"] = _normalizar_modulo_default(cleaned.get("default_module"), enabled_modules)
     # Mergear con el archivo existente para no borrar claves no incluidas en esta llamada
     existing: dict = {}
     if SETTINGS_PATH.exists():
@@ -200,9 +226,24 @@ def save_settings(data: dict) -> None:
                 existing = json.load(f)
         except Exception:
             pass
-    existing.update(cleaned)
+
+    merged = {**existing, **cleaned}
+
+    if "enabled_modules" in cleaned:
+        merged["enabled_modules"] = _normalizar_modulos(cleaned["enabled_modules"])
+    elif "enabled_modules" in merged:
+        merged["enabled_modules"] = _normalizar_modulos(merged.get("enabled_modules"))
+
+    if "enabled_modules" in merged:
+        merged["default_module"] = _normalizar_modulo_default(
+            cleaned.get("default_module", merged.get("default_module")),
+            merged["enabled_modules"],
+        )
+
     with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
-        json.dump(existing, f, indent=2, ensure_ascii=False)
+        json.dump(merged, f, indent=2, ensure_ascii=False)
+    if "excluir_monedas_viejos_base" in data:
+        save_operativa_config({"excluir_monedas_viejos_base": bool(data["excluir_monedas_viejos_base"])})
     _invalidar_cache()
 
 
