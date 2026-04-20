@@ -1,4 +1,4 @@
-# Especificación Funcional — CajaJDW
+# Especificacion Funcional — CajaJDW
 
 Documento de referencia funcional del comportamiento actual del sistema.
 
@@ -7,104 +7,91 @@ Documento de referencia funcional del comportamiento actual del sistema.
 Al ejecutar el `.exe` o el launcher Python:
 
 1. se muestra splash de inicio
-2. el launcher garantiza instancia única
-3. si la app ya está arrancando, los clics extra no deben abrir pestañas duplicadas
+2. el launcher garantiza instancia unica
+3. si la app ya esta arrancando, los clics extra no deben abrir pestanas duplicadas
 4. cuando el servidor local responde, se abre el navegador
 
-Además:
+Ademas:
 
-- el navegador envía heartbeat periódico
+- el navegador envia heartbeat periodico
 - si el proceso no recibe heartbeat durante el tiempo de gracia, se apaga solo
 
-## 2. Configuración base
+## 2. Configuracion base
 
-Desde Administración se define:
+Desde Administracion se define:
 
 - sede
 - carpeta de datos
-- módulos habilitados
-- módulo por defecto
+- modulos habilitados
+- modulo por defecto
 - estado inicial del sistema
 
 El estado inicial (`startup_state.json`) permite definir:
 
 - fecha de inicio
 - caja inicial
-- referencias iniciales por ítem de `Contadores`
+- referencias iniciales por item de `Contadores`
 
 ## 3. Reglas transversales
 
 ### Fecha de trabajo
 
-En general la sesión usa una fecha compartida entre módulos.
+En general la sesion usa una fecha compartida entre modulos.
 
-Excepción:
+Excepcion:
 
-- en `respaldo-version-especial`, durante la primera interacción:
+- en `respaldo-version-especial`, durante la primera interaccion:
   - `Caja`
   - `Plataformas`
   - `Contadores`
   - `Resumen`
   pueden abrir en `ayer()`
-- al pasar a módulos fuera de ese grupo, la sesión vuelve a `hoy()`
 
 ### Borradores
 
-Los borradores de sesión más sensibles hoy son:
+Los borradores de sesion mas sensibles hoy son:
 
 - `Caja`
 - `Contadores`
 
-### Autorización
+### Naturaleza de las contrasenas
 
-Hay dos niveles distintos:
+Las contrasenas visibles en el frontend deben entenderse como:
 
-1. autorización general por fecha o corrección
-2. microflujos internos dentro de `Contadores`
-
-En `Contadores`, los paneles de:
-
-- referencia crítica
-- pausa / reactivación
-
-se confirman con `OK`, sin contraseña dentro del propio panel.
-
-### Naturaleza de las contraseñas
-
-Las contraseñas visibles en el frontend deben entenderse como:
-
-- restricción operativa básica
+- restriccion operativa basica
 - aviso de que se intenta editar en una fecha no prevista
 
-No son autenticación fuerte ni un modelo de seguridad robusto de backend.
+No son autenticacion fuerte.
 
-## 4. Módulos
+## 4. Modulos
 
 ### Caja
 
-Propósito:
+Proposito:
 
-- registrar caja física del día
+- registrar caja fisica del dia
 
-Entradas principales:
+Campos principales:
 
-- billetes por denominación
-- total monedas
-- billetes viejos
+| Campo | Descripcion |
+|---|---|
+| Billetes | Cantidad por denominacion: 100.000, 50.000, 20.000, 10.000, 5.000, 2.000 |
+| Total monedas | Valor total de monedas sin desglose |
+| Billetes viejos | Valor total de billetes fuera de circulacion o deteriorados |
 
-Cálculo:
+Calculo:
 
 - `total_caja_fisica = billetes + monedas + billetes viejos`
 
 Persistencia:
 
-- hoja `Caja` de `Contadores_{sede}_{año}.xlsx`
+- hoja `Caja` de `Contadores_{sede}_{ano}.xlsx`
 
 ### Plataformas
 
-Propósito:
+Proposito:
 
-- registrar ventas de plataformas del día
+- registrar ventas de plataformas del dia
 
 Campos:
 
@@ -113,82 +100,109 @@ Campos:
 
 Persistencia:
 
-- hoja `Plataformas` de `Contadores_{sede}_{año}.xlsx`
-
-#### Referencias externas (solo super admin)
-
-En `main`, si hay sede activa configurada, el módulo puede leer referencias de archivos externos de solo lectura:
-
-- `Ventas_dia_Practisistemas.xlsx`
-- `Ventas_dia_Bet.xlsm`
-
-Esos valores se usan como referencia visual y de contraste, no como fuente de guardado propia.
+- hoja `Plataformas`
 
 ### Gastos
 
-Propósito:
+Proposito:
 
 - registrar egresos por concepto
 
+Reglas:
+
+- se pueden registrar multiples gastos el mismo dia
+- cada gasto agrega una fila nueva
+- los conceptos nuevos se agregan al catalogo local para autocompletado
+
 Persistencia:
 
-- hoja `Gastos` de `Contadores_{sede}_{año}.xlsx`
+- hoja `Gastos`
 
 ### Bonos
 
-Propósito:
+Proposito:
 
 - registrar bonos por cliente
 
+Reglas:
+
+- se pueden registrar multiples bonos del mismo cliente el mismo dia
+- se muestra acumulado diario por cliente
+- el cliente se agrega al catalogo local `data/bonos_clientes.json`
+- el nombre se normaliza como NomPropio
+
+### Autocompletado de clientes y personas
+
+El campo usa tres niveles en orden:
+
+1. coincidencia exacta
+2. coincidencia por prefijo
+3. coincidencia fuzzy si el texto tiene al menos 4 caracteres
+
+Esto aplica a:
+
+- Bonos
+- Gastos
+- Prestamos
+- Movimientos
+
+En Bonos y Prestamos los nombres se normalizan como NomPropios.
+
+### Prestamos
+
+Proposito:
+
+- registrar prestamos y pagos por persona
+
+Reglas:
+
+- el saldo pendiente se calcula desde el historico
+- un pago no puede superar el saldo pendiente
+- las personas se agregan al catalogo local y se normalizan como NomPropios
+
 Persistencia:
 
-- hoja `Bonos` de `Contadores_{sede}_{año}.xlsx`
-
-### Préstamos
-
-Propósito:
-
-- registrar préstamos y pagos por persona
-
-El saldo pendiente se calcula desde el histórico.
-
-Persistencia:
-
-- hoja `Prestamos` de `Contadores_{sede}_{año}.xlsx`
+- hoja `Prestamos`
 
 ### Movimientos
 
-Propósito:
+Proposito:
 
 - registrar ingresos y salidas extraordinarias
 
+Reglas:
+
+- multiples movimientos por dia
+- conceptos nuevos se agregan al catalogo local
+- el resumen muestra total ingresos, total salidas y neto
+
 Persistencia:
 
-- hoja `Movimientos` de `Contadores_{sede}_{año}.xlsx`
+- hoja `Movimientos`
 
 ### Contadores
 
-Es el módulo más sensible del sistema.
+Es el modulo mas sensible del sistema.
 
-#### Catálogo
+#### Catalogo
 
-Cada ítem tiene:
+Cada item tiene:
 
 - `item_id`
 - `nombre`
 - `denominacion`
 
-La pausa ya no vive como booleano persistente del catálogo. La fuente de verdad temporal es:
+La pausa temporal por fecha vive en:
 
 - `contadores_pausas.json`
 
 #### Referencia
 
-La referencia vigente de cada ítem puede venir de:
+La referencia vigente de cada item puede venir de:
 
-- último registro guardado
+- ultimo registro guardado
 - estado inicial
-- referencia crítica autorizada
+- referencia critica autorizada
 
 #### Yield y resultado
 
@@ -198,17 +212,15 @@ Regla base:
 - `yield_ref = ref_entradas - ref_salidas - ref_jackpot`
 - `resultado = (yield_actual - yield_ref) * denominacion`
 
-#### Referencia crítica
+#### Referencia critica
 
 Se usa cuando hubo reset o incoherencia real de contadores.
 
 Flujo:
 
-1. se abre el panel del ítem
-2. se ingresan los valores de referencia crítica
+1. se abre el panel del item
+2. se ingresan los valores de referencia critica
 3. se confirma con `OK`
-
-No requiere contraseña dentro del panel.
 
 #### Pausa
 
@@ -216,52 +228,45 @@ La pausa actual es por fecha.
 
 Reglas:
 
-- solo afecta al ítem pausado
-- no modifica otros ítems
+- solo afecta al item pausado
+- no modifica otros items
 - la fila sigue visible
 - `Entradas` y `Salidas` pueden apoyarse en la referencia vigente
-- `Jackpot` sigue su propia lógica
+- `Jackpot` sigue su propia logica
 
-#### Navegación de teclado
-
-`Contadores` ya no se comporta como un formulario lineal simple.
+#### Navegacion de teclado
 
 Reglas actuales:
 
-- `Tab` y `Enter` recorren solo:
-  - `Entradas`
-  - `Salidas`
+- `Tab` y `Enter` recorren solo `Entradas` y `Salidas`
 - `Jackpot` queda fuera del flujo operativo diario
-- `Jackpot` sigue siendo editable por clic directo
-- las flechas permiten navegación tipo grilla
+- las flechas permiten navegacion tipo grilla
 - `Escape` restaura el valor original del campo enfocado
 
 ### Resumen
 
-`Resumen` existe como módulo formal en:
+`Resumen` existe como modulo formal en:
 
 - `version-usuario`
 - `respaldo-version-especial`
 
-Propósito:
+Proposito:
 
-- agrupar por período la información de módulos
+- agrupar por periodo la informacion de modulos
 - exponer totales y detalle operativo
 
 No hace balance contable completo.
 
-En `main`, hoy no se usa como módulo operativo equivalente al de la rama usuario.
-
 ### Cuadre
 
-Propósito:
+Proposito:
 
-- cerrar el período comparando caja teórica contra caja física
+- cerrar el periodo comparando caja teorica contra caja fisica
 
 Elementos clave:
 
 - `base_anterior`
-- totales por módulo del período
+- totales por modulo del periodo
 - `caja_teorica`
 - `caja_fisica`
 - `diferencia`
@@ -269,49 +274,61 @@ Elementos clave:
 
 Persistencia:
 
-- hoja `Cuadre` de `Consolidado_{sede}_{año}.xlsx`
+- hoja `Cuadre` de `Consolidado_{sede}_{ano}.xlsx`
 
-## 5. Resincronización de Cuadre
+## 5. Resincronizacion de Cuadre
 
-Cuando se corrige información que afecta un período ya cuadrado:
+Cuando se corrige informacion que afecta un periodo ya cuadrado:
 
-- se resincroniza el `Cuadre` cuyo período contiene esa fecha
+- se resincroniza el `Cuadre` cuyo periodo contiene esa fecha
 
-Además, si la corrección es en `Caja` y cambia la `base_nueva` del cuadre recalculado:
+Si la correccion es en `Caja` y cambia la `base_nueva`:
 
-- también se resincroniza el siguiente `Cuadre`
+- tambien se resincroniza el siguiente `Cuadre`
 
-Esto existe porque:
+## 6. Recaudo de billetes viejos y monedas
 
-- la `base_nueva` de un cierre
-- es la `base_anterior` del siguiente
+Disponible solo cuando la sede tiene:
 
-## 6. Archivos de datos
+- `excluir_monedas_viejos_base: true`
+
+en `config_operativa.json`.
+
+Reglas:
+
+- `Caja fisica` sigue contando monedas y billetes viejos
+- `base_nueva` excluye esos valores cuando la sede lo define
+- el panel muestra el ciclo vigente y el ultimo cierre
+
+### Estado persistido
+
+- `recaudo_ciclos.json`
+
+vive en la misma carpeta que los Excel de la sede.
+
+### En `version-usuario`
+
+- el panel es informativo
+
+### En `main`
+
+- super admin puede registrar entregas
+- super admin puede cerrar ciclos
+
+## 7. Archivos de datos
 
 ### Libros Excel
 
-- `Contadores_{sede}_{año}.xlsx`
-- `Consolidado_{sede}_{año}.xlsx`
-
-Distribución actual:
-
-- `Contadores_{sede}_{año}.xlsx`
-  - Caja
-  - Plataformas
-  - Gastos
-  - Bonos
-  - Préstamos
-  - Movimientos
-
-- `Consolidado_{sede}_{año}.xlsx`
-  - Contadores
-  - Cuadre
+- `Contadores_{sede}_{ano}.xlsx`
+- `Consolidado_{sede}_{ano}.xlsx`
 
 ### Auxiliares por sede
 
 - `contadores_items.json`
 - `contadores_pausas.json`
 - `startup_state.json`
+- `config_operativa.json`
+- `recaudo_ciclos.json`
 
 ### Locales del equipo
 
@@ -321,42 +338,13 @@ Distribución actual:
 - `data/prestamos_personas.json`
 - `data/movimientos_conceptos.json`
 
-## 7. Arranque, splash y build
-
-Archivos clave:
-
-- `launcher_boot.py`
-- `launcher.py`
-- `launcher_super_admin.py`
-
-Comportamiento del launcher:
-
-- instancia única
-- splash de inicio
-- espera del servidor antes de abrir navegador
-- reducción de clics duplicados
-
-### `.spec` por rama
-
-La rama `main` usa:
-
-- `CajaSuperAdmin.spec`
-
-Las ramas operativas usan:
-
-- `CajaJDW.spec`
-
-Cada rama debe transportar el `.spec` correspondiente a su ejecutable.
-
 ## 8. Riesgo operativo con Excel
 
-La aplicación ya tiene mitigaciones de locking y validación, pero el riesgo estructural sigue siendo:
+La aplicacion ya tiene mitigaciones de locking y validacion, pero el riesgo estructural sigue siendo:
 
 - Excel compartido no es una base de datos
 - no hay concurrencia fuerte distribuida
 - Dropbox / OneDrive no sustituyen una capa transaccional
-
-Esto no invalida la app; solo define su límite operativo real.
 
 ## 9. Diferencias entre ramas
 
@@ -366,16 +354,45 @@ Esto no invalida la app; solo define su límite operativo real.
 - multisede
 - respaldos
 - referencias externas de plataformas
+- administracion de recaudo por sede
 - `CajaSuperAdmin.spec`
 
 ### `version-usuario`
 
-- operación diaria
+- operacion diaria
 - `Resumen`
+- panel de recaudo informativo
 - `CajaJDW.spec`
 
 ### `respaldo-version-especial`
 
 - base de usuario
-- arranque inicial en `ayer()` para módulos de cierre
+- arranque inicial en `ayer()` para modulos de cierre
 - `CajaJDW.spec`
+
+## 10. API REST de referencia
+
+### Configuracion y ciclo de vida
+
+- `GET /api/settings`
+- `POST /api/settings`
+- `GET /api/settings/startup`
+- `POST /api/settings/startup`
+- `POST /api/settings/browse-directory`
+- `POST /api/app/heartbeat`
+- `POST /api/app/shutdown`
+
+### Modulos operativos
+
+- `POST /api/modulos/caja/guardar`
+- `POST /api/modulos/plataformas/guardar`
+- `POST /api/modulos/contadores/guardar`
+- `POST /api/modulos/cuadre/guardar`
+- `GET /api/modulos/cuadre/calcular/{fecha}`
+- endpoints de consulta por fecha y ultimo registro
+
+### Recaudo
+
+- `GET /api/recaudo`
+- `POST /api/recaudo/registrar-entrega`
+- `POST /api/recaudo/cerrar-ciclo`

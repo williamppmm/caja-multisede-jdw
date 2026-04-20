@@ -1,16 +1,16 @@
-# Análisis Técnico — CajaJDW
+# Analisis Tecnico — CajaJDW
 
 ## Resumen
 
-CajaJDW ya funciona como una capa operativa por encima de Excel.
+CajaJDW funciona como una capa operativa por encima de Excel.
 
 Su valor actual es:
 
-- reduce edición manual directa sobre hojas
+- reduce edicion manual directa sobre hojas
 - centraliza validaciones
 - controla cierres
-- mejora la corrección de datos
-- mantiene Excel como respaldo operativo y salida analítica
+- mejora la correccion de datos
+- mantiene Excel como respaldo operativo y salida analitica
 
 ## Arquitectura
 
@@ -19,55 +19,31 @@ Capas principales:
 1. launcher Python / `.exe`
 2. FastAPI
 3. frontend web local
-4. servicios por módulo
+4. servicios por modulo
 5. persistencia Excel y JSON auxiliares
 
 ## Arranque y launcher
 
-El arranque ya no es el del prototipo original.
-
 Hoy incluye:
 
-- instancia única
+- instancia unica
 - splash de inicio
 - espera del servidor antes de abrir navegador
-- reducción de pestañas duplicadas al hacer varios clics
+- reduccion de pestanas duplicadas al hacer varios clics
 
 Archivos principales:
 
-- [launcher_boot.py](../launcher_boot.py)
-- [launcher.py](../launcher.py)
-- [launcher_super_admin.py](../launcher_super_admin.py)
+- [launcher_boot.py](C:\Users\User\Desktop\Caja\launcher_boot.py)
+- [launcher.py](C:\Users\User\Desktop\Caja\launcher.py)
+- [launcher_super_admin.py](C:\Users\User\Desktop\Caja\launcher_super_admin.py)
 
-### Rol de `launcher_boot.py`
-
-`launcher_boot.py` concentra la lógica compartida de:
-
-- mutex por instancia
-- selección y reserva de puerto
-- splash
-- poll del servidor
-- apertura de navegador
-- apagado controlado
-
-Eso hace que el launcher ya no sea un script menor, sino una parte real de la experiencia de producto.
+`launcher_boot.py` concentra la logica compartida de mutex, seleccion de puerto, splash, poll del servidor, apertura de navegador y apagado controlado.
 
 ## `.spec` y empaquetado
 
-El `.spec` no es accesorio en este proyecto.
-
-Define:
-
-- qué launcher entra al build
-- qué recursos se empaquetan
-- cómo se configura splash
-- si el ejecutable es windowed
-
-### Convención actual
-
 En `main`:
 
-- [CajaSuperAdmin.spec](../CajaSuperAdmin.spec)
+- [CajaSuperAdmin.spec](C:\Users\User\Desktop\Caja\CajaSuperAdmin.spec)
 
 En ramas operativas:
 
@@ -75,200 +51,278 @@ En ramas operativas:
 
 La regla actual es:
 
-- **un `.spec` oficial por rama**
-- **un `.exe` final por rama**
-
-Esto permite que otro equipo clone la rama correcta y tenga ya el `.spec` esperado para construir sin recrearlo manualmente.
+- un `.spec` oficial por rama
+- un `.exe` final por rama
 
 ## Persistencia
 
-La decisión técnica fuerte del sistema sigue siendo:
+La decision tecnica fuerte del sistema sigue siendo:
 
 - Excel es la fuente de verdad operativa
 
-Ventajas:
+La persistencia principal esta en:
 
-- adopción rápida
-- continuidad con el proceso real del negocio
-- facilidad de revisión manual
-- compatibilidad con Power Query
+- [excel_service.py](C:\Users\User\Desktop\Caja\app\services\excel_service.py)
 
-Límites:
+Este servicio:
 
-- no hay transacciones reales
-- no hay concurrencia distribuida fuerte
-- Dropbox / OneDrive no sustituyen una base de datos
+- abre o crea workbooks
+- genera hojas por modulo y sede
+- escribe encabezados y formatos
+- consulta registros por fecha
+- reemplaza registros de una fecha cuando se corrige
+- administra un lock local `.lock`
+- mantiene compatibilidad con algunos formatos legacy
 
-## Distribución de datos
+## Diseno de los libros
 
-Por sede y año existen dos libros:
+Dos libros por sede y ano:
 
-- `Contadores_{sede}_{año}.xlsx`
-- `Consolidado_{sede}_{año}.xlsx`
+- `Contadores_{sede}_{ano}.xlsx`
+- `Consolidado_{sede}_{ano}.xlsx`
 
-Distribución actual:
+Distribucion actual:
 
-- `Contadores_{sede}_{año}.xlsx`
+- `Contadores_{sede}_{ano}.xlsx`
   - Caja
   - Plataformas
   - Gastos
   - Bonos
-  - Préstamos
+  - Prestamos
   - Movimientos
-
-- `Consolidado_{sede}_{año}.xlsx`
+- `Consolidado_{sede}_{ano}.xlsx`
   - Contadores
   - Cuadre
 
-Archivos auxiliares:
+JSON auxiliares por sede:
 
 - `contadores_items.json`
 - `contadores_pausas.json`
 - `startup_state.json`
+- `config_operativa.json`
+- `recaudo_ciclos.json`
 
-## Servicios críticos
+JSON locales del equipo:
 
-### `excel_service.py`
+- `data/settings.json`
+- catalogos de nombres, conceptos y personas
 
-Es el corazón técnico de la persistencia.
+## Limitaciones del modelo Excel
+
+1. No hay transacciones reales.
+2. No hay control distribuido entre varios equipos.
+3. El lock local no resuelve conflictos entre clientes distintos.
+4. Dropbox puede producir conflictos de sincronizacion si dos usuarios de la misma sede escriben casi a la vez.
+
+## Modelos de datos
+
+Modelos principales:
+
+- [caja_models.py](C:\Users\User\Desktop\Caja\app\models\caja_models.py)
+- [contadores_models.py](C:\Users\User\Desktop\Caja\app\models\contadores_models.py)
+- [cuadre_models.py](C:\Users\User\Desktop\Caja\app\models\cuadre_models.py)
+
+La validacion con Pydantic cubre tipos, no negativos, obligatoriedad y estructura minima del payload.
+
+## Routers
+
+### Router principal
+
+- [modules.py](C:\Users\User\Desktop\Caja\app\routers\modules.py)
+
+Agrupa endpoints para guardar registros, consultar estado por fecha, consultar datos guardados, administrar catalogos y ejecutar operaciones especiales.
+
+### Router de settings
+
+- [settings.py](C:\Users\User\Desktop\Caja\app\routers\settings.py)
 
 Responsabilidades:
 
-- lectura por módulo
-- escritura por módulo
-- reemplazo por fecha o registro
-- búsqueda de períodos
-- lectura de `Cuadre`
-- resolución de archivos por sede y año
+- leer settings
+- guardar settings
+- abrir selector de carpeta
+- apagar la app
+- recibir heartbeat del navegador
 
-Es el punto más delicado del sistema por densidad funcional y por dependencia del backend Excel.
+### Router de recaudo
 
-### `contadores_service.py`
+- [recaudo.py](C:\Users\User\Desktop\Caja\app\routers\recaudo.py)
 
-Es el módulo con mayor complejidad de negocio.
+Responsabilidades:
 
-Hoy resuelve:
+- exponer el resumen del ciclo activo
+- registrar entregas parciales
+- cerrar ciclos
 
-- referencias vigentes
-- referencia crítica
-- pausa por fecha
-- guardado controlado
-- soporte a filas congeladas
+## Servicios por modulo
 
-La mejora técnica más importante fue abandonar la pausa global del catálogo y pasar a una pausa temporal por fecha.
+### Caja y modulos simples
 
-### `cuadre_service.py`
+- [caja_service.py](C:\Users\User\Desktop\Caja\app\services\caja_service.py)
 
-Ya no solo calcula cierres; también coordina resincronización.
+Contiene la logica para construir filas, guardar Caja, guardar Plataformas y preparar modulos simples por items.
 
-Puntos clave:
+### Bonos
 
-- recalcula el `Cuadre` afectado por una corrección
-- si una corrección en `Caja` cambia `base_nueva`, arrastra el siguiente cierre
+- [bonos_service.py](C:\Users\User\Desktop\Caja\app\services\bonos_service.py)
 
-Eso corrige un problema contable real que antes quedaba desalineado.
+Maneja registro, consulta, edicion y eliminacion del ultimo bono de la fecha.
 
-### `resumen_service.py`
+### Prestamos
 
-Existe en las ramas operativas y encapsula la consolidación de período para `Resumen`.
+- [prestamos_service.py](C:\Users\User\Desktop\Caja\app\services\prestamos_service.py)
 
-Técnicamente:
+Registra prestamos y pagos, y valida que un pago no supere el saldo pendiente.
 
-- no hace balance físico vs teórico
-- no encadena cierres
-- sirve como lectura operativa agregada del período
+### Movimientos
 
-## Diferencia técnica entre Resumen y Cuadre
+- [movimientos_service.py](C:\Users\User\Desktop\Caja\app\services\movimientos_service.py)
 
-`Resumen`:
+Registra ingresos y salidas extraordinarias y resume netos del dia.
 
-- consolida por período
-- sirve para lectura operativa
-- no hace balance físico vs teórico
-- no define bases para el siguiente cierre
+### Catalogos y autocompletado
 
-`Cuadre`:
+- [nombres_service.py](C:\Users\User\Desktop\Caja\app\services\nombres_service.py)
 
-- sí hace cierre contable
-- depende de `base_anterior`
-- define `base_nueva`
-- puede encadenarse con el siguiente cierre
+Responsabilidades:
 
-## Seguridad real vs restricción operativa
+- mantener catalogos JSON locales
+- agregar entradas nuevas sin duplicar
+- normalizar clientes y personas como NomPropios
+- exponer catalogos por tipo
 
-El proyecto no implementa autenticación robusta como objetivo principal.
+El frontend aplica autocompletado en tres niveles:
 
-Las contraseñas del frontend hoy cumplen una función distinta:
+1. coincidencia exacta
+2. prefijo
+3. fuzzy por distancia de edicion
 
-- restricción operativa
-- reducción de edición accidental
-- aviso de fecha incorrecta
+### Contadores
 
-Eso es útil para operación, pero no debe interpretarse como seguridad fuerte de backend.
+- [contadores_service.py](C:\Users\User\Desktop\Caja\app\services\contadores_service.py)
 
-## Riesgo operativo real: Excel y locking
+Es el modulo de mayor complejidad.
 
-La app ya tiene mejoras de locking y coordinación local, pero el riesgo estructural importante sigue siendo Excel compartido.
+Responsabilidades:
 
-Escenarios delicados:
+- administrar catalogo de items
+- pausar o reactivar items por fecha
+- reconstruir referencias vigentes desde historial
+- calcular yield actual
+- detectar alertas
+- exigir referencia critica si hay decrementos frente a referencia
 
-- dos equipos escribiendo el mismo libro de la misma sede
-- Excel abierto manualmente durante un guardado
-- sincronización lenta o conflictiva de Dropbox / OneDrive
+### Cuadre
 
-Conclusión técnica:
+- [cuadre_service.py](C:\Users\User\Desktop\Caja\app\services\cuadre_service.py)
 
-- el locking actual mitiga
-- no elimina por completo el riesgo operativo
+Responsabilidades:
 
-Ese riesgo sí merece estar documentado porque afecta comportamiento real del sistema en producción.
+- encontrar ultimo cuadre previo
+- calcular el periodo contable
+- sumar y restar modulos implicados
+- comparar caja teorica vs caja fisica
+- guardar el resultado final del cierre
 
-## Fortalezas actuales
+Punto tecnico importante:
 
-- muy alineado con la operación real
-- sin dependencia de infraestructura compleja
-- instalación y despliegue simples
-- build distribuible por rama
-- launcher más maduro
-- mejor captura y corrección en módulos críticos
+- si una correccion en `Caja` cambia `base_nueva`, se resincroniza el siguiente cierre afectado
 
-## Riesgos actuales
+### Recaudo
 
-- Excel compartido sigue siendo frágil bajo concurrencia real
-- `web/app.js` sigue concentrando mucha lógica de UI y reglas de flujo
-- `excel_service.py` sigue concentrando mucha responsabilidad de persistencia
+- [recaudo_service.py](C:\Users\User\Desktop\Caja\app\services\recaudo_service.py)
+
+Responsabilidades:
+
+- acumular el total de monedas y billetes viejos de Caja por ciclo
+- registrar entregas parciales
+- cerrar ciclos y llevar historial
+- exponer el ciclo actual y el ultimo cierre
+
+Estado persistido:
+
+- `recaudo_ciclos.json` en la carpeta de la sede
+
+### Configuracion operativa
+
+- [operativa_config_service.py](C:\Users\User\Desktop\Caja\app\services\operativa_config_service.py)
+
+Responsabilidades:
+
+- leer y guardar `config_operativa.json`
+- exponer reglas compartidas por sede
+- hoy gestiona `excluir_monedas_viejos_base`
+
+## Frontend
+
+Archivos principales:
+
+- [index.html](C:\Users\User\Desktop\Caja\web\index.html)
+- [app.js](C:\Users\User\Desktop\Caja\web\app.js)
+
+El frontend es una SPA simple sin framework.
+
+`app.js` concentra:
+
+- render de modulos
+- validaciones
+- control de pestanas
+- manejo de fecha
+- autorizacion admin
+- consumo de API
+- borradores temporales de Caja y Contadores
+- render de Cuadre
+- administracion de catalogos
+- autocompletado
+- panel de recaudo
+
+## Recaudo y configuracion compartida
+
+La regla `excluir_monedas_viejos_base` no vive en `settings.json`.
+
+Debe vivir en:
+
+- `config_operativa.json`
+
+Motivo:
+
+- `settings.json` es local al equipo
+- `config_operativa.json` si es visible para usuario y super admin
+
+Cuando la regla esta activa:
+
+- `Caja fisica` sigue contando monedas y viejos
+- `base_nueva` puede excluirlos
+- el panel de recaudo usa `recaudo_ciclos.json`
+
+## Seguridad real vs restriccion operativa
+
+Las contrasenas del frontend cumplen hoy una funcion operativa:
+
+- restringir correcciones
+- reducir edicion accidental
+- avisar que se esta entrando a un flujo sensible
+
+No son autenticacion fuerte.
+
+## Riesgos principales
+
+- Excel compartido sigue siendo fragil bajo concurrencia real
+- `web/app.js` concentra mucha logica de UI y flujo
+- `excel_service.py` concentra mucha responsabilidad de persistencia
 - la seguridad es operativa, no robusta
 
-## Evolución futura
+## Evolucion futura
 
-La siguiente decisión grande no será de frontend ni de launcher, sino de persistencia.
+Cuando la operacion crezca, lo natural sera:
 
-Cuando la operación crezca, lo natural será:
+- mover la operacion principal a base de datos
+- dejar Excel como respaldo, exportacion o salida analitica
 
-- mover la operación principal a base de datos
-- dejar Excel como:
-  - respaldo
-  - exportación
-  - insumo analítico
+## Conclusion
 
-Eso tendrá sentido especialmente si:
+Hoy CajaJDW ya es una aplicacion operativa real, no solo un frontend para Excel.
 
-- aumenta la concurrencia
-- se necesita mejor trazabilidad
-- Excel compartido deja de ser suficiente
+Su siguiente limite natural no es funcional sino estructural:
 
-## Conclusión
-
-Hoy CajaJDW ya es una aplicación operativa real, no solo un “frontend para Excel”.
-
-El sistema ganó:
-
-- control de captura
-- control de cierres
-- mejor arranque
-- corrección más segura
-- una arquitectura por ramas más clara
-
-Su siguiente límite natural no es funcional, sino estructural:
-
-- cuándo dejar de usar Excel como backend primario
+- cuando Excel deje de ser suficiente como backend principal

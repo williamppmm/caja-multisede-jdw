@@ -10,21 +10,22 @@ Este plan cubre:
 
 - arranque y ejecutable
 - persistencia en Excel
-- módulos operativos
+- modulos operativos
 - `Contadores`
 - `Cuadre`
+- recaudo
 - diferencias clave entre ramas
 
-## Preparación
+## Preparacion
 
 Antes de probar:
 
 1. usar una carpeta de prueba por sede
 2. evitar trabajar sobre datos reales
-3. comprobar que el libro no esté abierto en Excel
-4. usar catálogos simples y repetibles
+3. comprobar que el libro no este abierto en Excel
+4. usar catalogos simples y repetibles
 
-## Casos críticos
+## Casos criticos
 
 ## A. Arranque
 
@@ -39,28 +40,28 @@ Resultado esperado:
 - el servidor inicia
 - la app carga sin error
 
-### A-02 — Múltiples clics
+### A-02 — Multiples clics
 
 1. cerrar la app
 2. abrir el `.exe`
-3. hacer varios clics rápidos durante el arranque
+3. hacer varios clics rapidos durante el arranque
 
 Resultado esperado:
 
 - no se levantan varias instancias
-- no se duplican pestañas
+- no se duplican pestanas
 
-## B. Persistencia básica
+## B. Persistencia basica
 
-### B-01 — Creación de libros
+### B-01 — Creacion de libros
 
-1. guardar datos de módulos operativos
+1. guardar datos de modulos operativos
 2. guardar un `Cuadre`
 
 Resultado esperado:
 
-- existe `Contadores_<SEDE>_<AÑO>.xlsx`
-- existe `Consolidado_<SEDE>_<AÑO>.xlsx`
+- existe `Contadores_<SEDE>_<ANO>.xlsx`
+- existe `Consolidado_<SEDE>_<ANO>.xlsx`
 
 ### B-02 — Libro abierto
 
@@ -84,22 +85,72 @@ Resultado esperado:
 - total correcto
 - lectura correcta al recargar
 
-### C-02 — Corrección de Caja
+### C-02 — Correccion de Caja
 
 1. guardar una caja
 2. volver a esa fecha
-3. corregir con autorización
+3. corregir con autorizacion
 
 Resultado esperado:
 
 - la fecha se reemplaza
 - no quedan duplicados
 
-## D. Contadores
+## D. Bonos, Prestamos y Movimientos
+
+### BN-00 — Autocompletado fuzzy de cliente
+
+1. tener al menos un cliente en el catalogo, por ejemplo `Alfonso`
+2. escribir una variante con error tipografico de al menos 4 caracteres, por ejemplo `Alfonos`
+3. presionar `Tab` o `Enter`
+
+Resultado esperado:
+
+- el campo se completa con `Alfonso`
+- no se crea un registro nuevo con el nombre errado
+
+### BN-01 — Bono simple
+
+1. registrar un bono con cliente y valor
+
+Resultado esperado:
+
+- se agrega a la tabla del dia
+- el total diario se actualiza
+- el cliente entra al catalogo local normalizado como NomPropio
+
+### PR-01 — Prestamo inicial
+
+1. registrar un prestamo para una persona nueva
+
+Resultado esperado:
+
+- total prestado aumenta
+- saldo pendiente aumenta
+
+### PR-02 — Pago mayor al saldo
+
+1. intentar registrar un pago mayor al saldo pendiente
+
+Resultado esperado:
+
+- la app bloquea el guardado
+
+### MV-01 — Movimiento simple
+
+1. registrar un ingreso
+2. registrar una salida
+
+Resultado esperado:
+
+- ambas filas quedan registradas
+- el neto del dia coincide con el calculo manual
+
+## E. Contadores
 
 ### D-01 — Captura normal
 
-1. registrar contadores válidos
+1. registrar contadores validos
 2. guardar
 
 Resultado esperado:
@@ -107,10 +158,10 @@ Resultado esperado:
 - yield correcto
 - resultado correcto
 
-### D-02 — Referencia crítica
+### D-02 — Referencia critica
 
 1. provocar decremento frente a referencia
-2. abrir panel de referencia crítica
+2. abrir panel de referencia critica
 3. completar datos
 4. confirmar con `OK`
 5. guardar
@@ -120,39 +171,39 @@ Resultado esperado:
 - se permite el guardado
 - el registro queda consistente
 
-### D-03 — Pausar un solo ítem
+### D-03 — Pausar un solo item
 
-1. pausar un ítem
-2. ir al día siguiente
+1. pausar un item
+2. ir al dia siguiente
 
 Resultado esperado:
 
-- solo ese ítem cambia
-- los demás no se alteran
+- solo ese item cambia
+- los demas no se alteran
 
 ### D-04 — Pausa sin borrar formulario
 
-1. empezar a llenar varios ítems
-2. pausar otro ítem
+1. empezar a llenar varios items
+2. pausar otro item
 
 Resultado esperado:
 
-- los inputs ya escritos en los demás ítems no se borran
+- los inputs ya escritos en los demas items no se borran
 
-### D-05 — Pausa histórica
+### D-05 — Pausa historica
 
-1. pausar un ítem en una fecha
+1. pausar un item en una fecha
 2. abrir una fecha anterior
 
 Resultado esperado:
 
 - la pausa no contamina el pasado
 
-## E. Cuadre
+## F. Cuadre
 
-### E-01 — Cálculo simple
+### E-01 — Calculo simple
 
-1. registrar datos en todos los módulos necesarios
+1. registrar datos en todos los modulos necesarios
 2. calcular `Cuadre`
 
 Resultado esperado:
@@ -161,10 +212,10 @@ Resultado esperado:
 - `caja_fisica` correcta
 - `diferencia` correcta
 
-### E-02 — Resincronización del cuadre afectado
+### E-02 — Resincronizacion del cuadre afectado
 
 1. guardar un `Cuadre`
-2. corregir un módulo dentro de su período
+2. corregir un modulo dentro de su periodo
 
 Resultado esperado:
 
@@ -178,9 +229,51 @@ Resultado esperado:
 Resultado esperado:
 
 - se recalcula el `Cuadre` afectado
-- si cambia `base_nueva`, también se recalcula el siguiente
+- si cambia `base_nueva`, tambien se recalcula el siguiente
 
-## F. Ramas
+## G. Recaudo
+
+### RC-01 — Panel no visible sin flag
+
+1. asegurarse de que `config_operativa.json` no tenga `excluir_monedas_viejos_base: true`
+2. abrir la app
+
+Resultado esperado:
+
+- el panel de recaudo no aparece
+
+### RC-02 — Acumulado por ciclo
+
+1. habilitar `excluir_monedas_viejos_base: true` en `config_operativa.json`
+2. registrar Caja en varios dias con monedas y billetes viejos distintos de cero
+3. abrir el panel de recaudo
+
+Resultado esperado:
+
+- el panel muestra el total recaudado correcto
+- `Hoy` corresponde a la fecha consultada
+- `Acumulado` crece progresivamente dentro del ciclo vigente
+
+### RC-03 — Registrar entrega parcial
+
+1. con ciclo activo y total recaudado mayor a cero, registrar una entrega parcial desde `main`
+
+Resultado esperado:
+
+- la entrega aparece en el ciclo
+- el pendiente disminuye correctamente
+
+### RC-04 — Cierre de ciclo
+
+1. cerrar el ciclo activo desde `main`
+
+Resultado esperado:
+
+- el ciclo pasa al historial
+- se inicia un nuevo ciclo
+- el panel conserva solo el ciclo actual y el mensaje del ultimo cierre
+
+## H. Ramas
 
 ### F-01 — `main`
 
@@ -189,6 +282,7 @@ Validar:
 - modo super admin
 - respaldos
 - multisede
+- administracion de recaudo
 
 ### F-02 — `version-usuario`
 
@@ -197,25 +291,24 @@ Validar:
 - `Resumen`
 - captura diaria
 - launcher de usuario
+- panel de recaudo solo lectura cuando aplica
 
 ### F-03 — `respaldo-version-especial`
-
-Validar:
 
 1. abrir la app por primera vez
 2. comprobar `Caja` en `ayer()`
 3. pasar a `Resumen`
 4. comprobar `Resumen` en `ayer()`
-5. pasar a otro módulo
+5. pasar a otro modulo
 
 Resultado esperado:
 
 - `Caja` y `Resumen` respetan `ayer()` al inicio
-- al pasar a otro módulo, todo vuelve a `hoy()`
+- al pasar a otro modulo, todo vuelve a `hoy()`
 
-## G. Respaldo automático (`main`)
+## I. Respaldo automatico (`main`)
 
-### G-01 — Configuración de backup
+### G-01 — Configuracion de backup
 
 1. activar backup
 2. definir carpeta
@@ -227,13 +320,13 @@ Resultado esperado:
 
 ### G-02 — Idempotencia
 
-1. ejecutar backup nuevamente el mismo día
+1. ejecutar backup nuevamente el mismo dia
 
 Resultado esperado:
 
-- no duplica respaldos válidos
+- no duplica respaldos validos
 
-## Regresión mínima sugerida
+## Regresion minima sugerida
 
 Antes de cerrar una rama o build, repetir al menos:
 
@@ -241,17 +334,20 @@ Antes de cerrar una rama o build, repetir al menos:
 2. A-02
 3. B-01
 4. C-01
-5. D-02
-6. D-03
-7. D-04
+5. BN-00
+6. D-02
+7. D-03
 8. E-01
 9. E-02
 10. E-03
+11. RC-02
+12. RC-03
+13. RC-04
 
-## Evolución futura de pruebas
+## Evolucion futura de pruebas
 
 Si el sistema sigue creciendo, el siguiente paso natural es:
 
 - mantener estas pruebas manuales
-- sumar pruebas automatizadas de servicios críticos
-- preparar validaciones más cercanas a una futura migración a base de datos
+- sumar pruebas automatizadas de servicios criticos
+- preparar validaciones mas cercanas a una futura migracion a base de datos

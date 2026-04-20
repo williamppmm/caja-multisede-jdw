@@ -1,71 +1,100 @@
 # CajaJDW
 
-Aplicación local para registrar operación diaria de caja por sede, persistirla en libros Excel anuales y reducir la edición manual directa sobre Excel.
+Aplicacion local para registrar operacion diaria de caja por sede, persistirla en libros Excel anuales y reducir la edicion manual directa sobre Excel.
 
-La app sigue usando Excel como fuente de verdad operativa, pero ya centraliza captura, validación, consolidación, corrección y cierre desde una interfaz web local mucho más controlada.
+La app sigue usando Excel como fuente de verdad operativa, pero ya centraliza captura, validacion, consolidacion, correccion y cierre desde una interfaz web local mucho mas controlada.
 
 ## Estado actual por ramas
 
 | Rama | Rol principal | Ejecutable | Launcher | Spec versionado en esa rama |
 |---|---|---|---|---|
 | `main` | super admin / multisede | `CajaSuperAdmin.exe` | `launcher_super_admin.py` | `CajaSuperAdmin.spec` |
-| `version-usuario` | operación diaria por sede | `CajaJDW.exe` | `launcher.py` | `CajaJDW.spec` |
+| `version-usuario` | operacion diaria por sede | `CajaJDW.exe` | `launcher.py` | `CajaJDW.spec` |
 | `respaldo-version-especial` | variante operativa con arranque en `ayer()` | `CajaJDW.exe` | `launcher.py` | `CajaJDW.spec` |
 
-La convención actual es mantener **un solo `.spec` y un solo `.exe` final por rama**.
+La convencion actual es mantener un solo `.spec` y un solo `.exe` final por rama.
 
-## Qué resuelve hoy
+## Que resuelve hoy
 
-- Captura diaria de `Caja`, `Plataformas`, `Gastos`, `Bonos`, `Préstamos`, `Movimientos` y `Contadores`.
-- Cálculo y guardado de `Cuadre`.
+- Captura diaria de `Caja`, `Plataformas`, `Gastos`, `Bonos`, `Prestamos`, `Movimientos` y `Contadores`.
+- Calculo y guardado de `Cuadre`.
 - `Resumen` operativo en `version-usuario` y `respaldo-version-especial`.
-- Catálogos editables desde la propia aplicación.
-- Arranque refinado con:
-  - instancia única
-  - splash de inicio
-  - espera correcta antes de abrir navegador
-  - sin pestañas duplicadas por múltiples clics
+- Catalogos editables desde la propia aplicacion.
+- Arranque refinado con instancia unica, splash y espera correcta antes de abrir navegador.
 - Persistencia anual por sede.
-- Soporte multisede, referencias externas de plataformas y respaldos automáticos en `main`.
+- Soporte multisede, referencias externas de plataformas y respaldos automaticos en `main`.
+- Autocompletado por coincidencia exacta, prefijo y fuzzy en modulos con catalogo.
+- Normalizacion de clientes y personas como NomPropios en Bonos y Prestamos.
+- Panel de recaudo para sedes que separan monedas y billetes viejos de la base operativa.
+
+## Estructura principal
+
+```text
+app/
+  config.py
+  main.py
+  runtime_paths.py
+  models/
+  routers/
+  services/
+web/
+  index.html
+  app.js
+  styles.css
+  assets/
+scripts/
+  install_windows.ps1
+  build_windows_exe.ps1
+docs/
+  especificacion-funcional.md
+  analisis-tecnico.md
+  plan-pruebas.md
+data/                        <- archivos locales del equipo (no versionados)
+launcher.py
+launcher_boot.py
+launcher_super_admin.py
+CajaJDW.spec
+CajaSuperAdmin.spec
+README.md
+requirements.txt
+```
 
 ## Arranque y launcher
-
-Los builds actuales ya no dependen del arranque “ciego” original.
 
 El launcher compartido:
 
 - evita doble instancia real con mutex de Windows
 - muestra splash de inicio
-- espera a que el servidor local esté listo antes de abrir el navegador
+- espera a que el servidor local este listo antes de abrir el navegador
 - reduce clics repetidos sin sentido durante el arranque
 
 Archivo central:
 
-- [launcher_boot.py](launcher_boot.py)
+- [launcher_boot.py](C:\Users\User\Desktop\Caja\launcher_boot.py)
 
 Entrypoints por variante:
 
-- [launcher.py](launcher.py)
-- [launcher_super_admin.py](launcher_super_admin.py)
+- [launcher.py](C:\Users\User\Desktop\Caja\launcher.py)
+- [launcher_super_admin.py](C:\Users\User\Desktop\Caja\launcher_super_admin.py)
 
 ## Persistencia y archivos por sede
 
-Por sede y año se generan dos libros:
+Por sede y ano se generan dos libros:
 
-- `Contadores_{sede}_{año}.xlsx`
-- `Consolidado_{sede}_{año}.xlsx`
+- `Contadores_{sede}_{ano}.xlsx`
+- `Consolidado_{sede}_{ano}.xlsx`
 
-Distribución actual:
+Distribucion actual:
 
-- `Contadores_{sede}_{año}.xlsx`
+- `Contadores_{sede}_{ano}.xlsx`
   - Caja
   - Plataformas
   - Gastos
   - Bonos
-  - Préstamos
+  - Prestamos
   - Movimientos
 
-- `Consolidado_{sede}_{año}.xlsx`
+- `Consolidado_{sede}_{ano}.xlsx`
   - Contadores
   - Cuadre
 
@@ -74,8 +103,10 @@ Archivos auxiliares por sede:
 - `contadores_items.json`
 - `contadores_pausas.json`
 - `startup_state.json`
+- `config_operativa.json`
+- `recaudo_ciclos.json` cuando la sede usa recaudo separado
 
-Catálogos locales del equipo:
+Catalogos locales del equipo:
 
 - `data/settings.json`
 - `data/bonos_clientes.json`
@@ -83,29 +114,50 @@ Catálogos locales del equipo:
 - `data/prestamos_personas.json`
 - `data/movimientos_conceptos.json`
 
+Importante:
+
+- los JSON en `data/` son locales y no se comparten por Dropbox
+- `config_operativa.json` y `recaudo_ciclos.json` viven junto a los Excel de la sede, asi que si son compartidos por usuario y super admin
+
 ## Resumen y Cuadre
 
 `Resumen`:
 
-- consolida y expone los datos del período
+- consolida y expone los datos del periodo
 - sirve para lectura operativa
-- no hace balance físico vs teórico
-- hoy está disponible en `version-usuario` y `respaldo-version-especial`
+- no hace balance fisico vs teorico
+- hoy esta disponible en `version-usuario` y `respaldo-version-especial`
 
 `Cuadre`:
 
-- sí balancea ingresos, egresos y caja física
+- si balancea ingresos, egresos y caja fisica
 - usa `base_anterior`
 - calcula `caja_teorica`
 - compara contra `caja_fisica`
 - genera `diferencia`
 - define `base_nueva`
 
-Y esa `base_nueva` alimenta el siguiente cierre.
+En sedes con `excluir_monedas_viejos_base: true` en `config_operativa.json`, la `base_nueva` excluye `total_monedas` y `billetes_viejos`, y esa misma regla debe verse igual en `version-usuario`, `main` y `respaldo-version-especial`.
+
+## Recaudo por monedas y billetes viejos
+
+Cuando una sede separa monedas y billetes viejos del siguiente ciclo:
+
+- `Caja fisica` sigue contando esos valores para el cierre del dia
+- `Base nueva` puede excluirlos si la sede lo define en `config_operativa.json`
+- el sistema muestra un panel de recaudo en `Caja`
+- el estado del ciclo se guarda en `recaudo_ciclos.json`
+
+En `version-usuario` el panel es informativo.
+
+En `main`, super admin puede:
+
+- registrar entregas
+- cerrar ciclos
 
 ## Contadores y pausa por fecha
 
-`Contadores` dejó de manejar la pausa como un booleano global del catálogo.
+`Contadores` dejo de manejar la pausa como un booleano global del catalogo.
 
 Hoy la pausa se guarda por fecha en:
 
@@ -113,51 +165,37 @@ Hoy la pausa se guarda por fecha en:
 
 Eso permite:
 
-- múltiples ciclos de pausa por ítem
+- multiples ciclos de pausa por item
 - no contaminar fechas pasadas
-- no afectar otros ítems
+- no afectar otros items
 
-Semántica actual:
+## Seguridad y contrasenas
 
-- la fila sigue visible
-- `Entradas` y `Salidas` pueden apoyarse en la referencia vigente
-- `Jackpot` mantiene su propia lógica
-- el ítem no desaparece de la tabla
+Las contrasenas del frontend no son seguridad fuerte.
 
-## Seguridad y contraseñas
+Su proposito actual es:
 
-Las contraseñas del frontend **no son seguridad fuerte**.
-
-Su propósito actual es:
-
-- restricción operativa básica
-- alertar que se está intentando corregir en una fecha que no corresponde
-- reducir edición accidental fuera del flujo esperado
-
-No deben interpretarse como autenticación robusta de nivel backend o corporativo.
+- restriccion operativa basica
+- alertar que se esta intentando corregir en una fecha que no corresponde
+- reducir edicion accidental fuera del flujo esperado
 
 ## Riesgo operativo real: Excel y locking
 
 La app usa locking local y validaciones para reducir choques de escritura, pero el backend sigue dependiendo de Excel como fuente operativa.
 
-Eso implica límites reales:
+Eso implica limites reales:
 
 - no hay transacciones como en una base de datos
-- Dropbox / OneDrive no resuelven concurrencia fuerte por sí solos
+- Dropbox / OneDrive no resuelven concurrencia fuerte por si solos
 - si dos equipos de la misma sede escriben el mismo libro casi al mismo tiempo, sigue existiendo riesgo operativo
-
-En otras palabras:
-
-- la app ya mitiga parte del problema
-- pero Excel compartido sigue siendo un backend frágil bajo concurrencia real
 
 ## Build y `.spec`
 
-El `.spec` forma parte del proceso oficial de empaquetado y **debe existir en la rama que produce ese ejecutable**.
+El `.spec` forma parte del proceso oficial de empaquetado y debe existir en la rama que produce ese ejecutable.
 
 ### En `main`
 
-- [CajaSuperAdmin.spec](CajaSuperAdmin.spec)
+- [CajaSuperAdmin.spec](C:\Users\User\Desktop\Caja\CajaSuperAdmin.spec)
 - build esperado: `CajaSuperAdmin.exe`
 
 ### En `version-usuario` y `respaldo-version-especial`
@@ -165,9 +203,7 @@ El `.spec` forma parte del proceso oficial de empaquetado y **debe existir en la
 - `CajaJDW.spec`
 - build esperado: `CajaJDW.exe`
 
-Si se clona una rama en otro equipo, el `.spec` correcto de esa rama debe venir ya en el repositorio y no recrearse a mano.
-
-## Instalación y desarrollo
+## Instalacion y desarrollo
 
 ### Desarrollo
 
@@ -189,13 +225,24 @@ pip install -r requirements.txt
 python launcher.py
 ```
 
-### Instalación rápida
+Con recarga automatica:
 
-```text
-Instalar Caja.bat
+```powershell
+uvicorn app.main:app --reload
 ```
 
-### Builds
+### Instalacion rapida en Windows
+
+1. Descargar o clonar el proyecto.
+2. Ejecutar `Instalar Caja.bat`.
+
+Tambien puedes usar:
+
+```powershell
+scripts/install_windows.ps1
+```
+
+### Construccion del EXE
 
 Super admin:
 
@@ -209,41 +256,24 @@ Usuario:
 .\.venv\Scripts\python.exe -m PyInstaller CajaJDW.spec --clean
 ```
 
-## Scripts principales
-
-| Archivo | Función |
-|---|---|
-| `launcher_boot.py` | arranque compartido |
-| `launcher.py` | arranque de usuario |
-| `launcher_super_admin.py` | arranque de super admin |
-| `CajaSuperAdmin.spec` | build de `main` |
-| `Instalar Caja.bat` | instalación rápida |
-| `Construir EXE.bat` | build rápido disponible en la variante operativa |
-
 ## Limitaciones actuales
 
 - Excel sigue siendo la fuente de verdad operativa.
 - La concurrencia distribuida sigue siendo limitada.
 - La seguridad sigue siendo operativa, no robusta.
-- `app.js` y `excel_service.py` todavía concentran bastante responsabilidad.
+- `app.js` y `excel_service.py` todavia concentran bastante responsabilidad.
 
-## Evolución natural
+## Evolucion natural
 
-La app ya justificó el salto de trabajar directo en Excel a trabajar sobre una aplicación.
+La app ya justifico el salto de trabajar directo en Excel a trabajar sobre una aplicacion.
 
-El siguiente salto lógico, si crece la operación, es:
+El siguiente salto logico, si crece la operacion, es:
 
-- dejar Excel como respaldo o salida analítica
-- y mover la operación central a una base de datos
+- dejar Excel como respaldo o salida analitica
+- y mover la operacion central a una base de datos
 
-Eso tendrá sentido cuando:
+## Documentacion adicional
 
-- aumente la concurrencia por sede
-- haga falta mejor trazabilidad
-- Excel compartido deje de ser suficiente
-
-## Documentación adicional
-
-- [docs/especificacion-funcional.md](docs/especificacion-funcional.md)
-- [docs/analisis-tecnico.md](docs/analisis-tecnico.md)
-- [docs/plan-pruebas.md](docs/plan-pruebas.md)
+- [docs/especificacion-funcional.md](C:\Users\User\Desktop\Caja\docs\especificacion-funcional.md)
+- [docs/analisis-tecnico.md](C:\Users\User\Desktop\Caja\docs\analisis-tecnico.md)
+- [docs/plan-pruebas.md](C:\Users\User\Desktop\Caja\docs\plan-pruebas.md)
