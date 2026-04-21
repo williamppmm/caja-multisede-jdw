@@ -2490,6 +2490,9 @@ function _renderRefItem(prefix, ref, valorIngresado) {
   const estadoEl = document.getElementById(`${prefix}-estado`);
   if (!valorEl || !estadoEl) return;
   estadoEl.className = 'plataformas-ref-estado';
+  const rango = ref?.desde && ref?.hasta && ref.desde !== ref.hasta
+    ? `Acum. ${formatFechaVisual(ref.desde)} a ${formatFechaVisual(ref.hasta)}`
+    : '';
 
   if (!ref || ref.status === 'sin_ruta' || ref.status === 'sin_mapeo') {
     valorEl.textContent = '—';
@@ -2519,14 +2522,20 @@ function _renderRefItem(prefix, ref, valorIngresado) {
     valorEl.textContent = fmt(ref.valor);
     const diff = Math.abs((valorIngresado || 0) - ref.valor);
     if (valorIngresado === 0 || isNaN(valorIngresado)) {
-      estadoEl.textContent = '';
+      estadoEl.textContent = rango;
     } else if (diff <= 1) {
-      estadoEl.textContent = 'Coincide';
+      estadoEl.textContent = rango ? `Coincide · ${rango}` : 'Coincide';
       estadoEl.classList.add('coincide');
     } else {
-      estadoEl.textContent = `Difiere ${fmt(diff)}`;
+      estadoEl.textContent = rango ? `Difiere ${fmt(diff)} · ${rango}` : `Difiere ${fmt(diff)}`;
       estadoEl.classList.add('difiere');
     }
+    return;
+  }
+  if (ref.status === 'parcial' && ref.valor !== null) {
+    valorEl.textContent = fmt(ref.valor);
+    estadoEl.textContent = rango ? `Acumulado parcial · ${rango}` : 'Acumulado parcial';
+    estadoEl.classList.add('sin-dato');
     return;
   }
   // error u otro estado

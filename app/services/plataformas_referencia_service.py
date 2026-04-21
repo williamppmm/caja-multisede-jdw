@@ -81,6 +81,27 @@ def _fecha_coincide(cell_value: Any, fecha: date) -> bool:
     return False
 
 
+def _coerce_fecha(raw: Any) -> date | None:
+    """Convierte un valor devuelto por otros servicios a `date`.
+
+    `resolver_periodo_operativo()` puede devolver fechas como objetos `date`
+    o como strings ISO. Este helper normaliza ambas variantes.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, datetime):
+        return raw.date()
+    if isinstance(raw, date):
+        return raw
+    texto = str(raw).strip()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(texto, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
 def _leer_valor(path: Path, sheet_name: str, fecha_col: str,
                 header: str, fecha: date, keep_vba: bool = False) -> dict:
     """Abre el workbook, encuentra la fila de la fecha y extrae el valor
@@ -181,10 +202,69 @@ def obtener_referencias(fecha: date) -> dict:
             _cache[cache_key] = resultado
         return resultado
 
-    practi = _consultar(practi_file, _PRACTI_SHEET, _PRACTI_FECHA_COL,
-                        practi_header, False, "practisistemas")
-    deportivas = _consultar(bet_file, _BET_SHEET, _BET_FECHA_COL,
-                            bet_header, True, "deportivas")
+    try:
+        from app.services import cuadre_service
+        periodo_info = cuadre_service.resolver_periodo_operativo(fecha)
+        fechas_periodo_raw = periodo_info.get("periodo") or [fecha]
+        fechas_periodo = [fecha_ref for item in fechas_periodo_raw if (fecha_ref := _coerce_fecha(item)) is not None]
+        if not fechas_periodo:
+            fechas_periodo = [fecha]
+    except Exception:
+        fechas_periodo = [fecha]
+
+    def _consultar_fecha(archivo: Path | None, sheet: str, fecha_col: str,
+                        header: str, keep_vba: bool, fecha_ref: date) -> dict:
+        if not archivo:
+            return {"status": "sin_ruta", "valor": None, "header": header}
+        if not header:
+            return {"status": "sin_mapeo", "valor": None, "header": header}
+
+        cache_key = (str(archivo), fecha_ref.isoformat(), header, _mtime(archivo))
+        with _cache_lock:
+            if cache_key in _cache:
+                return _cache[cache_key]
+
+        resultado = _leer_valor(archivo, sheet, fecha_col, header, fecha_ref, keep_vba)
+
+        with _cache_lock:
+            _cache[cache_key] = resultado
+        return resultado
+
+    def _acumular(archivo: Path | None, sheet: str, fecha_col: str,
+                  header: str, keep_vba: bool) -> dict:
+        resultados = [
+            _consultar_fecha(archivo, sheet, fecha_col, header, keep_vba, fecha_ref)
+            for fecha_ref in fechas_periodo
+        ]
+
+        total = 0.0
+        ok_count = 0
+        ultimo_fallo = None
+        for resultado in resultados:
+            status = resultado.get("status")
+            if status == "ok" and resultado.get("valor") is not None:
+                total += float(resultado["valor"] or 0)
+                ok_count += 1
+            else:
+                ultimo_fallo = resultado
+
+        base = {
+            "header": header,
+            "desde": fechas_periodo[0].isoformat() if fechas_periodo else fecha.isoformat(),
+            "hasta": fechas_periodo[-1].isoformat() if fechas_periodo else fecha.isoformat(),
+            "dias": len(fechas_periodo),
+        }
+
+        if ok_count == len(resultados) and ok_count > 0:
+            return {**base, "status": "ok", "valor": round(total, 2)}
+        if ok_count > 0:
+            return {**base, "status": "parcial", "valor": round(total, 2), "detalle": ultimo_fallo.get("status") if ultimo_fallo else ""}
+        if ultimo_fallo:
+            return {**base, **ultimo_fallo}
+        return {**base, "status": "sin_dato", "valor": None}
+
+    practi = _acumular(practi_file, _PRACTI_SHEET, _PRACTI_FECHA_COL, practi_header, False)
+    deportivas = _acumular(bet_file, _BET_SHEET, _BET_FECHA_COL, bet_header, True)
 
     # Sede activa para contexto en la respuesta
     from app.services.settings_service import get_active_site, get_settings
@@ -198,6 +278,9 @@ def obtener_referencias(fecha: date) -> dict:
     return {
         "ok": True,
         "sede": sede,
+        "desde": fechas_periodo[0].isoformat() if fechas_periodo else fecha.isoformat(),
+        "hasta": fechas_periodo[-1].isoformat() if fechas_periodo else fecha.isoformat(),
+        "dias": len(fechas_periodo),
         "practisistemas": practi,
         "deportivas": deportivas,
     }
