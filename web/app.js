@@ -800,7 +800,7 @@ async function cargarContadoresCatalogo() {
 }
 
 function limpiarFormularioContadores() {
-  document.getElementById('contadores-body').innerHTML = '<tr><td colspan="9" class="bonos-vacio">Sin ítems configurados.</td></tr>';
+  document.getElementById('contadores-body').innerHTML = '<tr><td colspan="8" class="bonos-vacio">Sin ítems configurados.</td></tr>';
   document.getElementById('contadores-total').textContent = fmt(0);
 }
 
@@ -1196,8 +1196,8 @@ function renderContadores(items = [], total = 0) {
       <td>${crearInputContador('salidas', fila.salidas, fila.referencia?.salidas, entradasReadonly)}</td>
       <td>${crearInputContador('jackpot', fila.jackpot, null, fila.pausado)}</td>
       <td class="contador-yield" data-role="yield-actual">${fila.pausado ? '' : limpiarNumeroTexto(fila.yield_actual || 0, true)}</td>
-      <td data-role="yield-ref">${limpiarNumeroTexto(fila.referencia?.yield || 0, true)}<span class="yield-ref-fecha" title="${refFechaTitle}">·</span></td>
       <td class="contador-resultado ${!fila.pausado && fila.resultado_monetario < 0 ? 'negativo' : ''}" data-role="resultado">${fila.pausado ? '' : fmt(fila.resultado_monetario || 0)}</td>
+      <td data-role="yield-ref">${limpiarNumeroTexto(fila.referencia?.yield || 0, true)}<span class="yield-ref-fecha" title="${refFechaTitle}">·</span></td>
     `;
     tbody.appendChild(tr);
   });
@@ -3879,6 +3879,12 @@ async function init() {
     if (e.target.matches('.btn-toggle-pausa')) {
       togglePausaContador(e.target);
     }
+  });
+  document.querySelector('.contadores-tabla thead').addEventListener('click', e => {
+    const th = e.target.closest('th.th-col-toggle');
+    if (!th) return;
+    const table = th.closest('table');
+    if (th.dataset.colToggle === 'yieldref') table.classList.toggle('col-yieldref-oculto');
   });
   // Al expandir el panel de crítica en una fila ya guardada con override de admin:
   // marcar como no-guardada para que la autorización / re-autorización fluya igual que en una entrada nueva.

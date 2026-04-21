@@ -2103,3 +2103,41 @@ h2,
 #panel-contadores .contadores-tabla td:nth-child(9) {
   min-width: 78px;
 }
+
+/* ── Contadores: columna Yield ref. colapsable ───────────────────────────── */
+
+.th-col-toggle {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.th-col-btn {
+  display: none;
+  font-size: 0.75rem;
+  color: #8a99b0;
+  margin-left: 2px;
+}
+
+.col-yieldref-oculto th[data-col-toggle="yieldref"] .th-label {
+  display: none;
+}
+
+.col-yieldref-oculto th[data-col-toggle="yieldref"] .th-col-btn {
+  display: inline;
+}
+
+.col-yieldref-oculto.contadores-tabla th:nth-child(8),
+.col-yieldref-oculto.contadores-tabla td:nth-child(8) {
+  width: 18px !important;
+  max-width: 18px !important;
+  min-width: 0 !important;
+  overflow: hidden;
+  padding-left: 2px;
+  padding-right: 2px;
+}
+
+.col-yieldref-oculto.contadores-tabla td:nth-child(8) {
+  font-size: 0;
+  line-height: 0;
+}
