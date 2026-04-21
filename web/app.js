@@ -1359,6 +1359,17 @@ async function togglePausaContador(btn) {
     return;
   }
 
+  const snapshot = {};
+  document.querySelectorAll('#contadores-body tr[data-item-id]').forEach(tr => {
+    if (tr.dataset.itemId === itemId || tr.dataset.pausado === '1') return;
+    snapshot[tr.dataset.itemId] = {
+      entradas: tr.querySelector('[data-role="entradas"]')?.value || '',
+      salidas:  tr.querySelector('[data-role="salidas"]')?.value  || '',
+      jackpot:  tr.querySelector('[data-role="jackpot"]')?.value  || '',
+      draftDirty: tr.dataset.draftDirty === '1',
+    };
+  });
+
   try {
     const res = await fetch(`/api/modulos/contadores/catalogo/${encodeURIComponent(itemId)}/pausar`, {
       method: 'POST',
@@ -1367,9 +1378,18 @@ async function togglePausaContador(btn) {
     });
     const data = await res.json();
     if (!data.ok) { mostrarMensaje(data.mensaje || 'Error al cambiar estado.', 'error'); return; }
-    // Limpiar draft de la fecha antes de recargar para evitar reinyectar foto vieja
-    eliminarDraftContadores(fecha);
     await cargarDatosContadores(fecha);
+    Object.entries(snapshot).forEach(([id, vals]) => {
+      const tr = document.querySelector(`#contadores-body tr[data-item-id="${id}"]`);
+      if (!tr || tr.dataset.pausado === '1') return;
+      ['entradas', 'salidas', 'jackpot'].forEach(role => {
+        const input = tr.querySelector(`[data-role="${role}"]`);
+        if (input && !input.readOnly) input.value = vals[role];
+      });
+      if (vals.draftDirty) marcarFilaContadorDirty(tr);
+    });
+    recalcularContadores();
+    guardarDraftContadores();
     mostrarMensaje(`${row.dataset.nombre}: ${!pausado ? 'máquina pausada' : 'máquina reactivada'}.`, 'ok');
   } catch {
     mostrarMensaje('Error de conexión al cambiar estado de pausa.', 'error');
