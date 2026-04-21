@@ -459,22 +459,22 @@
         <h2>Ítems del día</h2>
         <div id="contadores-empty" class="modulo-ayuda oculto">No hay ítems configurados. Agrégalos desde Administración para comenzar a usar Contadores.</div>
         <div class="bonos-listado-wrap">
-          <table class="bonos-tabla contadores-tabla">
+          <table class="bonos-tabla contadores-tabla col-denom-oculto col-yieldref-oculto">
             <thead>
               <tr>
                 <th>Ítem</th>
-                <th>Denom.</th>
+                <th class="th-col-toggle" data-col-toggle="denom"><span class="th-label">Denom.</span><span class="th-col-btn">▸</span></th>
                 <th>Entradas</th>
                 <th>Salidas</th>
                 <th>Jackpot</th>
                 <th>Yield</th>
-                <th>Yield ref.</th>
                 <th>Resultado</th>
+                <th class="th-col-toggle" data-col-toggle="yieldref"><span class="th-label">Yield ref.</span><span class="th-col-btn">▸</span></th>
               </tr>
             </thead>
             <tbody id="contadores-body">
               <tr>
-                <td colspan="9" class="bonos-vacio">Sin ítems configurados.</td>
+                <td colspan="8" class="bonos-vacio">Sin ítems configurados.</td>
               </tr>
             </tbody>
           </table>
