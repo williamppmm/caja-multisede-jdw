@@ -20,6 +20,11 @@ def _normalizar_nombre(nombre: str) -> str:
     return " ".join(str(nombre or "").strip().split())
 
 
+def _normalizar_nombre_propio(nombre: str) -> str:
+    limpio = _normalizar_nombre(nombre)
+    return limpio.title() if limpio else ""
+
+
 def _obtener_path(tipo: str) -> Path:
     return CATALOG_PATHS.get(str(tipo or "").strip().lower(), NOMBRES_PATH)
 
@@ -80,3 +85,20 @@ def agregar_nombre(nombre: str) -> None:
 
 def importar_desde_txt(path: str) -> int:
     return importar_catalogo_desde_txt("bonos", path)
+
+
+def obtener_personas() -> list[str]:
+    raw = obtener_catalogo("prestamos")
+    return sorted({_normalizar_nombre_propio(n) for n in raw if n})
+
+
+def agregar_persona(nombre: str) -> None:
+    nombre_propio = _normalizar_nombre_propio(nombre)
+    if not nombre_propio:
+        return
+    raw = obtener_catalogo("prestamos")
+    normalizados = {_normalizar_nombre_propio(n) for n in raw if n}
+    if nombre_propio not in normalizados:
+        normalizados.add(nombre_propio)
+        with open(_obtener_path("prestamos"), "w", encoding="utf-8") as f:
+            json.dump(sorted(normalizados), f, indent=2, ensure_ascii=False)

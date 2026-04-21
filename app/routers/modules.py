@@ -179,10 +179,11 @@ def datos_fecha_prestamos(fecha: str):
         d = date.fromisoformat(fecha)
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
-    datos = excel_service.obtener_movimientos_prestamos_super_admin(d)
+    datos = excel_service.obtener_prestamos_modulo(d)
     registros = datos.get("items") or []
-    total_prestado = sum(float(item["valor"] or 0) for item in registros if item.get("tipo_movimiento") == "prestamo")
-    total_pagado = sum(float(item["valor"] or 0) for item in registros if item.get("tipo_movimiento") == "pago")
+    registros_dia = excel_service.obtener_prestamos_raw_fecha(d, d.year)
+    total_prestado = sum(float(item["valor"] or 0) for item in registros_dia if item.get("tipo_movimiento") == "prestamo")
+    total_pagado = sum(float(item["valor"] or 0) for item in registros_dia if item.get("tipo_movimiento") == "pago")
     return {
         "items": registros,
         "total_prestado": round(total_prestado, 2),
@@ -230,7 +231,7 @@ def gastos_conceptos():
 
 @router.get("/prestamos/personas")
 def prestamos_personas():
-    return {"personas": nombres_service.obtener_catalogo("prestamos")}
+    return {"personas": nombres_service.obtener_personas()}
 
 
 @router.get("/movimientos/conceptos")

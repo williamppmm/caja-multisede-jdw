@@ -1636,14 +1636,15 @@ function renderPrestamosRegistros(items = [], resumen = {}) {
     : {};
   tbody.innerHTML = '';
   if (!loanItems.length) {
-    tbody.innerHTML = `<tr><td colspan="${esSuperAdminActivo() ? 6 : 5}" class="bonos-vacio">Sin movimientos de préstamos para esta fecha.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${esSuperAdminActivo() ? 6 : 5}" class="bonos-vacio">Sin deuda activa para esta fecha.</td></tr>`;
   } else {
     [...loanItems].reverse().forEach(item => {
       const ts = item.fecha_hora_registro || '';
       const tr = document.createElement('tr');
       if (ts) tr.dataset.ts = ts;
+      if ((item.saldo_pendiente ?? 1) === 0) tr.classList.add('prestamo-saldado');
       tr.innerHTML = `
-        <td>${item.hora_display || ''}</td>
+        <td>${item.fecha ? `${formatFechaVisual(item.fecha)} ${item.hora_display || ''}`.trim() : (item.hora_display || '')}</td>
         <td>${item.persona || ''}</td>
         <td>${item.tipo_movimiento === 'pago' ? 'Pago' : 'Préstamo'}</td>
         <td>${fmt(item.valor || 0)}</td>

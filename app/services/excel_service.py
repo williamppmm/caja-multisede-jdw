@@ -1125,7 +1125,47 @@ def obtener_movimientos_fecha(fecha: date, year: int) -> list[dict]:
     return registros
 
 
-def obtener_movimientos_prestamos(persona: str | None = None) -> list[dict]:
+def _construir_ciclo_activo_prestamos(registros: list[dict], fecha_ref: date | None = None) -> list[dict]:
+    from datetime import date as _date
+    fecha_ref_iso = (fecha_ref or _date.today()).isoformat()
+
+    registros = sorted(registros, key=lambda item: (item["fecha"], item["fecha_hora_registro"] or ""))
+
+    saldos: dict[str, float] = {}
+    ciclo_inicio: dict[str, int] = {}
+    ciclo_cierre: dict[str, tuple[int, str]] = {}
+
+    for i, item in enumerate(registros):
+        persona_key = item["persona"].strip().lower()
+        saldo_prev = saldos.get(persona_key, 0.0)
+        if abs(saldo_prev) < 0.01 and item["tipo_movimiento"] == "prestamo":
+            ciclo_inicio[persona_key] = i
+        saldo = saldo_prev
+        if item["tipo_movimiento"] == "pago":
+            saldo -= float(item["valor"] or 0)
+        else:
+            saldo += float(item["valor"] or 0)
+        item["saldo_pendiente"] = round(saldo, 2)
+        saldos[persona_key] = saldo
+        if abs(saldo) < 0.01:
+            ciclo_cierre[persona_key] = (i, item["fecha"])
+
+    resultado = []
+    for i, item in enumerate(registros):
+        persona_key = item["persona"].strip().lower()
+        inicio = ciclo_inicio.get(persona_key, 0)
+        saldo_final = saldos.get(persona_key, 0.0)
+        if abs(saldo_final) >= 0.01:
+            if i >= inicio:
+                resultado.append(item)
+        else:
+            cierre = ciclo_cierre.get(persona_key)
+            if cierre and cierre[1] == fecha_ref_iso and inicio <= i <= cierre[0]:
+                resultado.append(item)
+    return resultado
+
+
+def obtener_movimientos_prestamos(persona: str | None = None, fecha_hasta: date | None = None) -> list[dict]:
     persona_norm = persona.strip().lower() if persona else None
     registros = []
     for path in _obtener_paths_excel_sede():
@@ -1135,33 +1175,14 @@ def obtener_movimientos_prestamos(persona: str | None = None) -> list[dict]:
             hojas = _obtener_hojas_para_lectura(wb, "prestamos")
             for ws in hojas:
                 registros.extend(_leer_movimientos_prestamos_desde_hoja(ws, persona_norm=persona_norm))
-    registros.sort(key=lambda item: (item["fecha"], item["fecha_hora_registro"] or ""))
-
-    # Calcular saldo corrido completo y registrar dónde cerró cada ciclo (saldo == 0).
-    saldos: dict[str, float] = {}
-    ultimo_corte: dict[str, int] = {}  # índice donde el saldo llegó a cero por última vez
-
-    for i, item in enumerate(registros):
-        persona_key = item["persona"].strip().lower()
-        saldo = saldos.get(persona_key, 0.0)
-        if item["tipo_movimiento"] == "pago":
-            saldo -= float(item["valor"] or 0)
-        else:
-            saldo += float(item["valor"] or 0)
-        item["saldo_pendiente"] = round(saldo, 2)
-        saldos[persona_key] = saldo
-        if abs(saldo) < 0.01:
-            ultimo_corte[persona_key] = i  # ciclo cerrado aquí
-
-    # Devolver solo el ciclo activo de cada persona (movimientos posteriores al último cierre).
-    return [
-        item for i, item in enumerate(registros)
-        if i > ultimo_corte.get(item["persona"].strip().lower(), -1)
-    ]
+    if fecha_hasta:
+        fecha_tope = fecha_hasta.isoformat()
+        registros = [item for item in registros if item["fecha"] <= fecha_tope]
+    return _construir_ciclo_activo_prestamos(registros, fecha_ref=fecha_hasta)
 
 
-def obtener_resumen_prestamos(persona: str | None = None) -> dict:
-    return _resumen_prestamos_desde_registros(obtener_movimientos_prestamos(persona=persona))
+def obtener_resumen_prestamos(persona: str | None = None, fecha_hasta: date | None = None) -> dict:
+    return _resumen_prestamos_desde_registros(obtener_movimientos_prestamos(persona=persona, fecha_hasta=fecha_hasta))
 
 
 def obtener_movimientos_prestamos_super_admin(fecha_objetivo: date) -> dict:
@@ -1203,6 +1224,44 @@ def obtener_movimientos_prestamos_super_admin(fecha_objetivo: date) -> dict:
         "saldos_por_persona": {k: round(v, 2) for k, v in saldos_por_persona.items()},
         "deuda_total_activa": deuda_total_activa,
     }
+
+def obtener_prestamos_modulo(fecha_objetivo: date) -> dict:
+    """Items del ciclo activo (con saldo_pendiente=0 en día de cierre) + saldos_por_persona acumulados."""
+    fecha_iso = fecha_objetivo.isoformat()
+    registros = []
+    for path in _obtener_paths_excel_sede():
+        if not path.exists():
+            continue
+        with _abrir_workbook_lectura(path) as wb:
+            hojas = _obtener_hojas_para_lectura(wb, "prestamos")
+            for ws in hojas:
+                registros.extend(_leer_movimientos_prestamos_desde_hoja(ws))
+
+    registros_hasta = [
+        item for item in registros
+        if item["fecha"] <= fecha_iso
+    ]
+    registros_hasta.sort(key=lambda item: (item["fecha"], item["fecha_hora_registro"] or ""))
+
+    saldos_por_persona: dict[str, float] = {}
+    for item in registros_hasta:
+        persona_key = item["persona"].strip().lower()
+        saldo = saldos_por_persona.get(persona_key, 0.0)
+        if item["tipo_movimiento"] == "pago":
+            saldo -= float(item["valor"] or 0)
+        else:
+            saldo += float(item["valor"] or 0)
+        saldos_por_persona[persona_key] = round(saldo, 2)
+
+    deuda_total_activa = round(sum(max(s, 0.0) for s in saldos_por_persona.values()), 2)
+    items_ciclo = _construir_ciclo_activo_prestamos(registros_hasta, fecha_ref=fecha_objetivo)
+
+    return {
+        "items": items_ciclo,
+        "saldos_por_persona": {k: round(v, 2) for k, v in saldos_por_persona.items()},
+        "deuda_total_activa": deuda_total_activa,
+    }
+
 
 def obtener_prestamos_raw_fecha(fecha: date, year: int) -> list[dict]:
     """Todos los movimientos de préstamos de una fecha, sin filtro de ciclo activo."""
@@ -1559,7 +1618,7 @@ def actualizar_prestamo_por_ts(fecha: date, year: int, ts_str: str, persona: str
             ) from exc
         finally:
             wb.close()
-    return obtener_resumen_prestamos(persona=persona)
+    return obtener_resumen_prestamos(persona=persona, fecha_hasta=fecha)
 
 
 def eliminar_prestamo_por_ts(fecha: date, year: int, ts_str: str) -> dict | None:
@@ -1590,7 +1649,7 @@ def eliminar_prestamo_por_ts(fecha: date, year: int, ts_str: str) -> dict | None
             ) from exc
         finally:
             wb.close()
-    return obtener_resumen_prestamos(persona=persona)
+    return obtener_resumen_prestamos(persona=persona, fecha_hasta=fecha)
 
 
 def actualizar_movimiento_por_ts(fecha: date, year: int, ts_str: str, tipo: str, concepto: str, valor: float, observacion: str, new_ts: datetime) -> dict | None:

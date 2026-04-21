@@ -16,7 +16,7 @@ def guardar_prestamo(entrada: PrestamoEntrada) -> dict:
     persona = entrada.persona.strip()
     tipo = entrada.tipo_movimiento
     valor = float(entrada.valor)
-    resumen_actual = excel_service.obtener_resumen_prestamos(persona=persona)
+    resumen_actual = excel_service.obtener_resumen_prestamos(persona=persona, fecha_hasta=entrada.fecha)
     saldo_actual = float(resumen_actual["saldo_pendiente"])
 
     if tipo == "pago" and valor > saldo_actual:
@@ -47,7 +47,7 @@ def guardar_prestamo(entrada: PrestamoEntrada) -> dict:
                 "total_pagado": float(resumen_actual["total_pagado"]),
                 "saldo_pendiente": float(resumen_actual["saldo_pendiente"]) + valor,
             }
-        nombres_service.agregar_item_catalogo("prestamos", persona)
+        nombres_service.agregar_persona(persona)
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
@@ -68,7 +68,8 @@ def guardar_prestamo(entrada: PrestamoEntrada) -> dict:
 
 
 def obtener_registros(fecha: date) -> dict:
-    items = excel_service.obtener_prestamos_fecha(fecha, fecha.year)
+    datos = excel_service.obtener_prestamos_modulo(fecha)
+    items = datos.get("items") or []
     total_prestado = sum(float(item["valor"] or 0) for item in items if item["tipo_movimiento"] == "prestamo")
     total_pagado = sum(float(item["valor"] or 0) for item in items if item["tipo_movimiento"] == "pago")
     return {
@@ -76,6 +77,8 @@ def obtener_registros(fecha: date) -> dict:
         "total_prestado": total_prestado,
         "total_pagado": total_pagado,
         "saldo_pendiente": total_prestado - total_pagado,
+        "deuda_total_activa": round(float(datos.get("deuda_total_activa") or 0), 2),
+        "saldos_por_persona": datos.get("saldos_por_persona") or {},
     }
 
 
@@ -85,7 +88,7 @@ def actualizar_prestamo_por_ts(fecha: date, ts_str: str, persona: str, tipo_movi
         resumen = excel_service.actualizar_prestamo_por_ts(fecha, fecha.year, ts_str, persona.strip(), tipo_movimiento, valor, timestamp)
         if resumen is None:
             return {"ok": False, "mensaje": "Registro no encontrado.", "fecha": str(fecha)}
-        nombres_service.agregar_item_catalogo("prestamos", persona)
+        nombres_service.agregar_persona(persona)
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(fecha)}
 
