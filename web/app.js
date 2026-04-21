@@ -2120,6 +2120,21 @@ function sugerirFechaModulo() {
   return hoyStr();
 }
 
+async function obtenerFechaSugeridaSede() {
+  try {
+    const res = await fetch('/api/modulos/cuadre/ultima');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.fecha) {
+        const d = new Date(data.fecha + 'T12:00:00');
+        d.setDate(d.getDate() + 1);
+        return d.toISOString().slice(0, 10);
+      }
+    }
+  } catch { /* fallback */ }
+  return hoyStr();
+}
+
 function _persistirFechasModulo() {
   try { sessionStorage.setItem('moduleDates', JSON.stringify(moduleDates)); } catch {}
 }
@@ -3598,6 +3613,9 @@ async function cambiarSedeActiva(siteId) {
       const sRes = await fetch('/api/settings');
       if (sRes.ok) { const s = await sRes.json(); configExcluirMonedasViejosBase = !!s.excluir_monedas_viejos_base; }
     } catch { /* mantener valor anterior */ }
+    const _fechaSede = await obtenerFechaSugeridaSede();
+    setSharedModuleDate(_fechaSede);
+    aplicarFechaModulo(currentModule);
     await cargarVistaModulo(currentModule, moduleDates[currentModule]);
     await verificarFechaActual();
     mostrarMensaje(`Sede activa: ${configActiveSite?.label || siteId}`, 'ok');
@@ -3916,7 +3934,8 @@ async function init() {
     )
     : hoyStr();
   moduleDates = {};
-  setSharedModuleDate(savedSharedDate);
+  const _fechaInicio = configActiveSite ? await obtenerFechaSugeridaSede() : savedSharedDate;
+  setSharedModuleDate(_fechaInicio);
   if (_isReload) {
     try { cajaDrafts = JSON.parse(sessionStorage.getItem('cajaDrafts') || '{}'); } catch { cajaDrafts = {}; }
     try { contadoresDrafts = JSON.parse(sessionStorage.getItem('contadoresDrafts') || '{}'); } catch { contadoresDrafts = {}; }
