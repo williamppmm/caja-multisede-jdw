@@ -26,6 +26,10 @@ La convencion actual es mantener un solo `.spec` y un solo `.exe` final por rama
 - Autocompletado por coincidencia exacta, prefijo y fuzzy en modulos con catalogo.
 - Normalizacion de clientes y personas como NomPropios en Bonos y Prestamos.
 - Panel de recaudo para sedes que separan monedas y billetes viejos de la base operativa.
+- Ciclo visible de `Prestamos`: muestra el ciclo activo completo por persona; en el dia de cierre, las filas saldadas se muestran con tachado y desaparecen al dia siguiente.
+- Edicion y eliminacion historica sin restriccion de fecha en `main` (super admin con sede activa puede operar cualquier fecha con registros).
+- Preservacion de inputs de `Contadores` al pausar o reactivar una maquina.
+- `config_operativa.json` por sede controla `excluir_monedas_viejos_base` de forma independiente al `settings.json` local.
 
 ## Estructura principal
 
@@ -270,12 +274,25 @@ Usuario:
 .\.venv\Scripts\python.exe -m PyInstaller CajaJDW.spec --clean
 ```
 
+## Modelo de ramas
+
+Cada rama es una version de produccion con su propio proposito, ejecutable y `.spec`. No son feature branches temporales — son versiones activas en paralelo.
+
+| Rama | Version | Para quien |
+|---|---|---|
+| `main` | Super admin | Auditor, opera multisede, corrige registros historicos |
+| `version-usuario` | Operativa diaria | Caja de la sede, captura del dia |
+| `respaldo-version-especial` | Variante operativa | Igual a `version-usuario` pero arranca en `ayer()` |
+
+Las ramas se retroalimentan entre ellas: una mejora de logica en una rama (ciclo de prestamos, pausa de contadores, preservacion de inputs, validacion de saldo con fecha) se evalua y porta a las demas cuando aplica. El criterio es si el cambio es transversal, exclusivo de auditoria, o exclusivo de operacion diaria.
+
+Regla de trabajo: no asumir que un cambio de una rama aplica automaticamente a las otras. Evaluar siempre antes de portar.
+
 ## Limitaciones actuales
 
 - Excel sigue siendo la fuente de verdad operativa.
 - La concurrencia distribuida sigue siendo limitada.
 - La seguridad sigue siendo operativa, no robusta.
-- `app.js` y `excel_service.py` todavia concentran bastante responsabilidad.
 
 ## Evolucion natural
 

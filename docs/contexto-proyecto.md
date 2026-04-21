@@ -23,13 +23,17 @@ Excel sigue siendo la fuente de verdad, pero la operación ya ocurre sobre la ap
 | `version-usuario` | `CajaJDW.exe` | captura operativa diaria |
 | `respaldo-version-especial` | `CajaJDW.exe` | misma base de usuario, pero `Caja` y `Resumen` arrancan en `ayer()` durante la primera interacción |
 
+Cada rama es una versión de producción activa, no una feature branch temporal. Tienen su propio ejecutable, su propio `.spec` y su propio ciclo de vida.
+
+Las ramas se retroalimentan entre sí. Una mejora de lógica o UX descubierta en una rama se evalúa y porta a las demás cuando aplica. Ejemplos recientes: el ciclo visible de préstamos, la preservación de inputs al pausar contadores, la validación de saldo con fecha de corte, y el sistema de recaudo. Todos nacieron o se refinaron en una rama y se evaluaron para las otras.
+
 Regla de trabajo:
 
 - no asumir que un cambio de una rama aplica automáticamente a las otras
 - evaluar siempre si el cambio es:
-  - transversal
-  - exclusivo de auditoría
-  - exclusivo de operación
+  - transversal (aplica a todas)
+  - exclusivo de auditoría (solo `main`)
+  - exclusivo de operación diaria (`version-usuario` y `respaldo-version-especial`)
 
 ## 3. Arquitectura general
 
