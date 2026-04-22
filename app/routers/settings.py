@@ -1,4 +1,5 @@
 import os
+import sys
 import threading
 import time
 from datetime import date
@@ -13,11 +14,36 @@ router = APIRouter()
 # El navegador envía POST /api/app/heartbeat cada ~30 s.
 # Si no llega ninguno en HEARTBEAT_TIMEOUT segundos, el servidor se apaga solo.
 # Esto cubre el caso en que el usuario cierra el navegador sin usar "Finalizar".
+#
+# Nota importante:
+# El proceso de escritorio corre Uvicorn embebido y, en ciertos cierres del
+# navegador, no siempre tenemos una señal de apagado limpia. Por eso se usa una
+# salida forzada como último recurso para evitar procesos zombie. La mantenemos
+# encapsulada en un helper para dejar explícito que es una decisión operativa,
+# no un olvido accidental.
 
 HEARTBEAT_TIMEOUT = 75  # segundos sin heartbeat → apagar
 _last_heartbeat = time.monotonic()
 _heartbeat_started = False
 _heartbeat_lock = threading.Lock()
+
+
+def _salida_forzada_app(motivo: str) -> None:
+    """Termina el proceso como último recurso.
+
+    Se intentan flushes best-effort antes de salir para reducir el riesgo de
+    perder trazas recientes, pero el cierre sigue siendo forzado para asegurar
+    que no queden procesos huérfanos cuando el frontend desaparece.
+    """
+    try:
+        sys.stdout.flush()
+    except Exception:
+        pass
+    try:
+        sys.stderr.flush()
+    except Exception:
+        pass
+    os._exit(0)
 
 
 def _watchdog():
@@ -26,7 +52,7 @@ def _watchdog():
         with _heartbeat_lock:
             elapsed = time.monotonic() - _last_heartbeat
         if elapsed > HEARTBEAT_TIMEOUT:
-            os._exit(0)
+            _salida_forzada_app("watchdog")
 
 
 def _iniciar_watchdog():
@@ -183,5 +209,5 @@ def heartbeat():
 
 @router.post("/api/app/shutdown")
 def shutdown_app():
-    threading.Timer(0.3, os._exit, args=(0,)).start()
+    threading.Timer(0.3, _salida_forzada_app, args=("shutdown",)).start()
     return {"ok": True}

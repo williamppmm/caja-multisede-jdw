@@ -322,6 +322,19 @@ vive en la misma carpeta que los Excel de la sede.
 - `Contadores_{sede}_{ano}.xlsx`
 - `Consolidado_{sede}_{ano}.xlsx`
 
+Distribucion actual:
+
+- `Contadores_{sede}_{ano}.xlsx`
+  - Caja
+  - Plataformas
+  - Gastos
+  - Bonos
+  - Prestamos
+  - Movimientos
+- `Consolidado_{sede}_{ano}.xlsx`
+  - Contadores
+  - Cuadre
+
 ### Auxiliares por sede
 
 - `contadores_items.json`

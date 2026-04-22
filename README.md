@@ -100,9 +100,9 @@ Distribucion actual:
   - Bonos
   - Prestamos
   - Movimientos
-  - Contadores
 
 - `Consolidado_{sede}_{ano}.xlsx`
+  - Contadores
   - Cuadre
 
 Archivos auxiliares por sede:

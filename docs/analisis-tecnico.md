@@ -90,8 +90,8 @@ Distribucion actual:
   - Bonos
   - Prestamos
   - Movimientos
-  - Contadores
 - `Consolidado_{sede}_{ano}.xlsx`
+  - Contadores
   - Cuadre
 
 JSON auxiliares por sede:
