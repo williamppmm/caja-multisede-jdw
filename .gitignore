@@ -33,3 +33,6 @@ startup_state.json
 .DS_Store
 Thumbs.db
 .claude/
+
+# Custom agents
+.agent.md
