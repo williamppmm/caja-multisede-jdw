@@ -48,6 +48,7 @@ let cajaDrafts = {};
 let contadorCatalog = [];
 let contadoresDrafts = {};
 let contadoresLocked = false;
+let _sessionStorageWarningShown = false;
 
 function fmt(n) {
   return '$ ' + Math.round(n).toLocaleString('es-CO');
@@ -60,6 +61,51 @@ function aplicarVisibilidadPanel(prefijo) {
     const card = document.getElementById(`${prefijo}-card-${mod}`);
     if (card) card.classList.toggle('oculto', !enabledModules.includes(mod));
   });
+}
+
+function advertirSessionStorageNoDisponible() {
+  if (_sessionStorageWarningShown) return;
+  _sessionStorageWarningShown = true;
+  mostrarMensaje('No se pudo guardar el borrador local de esta sesión. Los cambios no guardados podrían perderse si recargas la aplicación.', 'error');
+}
+
+function safeSessionSet(key, value) {
+  try {
+    sessionStorage.setItem(key, value);
+    return true;
+  } catch {
+    advertirSessionStorageNoDisponible();
+    return false;
+  }
+}
+
+function safeSessionRemove(key) {
+  try {
+    sessionStorage.removeItem(key);
+    return true;
+  } catch {
+    advertirSessionStorageNoDisponible();
+    return false;
+  }
+}
+
+function safeSessionGetItem(key) {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    advertirSessionStorageNoDisponible();
+    return null;
+  }
+}
+
+function safeSessionGetJson(key, fallback) {
+  try {
+    const raw = sessionStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    advertirSessionStorageNoDisponible();
+    return fallback;
+  }
 }
 
 function limpiarNumeroTexto(valor, allowNegative = false) {
@@ -863,13 +909,13 @@ function guardarDraftContadores(fechaOverride = null) {
   const fecha = fechaOverride || document.getElementById('fecha')?.value;
   if (!fecha || contadoresLocked) return;
   contadoresDrafts[fecha] = leerContadoresDraftActual();
-  try { sessionStorage.setItem('contadoresDrafts', JSON.stringify(contadoresDrafts)); } catch {}
+  safeSessionSet('contadoresDrafts', JSON.stringify(contadoresDrafts));
 }
 
 function eliminarDraftContadores(fecha) {
   if (!fecha) return;
   delete contadoresDrafts[fecha];
-  try { sessionStorage.setItem('contadoresDrafts', JSON.stringify(contadoresDrafts)); } catch {}
+  safeSessionSet('contadoresDrafts', JSON.stringify(contadoresDrafts));
 }
 
 function applyContadoresDraft(fecha) {
@@ -1991,13 +2037,13 @@ function guardarDraftCaja(fechaOverride = null) {
   const fecha = fechaOverride || document.getElementById('fecha')?.value;
   if (!fecha || cajaLocked) return;
   cajaDrafts[fecha] = obtenerDraftCajaActual();
-  try { sessionStorage.setItem('cajaDrafts', JSON.stringify(cajaDrafts)); } catch {}
+  safeSessionSet('cajaDrafts', JSON.stringify(cajaDrafts));
 }
 
 function eliminarDraftCaja(fecha) {
   if (!fecha) return;
   delete cajaDrafts[fecha];
-  try { sessionStorage.setItem('cajaDrafts', JSON.stringify(cajaDrafts)); } catch {}
+  safeSessionSet('cajaDrafts', JSON.stringify(cajaDrafts));
 }
 
 function aplicarDraftCaja(fecha) {
@@ -2076,7 +2122,7 @@ function sugerirFechaModulo(modulo) {
 }
 
 function _persistirFechasModulo() {
-  try { sessionStorage.setItem('moduleDates', JSON.stringify(moduleDates)); } catch {}
+  safeSessionSet('moduleDates', JSON.stringify(moduleDates));
 }
 
 function setSharedModuleDate(fecha) {
@@ -2116,7 +2162,7 @@ async function activarModulo(modulo) {
   if (!enabledModules.includes(modulo)) {
     currentModule = enabledModules[0];
   }
-  sessionStorage.setItem('lastModule', currentModule);
+  safeSessionSet('lastModule', currentModule);
   renderTabs();
   actualizarPaneles();
   aplicarFechaModulo(currentModule);
@@ -3676,8 +3722,7 @@ async function init() {
     defaultModule = settings.default_module || enabledModules[0];
   } catch { /* defaults */ }
 
-  let _savedDates = null;
-  try { _savedDates = JSON.parse(sessionStorage.getItem('moduleDates') || 'null'); } catch {}
+  let _savedDates = safeSessionGetJson('moduleDates', null);
   const _isReload = !!_savedDates;
   const savedSharedDate = _savedDates && typeof _savedDates === 'object'
     ? (
@@ -3695,10 +3740,10 @@ async function init() {
   moduleDates = {};
   setSharedModuleDate(savedSharedDate);
   if (_isReload) {
-    try { cajaDrafts = JSON.parse(sessionStorage.getItem('cajaDrafts') || '{}'); } catch { cajaDrafts = {}; }
-    try { contadoresDrafts = JSON.parse(sessionStorage.getItem('contadoresDrafts') || '{}'); } catch { contadoresDrafts = {}; }
+    cajaDrafts = safeSessionGetJson('cajaDrafts', {});
+    contadoresDrafts = safeSessionGetJson('contadoresDrafts', {});
   }
-  const _savedModule = sessionStorage.getItem('lastModule');
+  const _savedModule = safeSessionGetItem('lastModule');
   currentModule = (_savedModule && enabledModules.includes(_savedModule))
     ? _savedModule
     : (enabledModules.includes(defaultModule) ? defaultModule : enabledModules[0]);
