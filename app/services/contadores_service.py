@@ -1,4 +1,5 @@
 import json
+import logging
 import shutil
 from datetime import date, datetime
 from pathlib import Path
@@ -6,6 +7,8 @@ from pathlib import Path
 from app.models.contadores_models import ContadorCatalogoItem, ContadoresEntrada
 from app.services import cuadre_service, excel_service, startup_state_service
 from app.services.local_data_service import get_local_data_path
+
+logger = logging.getLogger(__name__)
 
 
 _CATALOGO_FILENAME = "contadores_items.json"
@@ -24,7 +27,14 @@ def _get_catalogo_path() -> Path:
         if legacy.exists():
             try:
                 shutil.move(str(legacy), str(target))
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "No se pudo migrar el catálogo legacy de Contadores desde %s hacia %s: %s. "
+                    "Se seguirá usando temporalmente la ruta antigua.",
+                    legacy,
+                    target,
+                    exc,
+                )
                 return legacy
     return target
 
