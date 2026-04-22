@@ -343,6 +343,12 @@ Distribucion actual:
 - `config_operativa.json`
 - `recaudo_ciclos.json`
 
+Regla funcional:
+
+- estos archivos viven junto a los Excel de la sede
+- por eso deben ser legibles tanto por `version-usuario` como por `main`
+- una regla operativa compartida no debe guardarse solo en `data/settings.json`
+
 ### Locales del equipo
 
 - `data/settings.json`
@@ -385,6 +391,12 @@ La aplicacion ya tiene mitigaciones de locking y validacion, pero el riesgo estr
 - util como variante de cierre nocturno
 - port 8000
 - `CajaJDW.spec` / `CajaJDW.exe`
+
+Nota de mantenimiento:
+
+- la rama especial se mantiene reconstruyendola sobre la base mas nueva de `version-usuario`
+- despues se reaplica solo su diferencia propia
+- no conviene dejarla divergir durante muchas tandas seguidas
 
 ## 10. API REST de referencia
 

@@ -97,6 +97,8 @@ Viven junto a los Excel de la sede:
 - `contadores_items.json`
 - `contadores_pausas.json`
 - `startup_state.json`
+- `config_operativa.json`
+- `recaudo_ciclos.json` cuando la sede usa recaudo separado
 
 ### Archivos locales del equipo
 
@@ -107,6 +109,12 @@ Viven en `data/`:
 - `gastos_conceptos.json`
 - `prestamos_personas.json`
 - `movimientos_conceptos.json`
+
+Regla importante:
+
+- lo que vive en `data/` es local al equipo
+- lo que vive junto a los Excel pertenece a la sede y debe ser visible tambien para `main`
+- por eso `config_operativa.json` no debe reemplazarse por `settings.json`
 
 ## 6. Launcher y distribución
 
@@ -213,6 +221,13 @@ Base actualizada de `version-usuario` con una regla extra:
   - `Caja` arranca en `ayer()`
   - `Resumen` también puede verse en `ayer()`
 - al pasar a cualquier otro módulo, todo vuelve a `hoy()`
+
+Patron de mantenimiento:
+
+- primero se estabiliza `version-usuario`
+- luego se reevalua que cambios deben pasar a `main`
+- despues `respaldo-version-especial` se reconstruye sobre la base nueva de `version-usuario`
+- y se reaplica solo su diferencia propia de `ayer()`
 
 ## 10. Límites actuales
 

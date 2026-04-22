@@ -107,6 +107,12 @@ JSON locales del equipo:
 - `data/settings.json`
 - catalogos de nombres, conceptos y personas
 
+Lectura recomendada de esta separacion:
+
+- `data/settings.json` pertenece a la instalacion local
+- `config_operativa.json` y `recaudo_ciclos.json` pertenecen a la sede activa
+- si una regla debe verse igual en `main` y `version-usuario`, no debe quedarse solo en `data/settings.json`
+
 ## Limitaciones del modelo Excel
 
 1. No hay transacciones reales.

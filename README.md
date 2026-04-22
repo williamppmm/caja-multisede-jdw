@@ -125,6 +125,15 @@ Importante:
 
 - los JSON en `data/` son locales y no se comparten por Dropbox
 - `config_operativa.json` y `recaudo_ciclos.json` viven junto a los Excel de la sede, asi que si son compartidos por usuario y super admin
+- en terminos practicos:
+  - `settings.json` define preferencias y comportamiento local del equipo
+  - `config_operativa.json` define reglas operativas compartidas de la sede
+  - `recaudo_ciclos.json` define el estado administrativo compartido del recaudo separado
+
+Regla de trabajo importante:
+
+- no mover reglas por sede a `data/settings.json`
+- si una decision debe verse igual en `main` y en `version-usuario`, debe vivir junto a los Excel de la sede
 
 ## Resumen y Cuadre
 
@@ -172,6 +181,20 @@ Solo en `main` (super admin). Cuando se configura una carpeta de backup:
 - conserva los ultimos 3 dias por sede (elimina lo anterior)
 - los archivos se validan antes de copiar (openpyxl + JSON parse)
 - tambien se puede disparar manualmente desde la interfaz
+
+## Mantenimiento entre ramas
+
+La estrategia actual de trabajo no es usar `main` como unica fuente de cambios.
+
+Regla operativa:
+
+1. muchos ajustes de flujo diario se prueban primero en `version-usuario`
+2. los cambios transversales se portan selectivamente a `main`
+3. `respaldo-version-especial` no evoluciona sola durante mucho tiempo
+4. la rama especial normalmente se reconstruye sobre la base mas nueva de `version-usuario`
+5. luego se reaplica solo su diferencia propia de arranque en `ayer()`
+
+Esto evita que la rama especial se quede atras en fixes ya aprobados para usuario.
 
 ## Contadores y pausa por fecha
 
