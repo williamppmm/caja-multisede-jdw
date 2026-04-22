@@ -1,5 +1,6 @@
 import ctypes
 import json
+import logging
 import socket
 import sys
 import threading
@@ -16,6 +17,7 @@ try:
 except Exception:
     pyi_splash = None
 
+logger = logging.getLogger(__name__)
 
 HOST = "127.0.0.1"
 ERROR_ALREADY_EXISTS = 183
@@ -63,7 +65,8 @@ def _leer_state(app_id: str) -> str | None:
         return None
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as exc:
+        logger.warning("No se pudo leer el state local %s: %s", path, exc)
         return None
     url = str(data.get("url") or "").strip()
     return url or None
@@ -74,8 +77,8 @@ def _limpiar_state(app_id: str) -> None:
     try:
         if path.exists():
             path.unlink()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("No se pudo limpiar el state local %s: %s", path, exc)
 
 
 def _adquirir_mutex(nombre: str):
@@ -83,9 +86,11 @@ def _adquirir_mutex(nombre: str):
         kernel32 = ctypes.windll.kernel32
         handle = kernel32.CreateMutexW(None, False, nombre)
         if not handle:
+            logger.error("No se pudo crear el mutex %s.", nombre)
             return None, False
         return handle, kernel32.GetLastError() == ERROR_ALREADY_EXISTS
-    except Exception:
+    except Exception as exc:
+        logger.exception("Error creando mutex %s: %s", nombre, exc)
         return None, False
 
 
@@ -100,7 +105,8 @@ class StartupSplash:
     def start(self) -> None:
         try:
             import tkinter as tk
-        except Exception:
+        except Exception as exc:
+            logger.warning("No se pudo importar tkinter para el splash: %s", exc)
             return
 
         try:
@@ -141,7 +147,8 @@ class StartupSplash:
             self.root = root
             self._photo = photo
             self._ready = True
-        except Exception:
+        except Exception as exc:
+            logger.warning("No se pudo iniciar el splash de arranque: %s", exc)
             self.root = None
             self._photo = None
             self._ready = False
@@ -151,20 +158,20 @@ class StartupSplash:
             return
         try:
             self.root.mainloop()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("El loop del splash terminó con error: %s", exc)
 
     def close(self) -> None:
         if self.root is not None and self._ready:
             try:
                 self.root.after(0, self.root.destroy)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("No se pudo cerrar la ventana del splash: %s", exc)
         try:
             if pyi_splash is not None:
                 pyi_splash.close()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("No se pudo cerrar pyi_splash: %s", exc)
 
 
 def _esperar_servidor_y_abrir(
@@ -180,19 +187,23 @@ def _esperar_servidor_y_abrir(
                 if splash is not None:
                     splash.close()
                 webbrowser.open(url)
+                logger.info("Servidor listo; navegador abierto en %s", url)
                 return
         except OSError:
             time.sleep(0.4)
     if splash is not None:
         splash.close()
+    logger.error("Timeout esperando el servidor local en %s", url)
 
 
 def _run_server(app, port: int, splash: StartupSplash | None = None) -> None:
     try:
+        logger.info("Iniciando servidor local en http://%s:%s", HOST, port)
         uvicorn.run(app, host=HOST, port=port)
     finally:
         if splash is not None:
             splash.close()
+        logger.info("Servidor local detenido en puerto %s", port)
 
 
 def launch_app(
@@ -207,10 +218,12 @@ def launch_app(
     mutex_handle, already_running = _adquirir_mutex(mutex_name)
 
     if already_running:
+        logger.info("La aplicación %s ya estaba en ejecución; no se abrirá otra instancia.", app_id)
         return
 
     port = _encontrar_puerto_libre(default_port)
     url = f"http://{HOST}:{port}"
+    logger.info("Lanzando %s en %s", app_id, url)
     _guardar_state(app_id, url)
 
     splash = StartupSplash(splash_title, splash_subtitle)
@@ -239,5 +252,5 @@ def launch_app(
             try:
                 ctypes.windll.kernel32.ReleaseMutex(mutex_handle)
                 ctypes.windll.kernel32.CloseHandle(mutex_handle)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("No se pudo liberar el mutex %s: %s", mutex_name, exc)

@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import socket
 import time
@@ -12,6 +13,8 @@ from openpyxl.styles import Alignment, Font, PatternFill
 
 from app.config import ENCABEZADOS, HOJA_REGISTROS, get_consolidado_path, get_excel_path, normalizar_sede_archivo
 from app.services.settings_service import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class ArchivoCajaOcupadoError(Exception):
@@ -247,21 +250,25 @@ def _bloqueo_escritura(path: Path):
             except FileExistsError as exc:
                 age = _lock_age_seconds(lock_path)
                 if age > _LOCK_TTL:
+                    logger.warning("Se detectó un lock huérfano en %s (%.1fs); se eliminará y se reintentará.", lock_path, age)
                     lock_path.unlink(missing_ok=True)
                     continue
                 if time.monotonic() >= deadline:
                     host = _lock_host(lock_path)
                     suffix = f" desde el equipo '{host}'" if host else ""
+                    logger.info("Lock activo detectado para %s%s", path, suffix)
                     raise ArchivoCajaOcupadoError(
                         f"Hay otro guardado en curso{suffix}. Vuelve a intentarlo en unos segundos."
                     ) from exc
                 time.sleep(_LOCK_RETRY_INTERVAL)
                 continue
             except PermissionError as exc:
+                logger.warning("No se pudo crear el lock de escritura para %s por permisos/sincronización: %s", path, exc)
                 raise ArchivoCajaOcupadoError(
                     "No se pudo guardar porque el libro esta abierto o sincronizandose. Cierra Excel y vuelve a intentarlo."
                 ) from exc
             except OSError as exc:
+                logger.warning("No se pudo bloquear el libro %s para escritura: %s", path, exc)
                 raise ArchivoCajaOcupadoError(
                     "No se pudo bloquear el libro para guardar. Vuelve a intentarlo en unos segundos."
                 ) from exc
@@ -270,7 +277,10 @@ def _bloqueo_escritura(path: Path):
         if fd is not None:
             os.close(fd)
         if lock_creado and lock_path.exists():
-            lock_path.unlink(missing_ok=True)
+            try:
+                lock_path.unlink(missing_ok=True)
+            except Exception as exc:
+                logger.warning("No se pudo limpiar el lock %s al finalizar la escritura: %s", lock_path, exc)
 
 
 @contextmanager
@@ -539,6 +549,7 @@ def guardar_filas_modulo(modulo: str, filas: list, year: int, reemplazar_fecha: 
         try:
             wb.save(path)
         except PermissionError as exc:
+            logger.warning("Excel ocupado al guardar %s en %s: %s", modulo, path, exc)
             raise ArchivoCajaOcupadoError(
                 "No se pudo guardar porque el libro esta siendo usado por otro proceso. Intenta nuevamente."
             ) from exc
@@ -585,6 +596,7 @@ def eliminar_fecha_modulo(modulo: str, fecha: date, year: int) -> int:
         try:
             wb.save(path)
         except PermissionError as exc:
+            logger.warning("Excel ocupado al eliminar %s de %s en %s: %s", fecha, modulo, path, exc)
             raise ArchivoCajaOcupadoError(
                 "No se pudo actualizar el libro porque esta ocupado. Intenta nuevamente."
             ) from exc
