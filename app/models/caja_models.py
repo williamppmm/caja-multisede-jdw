@@ -1,3 +1,4 @@
+import math
 from datetime import date
 from typing import Dict, List
 
@@ -64,6 +65,14 @@ class PlataformasEntrada(BaseModel):
     def validar_practisistemas(cls, v):
         if v < 0:
             raise ValueError("La venta de Practisistemas no puede ser negativa")
+        return v
+
+    @field_validator("venta_deportivas")
+    @classmethod
+    def validar_deportivas(cls, v):
+        # Acepta negativos: las pérdidas en Deportivas son válidas por negocio
+        if not math.isfinite(v):
+            raise ValueError("venta_deportivas debe ser un número finito")
         return v
 
 
