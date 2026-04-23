@@ -3613,11 +3613,14 @@ async function guardarAdmin() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items: parseCatalogoTextarea('admin-movimientos-catalogo') }),
     });
-    await fetch('/api/modulos/catalogos/contadores', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: parseContadoresCatalogoGrid() }),
-    });
+    const contadoresCatalogo = parseContadoresCatalogoGrid();
+    if (contadoresCatalogo.length) {
+      await fetch('/api/modulos/catalogos/contadores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: contadoresCatalogo }),
+      });
+    }
     const itemsAgregados = sincronizarReferenciasCatalogo();
     await fetch('/api/settings/startup', {
       method: 'POST',

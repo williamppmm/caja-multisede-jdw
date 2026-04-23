@@ -88,6 +88,9 @@ def guardar_catalogo(items: list[dict]) -> list[dict]:
         vistos.add(key)
         normalizados.append(item.model_dump())
 
+    if not normalizados:
+        return obtener_catalogo()
+
     _guardar_json(_get_catalogo_path(), normalizados)
     return obtener_catalogo()
 
