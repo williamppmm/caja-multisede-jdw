@@ -259,6 +259,44 @@ Reglas actuales:
 Proposito:
 
 - agrupar por periodo la informacion de modulos
+
+### Faltantes
+
+`Faltantes` existe como modulo formal en:
+
+- `main`
+
+Proposito:
+
+- volver visible el historico operativo de diferencias de `Cuadre`
+- ayudar a detectar faltantes recurrentes sin obligar al usuario a abrir Excel
+
+Reglas:
+
+- no depende del date picker compartido
+- trabaja anclado al presente operativo
+- `hoy()` se muestra como pendiente visual y no entra como cierre evaluado
+- usa solo el `Consolidado_{sede}_{ano}.xlsx` del ano actual
+- no crea persistencia nueva
+
+Estados operativos internos:
+
+- `FALTANTE`
+- `SOBRANTE`
+- `OK`
+- `PENDIENTE`
+- `NO OPERO`
+
+Presentacion actual:
+
+- `Semana actual` abierta por defecto
+- `Semanas anteriores del mes` colapsadas
+- `Meses anteriores del ano` colapsados
+- el detalle visible por dia muestra solo:
+  - fecha
+  - diferencia
+
+La intencion del modulo no es rehacer `Cuadre`, sino exponer de forma legible el comportamiento acumulado de sus diferencias.
 - exponer totales y detalle operativo
 
 No hace balance contable completo.

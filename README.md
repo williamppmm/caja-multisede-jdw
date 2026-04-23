@@ -23,6 +23,7 @@ La convencion actual es mantener un solo `.spec` y un solo `.exe` final por rama
 - Arranque refinado con instancia unica, splash y espera correcta antes de abrir navegador.
 - Persistencia anual por sede.
 - Soporte multisede, referencias externas de plataformas y respaldos automaticos en `main`.
+- Modulo `Faltantes` en `main` para leer el historico de `Cuadre` del ano actual y exponer diferencias operativas sin depender del date picker.
 - Autocompletado por coincidencia exacta, prefijo y fuzzy en modulos con catalogo.
 - Normalizacion de clientes y personas como NomPropios en Bonos y Prestamos.
 - Panel de recaudo para sedes que separan monedas y billetes viejos de la base operativa.
@@ -155,6 +156,20 @@ Regla de trabajo importante:
 - se autoguarda cuando `Caja` y `Contadores` del periodo ya estan listos
 - si luego se corrige otro modulo del mismo periodo, resincroniza el `Cuadre` afectado
 - si se corrige `Caja` y cambia `base_nueva`, tambien resincroniza el siguiente `Cuadre`
+
+`Faltantes`:
+
+- hoy existe como modulo formal en `main`
+- no depende del date picker compartido
+- siempre se consulta desde el presente operativo
+- toma `hoy()` como referencia visual y deja ese dia como pendiente
+- lee la hoja `Cuadre` de `Consolidado_{sede}_{ano}.xlsx`
+- muestra:
+  - semana actual abierta
+  - semanas anteriores del mes colapsadas
+  - meses anteriores del ano colapsados
+- usa el neto de diferencias por bloque como resumen compacto
+- la visualizacion diaria simplificada muestra solo `Fecha` y `Diferencia`
 
 En sedes con `excluir_monedas_viejos_base: true` en `config_operativa.json`, la `base_nueva` excluye `total_monedas` y `billetes_viejos`, y esa misma regla debe verse igual en `version-usuario`, `main` y `respaldo-version-especial`.
 

@@ -163,6 +163,15 @@ Responsabilidades:
 - registrar entregas parciales
 - cerrar ciclos
 
+### Router de diferencias
+
+- [diferencias.py](C:\Users\User\Desktop\Caja\app\routers\diferencias.py)
+
+Responsabilidades:
+
+- exponer el panel consolidado del modulo `Faltantes`
+- devolver solo la estructura necesaria para pintar la semana actual, semanas previas del mes y meses previos del ano
+
 ## Servicios por modulo
 
 ### Caja y modulos simples
@@ -258,6 +267,27 @@ Responsabilidades:
 - validar cada archivo antes de copiarlo (openpyxl + JSON parse)
 - conservar solo los ultimos 3 dias por sede (retencio RETENTION_DAYS = 3)
 - registrar cada operacion en `backup_log.jsonl`
+
+### Diferencias / Faltantes
+
+- [diferencias_service.py](C:\Users\User\Desktop\Caja\app\services\diferencias_service.py)
+
+Responsabilidades:
+
+- leer la hoja `Cuadre` del `Consolidado_{sede}_{ano}.xlsx` vigente
+- construir el estado diario del ano actual hasta `hoy()`
+- clasificar dias en torno a la diferencia registrada
+- agrupar la salida por:
+  - semana actual
+  - semanas previas del mes
+  - meses previos del ano
+- calcular el neto de diferencias por bloque para mostrarlo como badge compacto en frontend
+
+Decision tecnica importante:
+
+- el modulo `Faltantes` en `main` no depende del date picker compartido
+- se consulta siempre desde el presente operativo
+- por eso el endpoint devuelve un panel listo para render y no una consulta abierta por fecha arbitraria
 
 Programacion:
 

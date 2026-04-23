@@ -254,7 +254,44 @@ Resultado esperado:
 - la recarga mantiene la fecha manual elegida en esa misma sede
 - al cambiar a otra sede, se recalcula la sugerencia inicial de esa nueva sede
 
-## G. Recaudo
+## G. Faltantes (`main`)
+
+### G-01 — Apertura del modulo
+
+1. habilitar `Faltantes` en `main`
+2. abrir el modulo
+
+Resultado esperado:
+
+- el panel abre sin usar el date picker
+- se ocultan los controles de fecha, guardar y limpiar propios de captura
+- la `Semana actual` aparece visible al entrar
+
+### G-02 — Semana actual y dia pendiente
+
+1. abrir `Faltantes` en una sede con historico de `Cuadre`
+2. revisar la fila correspondiente a `hoy()`
+
+Resultado esperado:
+
+- `hoy()` no aparece como diferencia cerrada
+- se muestra como valor pendiente visual
+- los dias previos de la semana muestran su diferencia real
+
+### G-03 — Historico colapsado
+
+1. abrir `Faltantes`
+2. expandir una semana anterior del mes
+3. expandir un mes previo del ano
+
+Resultado esperado:
+
+- las semanas anteriores del mes aparecen colapsadas
+- los meses anteriores del ano aparecen colapsados
+- cada bloque muestra su neto resumido
+- al expandir, el detalle diario muestra solo `Fecha` y `Diferencia`
+
+## H. Recaudo
 
 ### RC-01 — Panel no visible sin flag
 
@@ -296,7 +333,7 @@ Resultado esperado:
 - se inicia un nuevo ciclo
 - el panel conserva solo el ciclo actual y el mensaje del ultimo cierre
 
-## H. Ramas
+## I. Ramas
 
 ### F-01 — `main`
 
@@ -329,7 +366,7 @@ Resultado esperado:
 - `Caja` y `Resumen` respetan `ayer()` al inicio
 - al pasar a otro modulo, todo vuelve a `hoy()`
 
-## I. Respaldo automatico (`main`)
+## J. Respaldo automatico (`main`)
 
 ### G-01 — Configuracion de backup
 
