@@ -141,7 +141,7 @@ def save_settings(data: dict) -> None:
 
 
 def _normalizar_modulos(value) -> list[str]:
-    permitidos = ["bonos", "gastos", "prestamos", "movimientos", "plataformas", "contadores", "caja", "cuadre", "resumen"]
+    permitidos = ["bonos", "gastos", "prestamos", "movimientos", "plataformas", "contadores", "caja", "cuadre", "resumen", "faltantes"]
     if not isinstance(value, list):
         value = ["caja"]
     modulos = [str(v).strip().lower() for v in value if str(v).strip().lower() in permitidos]

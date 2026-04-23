@@ -24,7 +24,7 @@
       </div>
     </div>
 
-    <section class="card card-contexto card-fecha">
+    <section id="fecha-card" class="card card-contexto card-fecha">
       <h2>Fecha</h2>
       <div class="fecha-row">
         <label for="fecha" id="fecha-label">Fecha del módulo</label>
@@ -749,7 +749,33 @@
       </div>
     </section>
 
-    <section class="card card-acciones">
+    <section id="panel-faltantes" class="modulo-panel oculto">
+      <div class="cuadre-grid faltantes-grid">
+        <section class="card">
+          <div class="cuadre-seccion-header">
+            <h2 id="faltantes-semana-actual-label">Semana actual</h2>
+            <span id="faltantes-semana-actual-badge" class="cuadre-total-badge"></span>
+          </div>
+          <div id="faltantes-semana-actual"></div>
+        </section>
+
+        <section class="card">
+          <div class="cuadre-seccion-header">
+            <h2>Semanas anteriores del mes</h2>
+          </div>
+          <div id="faltantes-semanas-mes"></div>
+        </section>
+
+        <section class="card">
+          <div class="cuadre-seccion-header">
+            <h2>Meses anteriores del año</h2>
+          </div>
+          <div id="faltantes-meses-previos"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="acciones-card" class="card card-acciones">
       <button id="btn-guardar" class="btn btn-primary">Guardar</button>
       <button id="btn-limpiar" class="btn btn-secondary">Limpiar</button>
       <button id="btn-ultima" class="btn btn-info">Último registro</button>
@@ -800,6 +826,7 @@
               <label><input type="checkbox" name="enabled_modules" value="contadores" /> Contadores</label>
               <label><input type="checkbox" name="enabled_modules" value="cuadre" /> Cuadre</label>
               <label><input type="checkbox" name="enabled_modules" value="resumen" /> Resumen</label>
+              <label><input type="checkbox" name="enabled_modules" value="faltantes" /> Faltantes</label>
             </div>
           </div>
           <div class="campo-config">
