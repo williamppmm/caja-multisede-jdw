@@ -572,52 +572,56 @@ def guardar_cuadre(entrada, base_anterior: float) -> dict:
     }
 
 
-def autoguardar_cuadre_si_listo(fecha: date) -> dict | None:
-    """Sincroniza el Cuadre derivado cuando ya existen Caja y Contadores del día.
-
-    Solo se ejecuta si la base anterior ya está resuelta por un cuadre previo
-    o por startup_state; cuando la base requiere ingreso manual se omite.
-    """
-    year = fecha.year
-    if not excel_service.fecha_existe_modulo("caja", fecha, year):
+def buscar_fecha_cuadre_afectado(fecha_operacion: date) -> date | None:
+    cuadre = excel_service.obtener_cuadre_que_contiene_fecha(fecha_operacion)
+    if not cuadre:
         return None
-    if not excel_service.fecha_existe_modulo("contadores", fecha, year):
+    try:
+        return date.fromisoformat(cuadre["fecha"])
+    except ValueError:
         return None
 
-    preconds = verificar_precondiciones(fecha)
+
+def sincronizar_cuadre_guardado(fecha_cierre: date) -> dict:
+    preconds = verificar_precondiciones(fecha_cierre)
     if not preconds["ok"] or not preconds["tiene_base_anterior"]:
+        return {
+            "ok": False,
+            "recalculado": False,
+            "fecha_cuadre": str(fecha_cierre),
+            "mensaje": (
+                f"La corrección afecta el Cuadre de {_fmt(fecha_cierre)}, "
+                "pero ya no cumple precondiciones y requiere revisión manual."
+            ),
+        }
+
+    entrada = SimpleNamespace(fecha=fecha_cierre, forzar=True)
+    resultado = guardar_cuadre(entrada, float(preconds["base_anterior"] or 0))
+    if resultado.get("ok"):
+        return {
+            "ok": True,
+            "recalculado": True,
+            "fecha_cuadre": str(fecha_cierre),
+            "mensaje": f"Cuadre de {_fmt(fecha_cierre)} recalculado automáticamente.",
+        }
+    return {
+        "ok": False,
+        "recalculado": False,
+        "fecha_cuadre": str(fecha_cierre),
+        "mensaje": resultado.get("mensaje") or f"No se pudo resincronizar el Cuadre de {_fmt(fecha_cierre)}.",
+    }
+
+
+def sincronizar_cuadre_afectado(fecha_operacion: date) -> dict | None:
+    fecha_cierre = buscar_fecha_cuadre_afectado(fecha_operacion)
+    if fecha_cierre is None:
         return None
-
-    entrada = SimpleNamespace(
-        fecha=fecha,
-        forzar=excel_service.fecha_existe_modulo("cuadre", fecha, year),
-    )
-    return guardar_cuadre(entrada, float(preconds["base_anterior"] or 0))
+    return sincronizar_cuadre_guardado(fecha_cierre)
 
 
-def sincronizar_cuadre_afectado(fecha: date) -> dict | None:
-    """Wrapper semántico sobre autoguardar_cuadre_si_listo para módulos auxiliares.
-
-    Retorna None si no hay cuadre que sincronizar (sin Caja/Contadores o sin base).
-    Retorna dict con ok=True/False según el resultado del guardado.
-    """
-    cuadre = excel_service.obtener_cuadre_que_contiene_fecha(fecha)
-    if not cuadre:
-        return None
-    try:
-        fecha_cierre = date.fromisoformat(cuadre["fecha"])
-    except ValueError:
-        return None
-    return autoguardar_cuadre_si_listo(fecha_cierre)
-
-def sincronizar_cadena_caja(fecha: date) -> dict | None:
-    cuadre = excel_service.obtener_cuadre_que_contiene_fecha(fecha)
-    if not cuadre:
-        return None
-
-    try:
-        fecha_cierre = date.fromisoformat(cuadre["fecha"])
-    except ValueError:
+def sincronizar_cadena_caja(fecha_operacion: date) -> dict | None:
+    fecha_cierre = buscar_fecha_cuadre_afectado(fecha_operacion)
+    if fecha_cierre is None:
         return None
 
     mensajes: list[str] = []
@@ -629,7 +633,7 @@ def sincronizar_cadena_caja(fecha: date) -> dict | None:
         else None
     )
 
-    sync_result = autoguardar_cuadre_si_listo(fecha_cierre)
+    sync_result = sincronizar_cuadre_guardado(fecha_cierre)
     if sync_result and sync_result.get("mensaje"):
         mensajes.append(sync_result["mensaje"])
     if not sync_result or not sync_result.get("ok"):
@@ -679,7 +683,7 @@ def sincronizar_cadena_caja(fecha: date) -> dict | None:
             "mensaje": " ".join(mensajes).strip(),
         }
 
-    sync_siguiente = autoguardar_cuadre_si_listo(fecha_siguiente)
+    sync_siguiente = sincronizar_cuadre_guardado(fecha_siguiente)
     if sync_siguiente and sync_siguiente.get("mensaje"):
         mensajes.append(sync_siguiente["mensaje"])
 
@@ -697,3 +701,32 @@ def sincronizar_cadena_caja(fecha: date) -> dict | None:
         "fecha_cuadre": str(fecha_cierre),
         "mensaje": " ".join(mensajes).strip(),
     }
+
+
+def anexar_mensaje_sync(mensaje_base: str, sync_result: dict | None) -> str:
+    if not sync_result or not sync_result.get("mensaje"):
+        return mensaje_base
+    return f"{mensaje_base}. {sync_result['mensaje']}"
+
+
+def autoguardar_cuadre_si_listo(fecha: date) -> dict | None:
+    """Sincroniza el Cuadre derivado cuando ya existen Caja y Contadores del día.
+
+    Solo se ejecuta si la base anterior ya está resuelta por un cuadre previo
+    o por startup_state; cuando la base requiere ingreso manual se omite.
+    """
+    year = fecha.year
+    if not excel_service.fecha_existe_modulo("caja", fecha, year):
+        return None
+    if not excel_service.fecha_existe_modulo("contadores", fecha, year):
+        return None
+
+    preconds = verificar_precondiciones(fecha)
+    if not preconds["ok"] or not preconds["tiene_base_anterior"]:
+        return None
+
+    entrada = SimpleNamespace(
+        fecha=fecha,
+        forzar=excel_service.fecha_existe_modulo("cuadre", fecha, year),
+    )
+    return guardar_cuadre(entrada, float(preconds["base_anterior"] or 0))

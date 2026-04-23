@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from app.config import DENOMINACIONES
 from app.models.caja_models import CajaEntrada, ModuloItemsEntrada, PlataformasEntrada
-from app.services import excel_service, nombres_service
+from app.services import cuadre_service, excel_service, nombres_service
 
 
 ROW_TYPES = {
@@ -76,15 +76,16 @@ def guardar_caja(entrada: CajaEntrada) -> dict:
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
-    from app.services import cuadre_service
-
-    sync_result = cuadre_service.sincronizar_cadena_caja(entrada.fecha)
     mensaje = "Caja guardada correctamente"
-    fecha_fmt = entrada.fecha.strftime("%d-%m-%Y")
-    if sync_result and sync_result.get("ok"):
-        mensaje += f". Tus cambios han afectado el Cuadre del {fecha_fmt}"
-    elif sync_result and not sync_result.get("ok"):
-        mensaje += ". Tus cambios podrían no reflejarse en el Cuadre de inmediato"
+    if entrada.forzar:
+        mensaje = cuadre_service.anexar_mensaje_sync(
+            mensaje,
+            cuadre_service.sincronizar_cadena_caja(entrada.fecha),
+        )
+    else:
+        sync_result = cuadre_service.autoguardar_cuadre_si_listo(entrada.fecha)
+        if sync_result and sync_result.get("ok"):
+            mensaje += " y Cuadre sincronizado automaticamente"
 
     return {
         "ok": True,
@@ -122,18 +123,11 @@ def guardar_plataformas(entrada: PlataformasEntrada) -> dict:
     except excel_service.ArchivoCajaOcupadoError as exc:
         return {"ok": False, "mensaje": str(exc), "fecha": str(entrada.fecha)}
 
-    from app.services import cuadre_service
-    sync = cuadre_service.sincronizar_cuadre_afectado(entrada.fecha)
-    fecha_fmt = entrada.fecha.strftime("%d-%m-%Y")
-    mensaje = "Plataformas guardadas correctamente"
-    if sync and sync.get("ok"):
-        mensaje += f". Tus cambios han afectado el Cuadre del {fecha_fmt}"
-    elif sync and not sync.get("ok"):
-        mensaje += ". Tus cambios podrían no reflejarse en el Cuadre de inmediato"
+    sync_result = cuadre_service.sincronizar_cuadre_afectado(entrada.fecha)
 
     return {
         "ok": True,
-        "mensaje": mensaje,
+        "mensaje": cuadre_service.anexar_mensaje_sync("Plataformas guardadas correctamente", sync_result),
         "fecha": str(entrada.fecha),
         "venta_practisistemas": float(entrada.venta_practisistemas or 0),
         "venta_deportivas": float(entrada.venta_deportivas or 0),
@@ -170,18 +164,10 @@ def guardar_items_modulo(modulo: str, entrada: ModuloItemsEntrada) -> dict:
         "movimientos": "Movimientos",
     }.get(modulo, modulo.title())
 
-    from app.services import cuadre_service
-    sync = cuadre_service.sincronizar_cuadre_afectado(entrada.fecha)
-    fecha_fmt = entrada.fecha.strftime("%d-%m-%Y")
-    mensaje = f"{nombre} guardados correctamente"
-    if sync and sync.get("ok"):
-        mensaje += f". Tus cambios han afectado el Cuadre del {fecha_fmt}"
-    elif sync and not sync.get("ok"):
-        mensaje += ". Tus cambios podrían no reflejarse en el Cuadre de inmediato"
-
+    sync_result = cuadre_service.sincronizar_cuadre_afectado(entrada.fecha)
     return {
         "ok": True,
-        "mensaje": mensaje,
+        "mensaje": cuadre_service.anexar_mensaje_sync(f"{nombre} guardados correctamente", sync_result),
         "fecha": str(entrada.fecha),
         "total": total,
         "cantidad_items": cantidad,
