@@ -127,6 +127,12 @@ Lo que hace hoy:
 - espera del servidor antes de abrir navegador
 - evita pestañas duplicadas por múltiples clics
 
+En `main`, además:
+
+- la primera carga de una sede usa como fecha sugerida el dia siguiente al ultimo `Cuadre`
+- si la sesion ya estaba trabajando otra fecha en esa misma sede, un `F5` conserva esa fecha
+- al cambiar de sede, la sugerencia se recalcula para la nueva sede
+
 Archivo central:
 
 - [launcher_boot.py](../launcher_boot.py)
@@ -162,6 +168,8 @@ La autorización general por fecha sigue siendo otra capa aparte cuando aplica.
 ### Cuadre y resincronización
 
 El sistema ya resincroniza el `Cuadre` afectado cuando una corrección cambia datos de un período cerrado.
+
+Tambien autoguarda `Cuadre` cuando el periodo ya tiene `Caja` y `Contadores` listos y la base previa esta resuelta.
 
 Además, si una corrección en `Caja` cambia la `base_nueva` de un cierre:
 

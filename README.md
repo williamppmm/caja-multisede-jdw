@@ -152,6 +152,9 @@ Regla de trabajo importante:
 - compara contra `caja_fisica`
 - genera `diferencia`
 - define `base_nueva`
+- se autoguarda cuando `Caja` y `Contadores` del periodo ya estan listos
+- si luego se corrige otro modulo del mismo periodo, resincroniza el `Cuadre` afectado
+- si se corrige `Caja` y cambia `base_nueva`, tambien resincroniza el siguiente `Cuadre`
 
 En sedes con `excluir_monedas_viejos_base: true` en `config_operativa.json`, la `base_nueva` excluye `total_monedas` y `billetes_viejos`, y esa misma regla debe verse igual en `version-usuario`, `main` y `respaldo-version-especial`.
 
@@ -181,6 +184,16 @@ Solo en `main` (super admin). Cuando se configura una carpeta de backup:
 - conserva los ultimos 3 dias por sede (elimina lo anterior)
 - los archivos se validan antes de copiar (openpyxl + JSON parse)
 - tambien se puede disparar manualmente desde la interfaz
+
+## Arranque por sede en `main`
+
+En `main`, cuando hay una sede activa:
+
+- en la primera carga de esa sede, la fecha sugerida parte del dia siguiente al ultimo `Cuadre`
+- si el usuario ya se movio manualmente a otra fecha y hace `F5`, se conserva esa fecha en la misma sede
+- si cambia de sede, vuelve a aplicarse la sugerencia inicial propia de la nueva sede
+
+Esto evita que super admin pierda el contexto de correccion al recargar la app.
 
 ## Mantenimiento entre ramas
 

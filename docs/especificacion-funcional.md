@@ -38,6 +38,12 @@ El estado inicial (`startup_state.json`) permite definir:
 
 En general la sesion usa una fecha compartida entre modulos.
 
+En `main`, cuando hay sede activa:
+
+- la primera carga de esa sede puede sugerir el dia siguiente al ultimo `Cuadre`
+- una recarga posterior (`F5`) dentro de la misma sede conserva la fecha que ya estaba usando la sesion
+- al cambiar de sede, se recalcula la sugerencia inicial propia de esa sede
+
 Excepcion:
 
 - en `respaldo-version-especial`, durante la primera interaccion:
@@ -277,6 +283,8 @@ Persistencia:
 - hoja `Cuadre` de `Consolidado_{sede}_{ano}.xlsx`
 
 ## 5. Resincronizacion de Cuadre
+
+Cuando un periodo ya tiene `Caja` y `Contadores` listos, el sistema puede autoguardar su `Cuadre`.
 
 Cuando se corrige informacion que afecta un periodo ya cuadrado:
 

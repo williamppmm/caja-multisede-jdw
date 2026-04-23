@@ -231,6 +231,29 @@ Resultado esperado:
 - se recalcula el `Cuadre` afectado
 - si cambia `base_nueva`, tambien se recalcula el siguiente
 
+### E-04 — Autoguardado de Cuadre cuando el dia queda listo
+
+1. partir de una fecha sin `Cuadre`
+2. guardar `Caja` y `Contadores` del periodo, en cualquier orden
+
+Resultado esperado:
+
+- el sistema autoguarda el `Cuadre`
+- la hoja `Cuadre` queda creada en Excel sin tener que pulsar `Guardar Cuadre`
+
+### E-05 — Fecha sugerida por sede solo en primera carga
+
+1. en `main`, elegir una sede cuyo ultimo `Cuadre` sea de un dia anterior
+2. abrir la app y verificar que arranca en el dia siguiente sugerido
+3. moverse manualmente a otra fecha de correccion
+4. hacer `F5`
+
+Resultado esperado:
+
+- la primera carga de la sede usa la fecha sugerida
+- la recarga mantiene la fecha manual elegida en esa misma sede
+- al cambiar a otra sede, se recalcula la sugerencia inicial de esa nueva sede
+
 ## G. Recaudo
 
 ### RC-01 — Panel no visible sin flag
