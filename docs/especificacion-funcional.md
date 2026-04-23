@@ -574,6 +574,18 @@ Es el valor de `base_nueva` del cuadre inmediatamente anterior. En el primer cua
 - Si `startup_state` está activo: usa `caja_inicial`.
 - Si no: el usuario puede ingresar una base manualmente en la interfaz (campo editable en el formulario del Cuadre).
 
+### 11.4.1 Autoguardado y resincronización
+
+Cuando un periodo ya tiene `Caja` y `Contadores` listos, el sistema puede autoguardar su `Cuadre` sin exigir que el usuario pulse manualmente `Guardar Cuadre`.
+
+Si después se corrige información que afecta un periodo ya cuadrado:
+
+- se resincroniza el `Cuadre` cuyo periodo contiene esa fecha
+
+Si la corrección es en `Caja` y cambia la `base_nueva`:
+
+- también se resincroniza el siguiente `Cuadre`
+
 ### 11.5 Vista del cuadre
 
 La interfaz muestra:

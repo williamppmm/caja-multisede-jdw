@@ -648,6 +648,36 @@ Resultado esperado:
 - la caja teórica coincide con el cálculo manual
 - la diferencia coincide con caja física menos caja teórica
 
+## CQ-06 — Autoguardado de Cuadre cuando el día queda listo
+
+Prioridad: Alta
+
+Pasos:
+
+1. Partir de una fecha sin `Cuadre`.
+2. Guardar `Caja` y `Contadores` del periodo, en cualquier orden.
+
+Resultado esperado:
+
+- el sistema autoguarda el `Cuadre`
+- la hoja `Cuadre` queda creada en Excel sin tener que pulsar `Guardar Cuadre`
+
+## CQ-07 — Resincronización por corrección y por cambio de Caja
+
+Prioridad: Alta
+
+Pasos:
+
+1. Tener un `Cuadre` ya guardado.
+2. Corregir un módulo dentro de su periodo.
+3. Confirmar que el `Cuadre` afectado se actualiza.
+4. Luego corregir `Caja` de un periodo que ya tenga un siguiente `Cuadre`.
+
+Resultado esperado:
+
+- el `Cuadre` afectado se resincroniza
+- si la corrección de `Caja` cambia `base_nueva`, también se recalcula el siguiente `Cuadre`
+
 ## Pruebas de Excel y persistencia
 
 ## EX-01 — Libro abierto en Excel

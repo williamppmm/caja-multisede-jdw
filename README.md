@@ -178,6 +178,16 @@ Ejemplo:
 | SanJose | `Contadores_SanJose_2026.xlsx` | `Consolidado_SanJose_2026.xlsx` |
 | Satinga | `Contadores_Satinga_2026.xlsx` | `Consolidado_Satinga_2026.xlsx` |
 
+## Comportamiento actual de Cuadre
+
+`Cuadre` hoy sigue esta lógica:
+
+- se autoguarda cuando `Caja` y `Contadores` del periodo ya están listos
+- si luego se corrige otro módulo del mismo periodo, resincroniza el `Cuadre` afectado
+- si se corrige `Caja` y cambia `base_nueva`, también resincroniza el siguiente `Cuadre`
+
+Esto aplica especialmente a la operación diaria de `version-usuario` y a la base que luego hereda la rama especial.
+
 ## Límite importante con Dropbox
 
 La app usa un bloqueo local `.lock` para reducir guardados simultáneos en el mismo equipo, pero no tiene coordinación central entre varios equipos.
