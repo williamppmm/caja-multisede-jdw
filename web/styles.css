@@ -1625,6 +1625,10 @@ body.auth-banner-open::before {
   background: #c62828;
 }
 
+.cuadre-badge-positivo {
+  background: #1f7a44;
+}
+
 .cuadre-seccion-sub {
   font-size: 0.88rem;
   color: #6b7a99;
@@ -1684,6 +1688,89 @@ body.auth-banner-open::before {
   margin: 0 0 14px;
   border-bottom: 1px solid #c3d0f0;
   padding-bottom: 8px;
+}
+
+
+.faltantes-grid .card {
+  overflow: hidden;
+}
+
+.faltantes-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.faltantes-tabla th:nth-child(2),
+.faltantes-tabla td:nth-child(2) {
+  text-align: right;
+}
+
+.faltantes-detalle {
+  border-top: 1px solid #edf1f7;
+  padding-top: 10px;
+  margin-top: 10px;
+}
+
+.faltantes-detalle:first-child {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.faltantes-detalle > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.faltantes-resumen-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border-soft);
+  color: var(--brand);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.faltantes-subgrupos {
+  margin-top: 8px;
+}
+
+.faltantes-diferencia-negativa {
+  color: #a61d24;
+  font-weight: 700;
+}
+
+.faltantes-diferencia-positiva {
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.faltantes-diferencia-vacia {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.faltantes-diferencia-hoy {
+  color: #9a650d;
+  font-weight: 700;
+}
+
+@media (max-width: 920px) {
+  .faltantes-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .faltantes-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 

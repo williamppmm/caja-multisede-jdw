@@ -161,7 +161,7 @@ def _resolver_settings() -> dict:
         data["enabled_modules"] = _normalizar_modulos(
             data["enabled_modules"] or _normalizar_modulos(list(_DEFAULTS["enabled_modules"]))
         )
-        all_modules = ["caja", "plataformas", "gastos", "bonos", "prestamos", "movimientos", "contadores", "cuadre"]
+        all_modules = ["caja", "plataformas", "gastos", "bonos", "prestamos", "movimientos", "contadores", "cuadre", "faltantes"]
         for m in all_modules:
             if m not in data["enabled_modules"]:
                 data["enabled_modules"].append(m)
@@ -358,7 +358,7 @@ def get_plataformas_ref_config() -> dict:
 
 
 def _normalizar_modulos(value) -> list[str]:
-    permitidos = ["bonos", "gastos", "prestamos", "movimientos", "plataformas", "contadores", "caja", "cuadre"]
+    permitidos = ["bonos", "gastos", "prestamos", "movimientos", "plataformas", "contadores", "caja", "cuadre", "faltantes"]
     if not isinstance(value, list):
         value = ["caja"]
     modulos = [str(v).strip().lower() for v in value if str(v).strip().lower() in permitidos]

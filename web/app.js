@@ -11,6 +11,7 @@ const MODULE_META = {
   movimientos: { label: 'Movimientos', panelId: 'panel-movimientos', dateLabel: 'Fecha de movimientos' },
   contadores: { label: 'Contadores', panelId: 'panel-contadores', dateLabel: 'Fecha de contadores' },
   cuadre: { label: 'Cuadre', panelId: 'panel-cuadre', dateLabel: 'Fecha del cuadre' },
+  faltantes: { label: 'Faltantes', panelId: 'panel-faltantes', dateLabel: 'Control actual de faltantes' },
 };
 
 let configModoEntrada = 'cantidad';
@@ -26,7 +27,7 @@ let configActiveSite = null;
 let currentModule = 'caja';
 const cajaInputSessionToken = `caja_${Date.now().toString(36)}`;
 let moduleDates = {};
-let adminOverride = { caja: null, plataformas: null, gastos: null, bonos: null, prestamos: null, movimientos: null, contadores: null, cuadre: null };
+let adminOverride = { caja: null, plataformas: null, gastos: null, bonos: null, prestamos: null, movimientos: null, contadores: null, cuadre: null, faltantes: null };
 let cuadreDatos = null;
 let debounceTimer = null;
 let pendingAdminAction = null;
@@ -2153,10 +2154,14 @@ function actualizarPaneles() {
   Object.entries(MODULE_META).forEach(([modulo, meta]) => {
     document.getElementById(meta.panelId).classList.toggle('oculto', modulo !== currentModule);
   });
+  const esFaltantes = currentModule === 'faltantes';
+  document.getElementById('fecha-card').classList.toggle('oculto', esFaltantes);
   document.getElementById('fecha-label').textContent = MODULE_META[currentModule].dateLabel;
-  document.getElementById('btn-guardar').classList.toggle('oculto', ['bonos', 'gastos', 'prestamos', 'movimientos', 'cuadre'].includes(currentModule));
+  document.getElementById('btn-guardar').classList.toggle('oculto', ['bonos', 'gastos', 'prestamos', 'movimientos', 'cuadre', 'faltantes'].includes(currentModule));
+  document.getElementById('btn-limpiar').classList.toggle('oculto', esFaltantes);
+  document.getElementById('btn-ultima').classList.toggle('oculto', esFaltantes);
   document.getElementById('btn-guardar').textContent = 'Guardar';
-  document.getElementById('btn-ir-cuadre').classList.toggle('oculto', currentModule === 'cuadre' || !enabledModules.includes('cuadre'));
+  document.getElementById('btn-ir-cuadre').classList.toggle('oculto', currentModule === 'cuadre' || !enabledModules.includes('cuadre') || esFaltantes);
   actualizarBonosVisuales();
   actualizarPrestamosVisuales();
   actualizarMovimientosVisuales();
@@ -2312,6 +2317,14 @@ async function verificarFechaActual() {
   const fecha = document.getElementById('fecha').value;
   const estado = document.getElementById('fecha-estado');
   const btnGuardar = document.getElementById('btn-guardar');
+
+  if (currentModule === 'faltantes') {
+    estado.textContent = '';
+    estado.className = 'fecha-estado';
+    btnGuardar.disabled = true;
+    guardarEstadoModulo(currentModule, hoyStr(), { existe: true, solo_lectura: true });
+    return;
+  }
 
   if (!fecha) {
     estado.textContent = '';
@@ -2660,7 +2673,128 @@ async function cargarDatosContadores(fecha) {
   }
 }
 
+function claseValorDiferencia(valor) {
+  if (valor == null) return 'faltantes-diferencia-vacia';
+  return valor < 0 ? 'faltantes-diferencia-negativa' : 'faltantes-diferencia-positiva';
+}
+
+function actualizarBadgeDiferencias(el, valor) {
+  if (!el) return;
+  el.textContent = fmt(valor || 0);
+  el.classList.remove('cuadre-badge-negativo', 'cuadre-badge-positivo');
+  if ((valor || 0) < 0) {
+    el.classList.add('cuadre-badge-negativo');
+  } else if ((valor || 0) > 0) {
+    el.classList.add('cuadre-badge-positivo');
+  }
+}
+
+function renderTablaDiasDiferencias(dias = []) {
+  if (!dias.length) {
+    return '<p class="modulo-ayuda">No hay datos para mostrar en este tramo.</p>';
+  }
+  const hoy = hoyStr();
+  const filas = dias.map(item => {
+    const esHoy = item.fecha === hoy;
+    const claseCelda = esHoy && item.diferencia == null ? 'faltantes-diferencia-hoy' : claseValorDiferencia(item.diferencia);
+    const contenido = item.diferencia == null
+      ? (esHoy ? 'Hoy' : '—')
+      : fmt(item.diferencia);
+    return `
+      <tr>
+        <td>${formatFechaVisual(item.fecha)}</td>
+        <td class="${claseCelda}">${contenido}</td>
+      </tr>
+    `;
+  }).join('');
+  return `
+    <div class="bonos-listado-wrap">
+      <table class="bonos-tabla faltantes-tabla">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Diferencia</th>
+          </tr>
+        </thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderGrupoSemanaDiferencias(semana, openDefault = false) {
+  if (!semana) return '';
+  return `
+    <details class="faltantes-detalle" ${openDefault ? 'open' : ''}>
+      <summary>
+        <span>${semana.label}</span>
+        <span class="faltantes-resumen-chip">${fmt(semana.resumen?.neto_diferencias || 0)}</span>
+      </summary>
+      ${renderTablaDiasDiferencias(semana.dias || [])}
+    </details>
+  `;
+}
+
+function renderGrupoMesDiferencias(mes) {
+  if (!mes) return '';
+  const semanas = (mes.semanas || []).map(semana => renderGrupoSemanaDiferencias(semana)).join('');
+  return `
+    <details class="faltantes-detalle">
+      <summary>
+        <span>${mes.label}</span>
+        <span class="faltantes-resumen-chip">${fmt(mes.resumen?.neto_diferencias || 0)}</span>
+      </summary>
+      <div class="faltantes-subgrupos">
+        ${semanas || '<p class="modulo-ayuda">Sin semanas con datos para este mes.</p>'}
+      </div>
+    </details>
+  `;
+}
+
+function limpiarPanelFaltantes() {
+  document.getElementById('faltantes-semana-actual-label').textContent = 'Semana actual';
+  document.getElementById('faltantes-semana-actual').innerHTML = '<p class="modulo-ayuda">No hay datos disponibles todavía.</p>';
+  document.getElementById('faltantes-semanas-mes').innerHTML = '<p class="modulo-ayuda">No hay semanas previas para este mes.</p>';
+  document.getElementById('faltantes-meses-previos').innerHTML = '<p class="modulo-ayuda">Aún no hay meses previos con historial este año.</p>';
+  actualizarBadgeDiferencias(document.getElementById('faltantes-semana-actual-badge'), 0);
+}
+
+function renderPanelFaltantes(data) {
+  const semanaActual = data?.semana_actual || {};
+  const mesActual = data?.mes_actual || {};
+  const mesesPrevios = data?.meses_previos || [];
+
+  document.getElementById('faltantes-semana-actual-label').textContent = semanaActual.label || 'Semana actual';
+  document.getElementById('faltantes-semana-actual').innerHTML = renderTablaDiasDiferencias(semanaActual.dias || []);
+  document.getElementById('faltantes-semanas-mes').innerHTML = (mesActual.semanas_previas || []).length
+    ? mesActual.semanas_previas.map(semana => renderGrupoSemanaDiferencias(semana)).join('')
+    : '<p class="modulo-ayuda">No hay semanas previas para este mes.</p>';
+  document.getElementById('faltantes-meses-previos').innerHTML = mesesPrevios.length
+    ? mesesPrevios.map(mes => renderGrupoMesDiferencias(mes)).join('')
+    : '<p class="modulo-ayuda">Aún no hay meses previos con historial este año.</p>';
+
+  actualizarBadgeDiferencias(document.getElementById('faltantes-semana-actual-badge'), semanaActual.resumen?.neto_diferencias || 0);
+}
+
+async function cargarPanelFaltantes() {
+  try {
+    const res = await fetch('/api/diferencias/panel');
+    if (!res.ok) {
+      limpiarPanelFaltantes();
+      return;
+    }
+    const data = await res.json();
+    renderPanelFaltantes(data);
+  } catch {
+    limpiarPanelFaltantes();
+  }
+}
+
 async function cargarVistaModulo(modulo, fecha) {
+  if (modulo === 'faltantes') {
+    await cargarPanelFaltantes();
+    return;
+  }
   if (!fecha) return;
   if (modulo === 'caja') {
     await cargarDatosCaja(fecha);
