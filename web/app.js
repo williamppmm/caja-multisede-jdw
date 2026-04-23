@@ -53,6 +53,7 @@ let contadoresDrafts = {};
 let contadoresLocked = false;
 let excelOpenTargets = {};
 let _sessionStorageWarningShown = false;
+const MODULE_DATES_SITE_KEY = 'moduleDatesSiteId';
 
 function fmt(n) {
   return '$ ' + Math.round(n).toLocaleString('es-CO');
@@ -2183,6 +2184,7 @@ async function obtenerFechaSugeridaSede() {
 
 function _persistirFechasModulo() {
   safeSessionSet('moduleDates', JSON.stringify(moduleDates));
+  safeSessionSet(MODULE_DATES_SITE_KEY, configActiveSite?.id || '');
 }
 
 function setSharedModuleDate(fecha) {
@@ -3965,6 +3967,8 @@ async function init() {
 
   let _savedDates = safeSessionGetJson('moduleDates', null);
   const _isReload = !!_savedDates;
+  const _savedDatesSiteId = safeSessionGetItem(MODULE_DATES_SITE_KEY) || '';
+  const _currentSiteId = configActiveSite?.id || '';
   const savedSharedDate = _savedDates && typeof _savedDates === 'object'
     ? (
       _savedDates.caja
@@ -3979,7 +3983,11 @@ async function init() {
     )
     : hoyStr();
   moduleDates = {};
-  const _fechaInicio = configActiveSite ? await obtenerFechaSugeridaSede() : savedSharedDate;
+  const _fechaInicio = configActiveSite
+    ? ((_isReload && _savedDatesSiteId === _currentSiteId)
+      ? savedSharedDate
+      : await obtenerFechaSugeridaSede())
+    : savedSharedDate;
   setSharedModuleDate(_fechaInicio);
   if (_isReload) {
     cajaDrafts = safeSessionGetJson('cajaDrafts', {});
