@@ -19,6 +19,7 @@ let configModoEntrada = 'cantidad';
 let configSede = 'Principal';
 let configDataDir = '';
 let configExcluirMonedasViejosBase = false;
+let configHistorialCompleto = false;
 let enabledModules = ['caja', 'gastos'];
 let defaultModule = 'caja';
 let currentModule = 'caja';
@@ -50,6 +51,7 @@ let contadorCatalog = [];
 let contadoresDrafts = {};
 let contadoresLocked = false;
 let _sessionStorageWarningShown = false;
+const HISTORIAL_DIAS_VISIBLES = 5;
 
 function fmt(n) {
   return '$ ' + Math.round(n).toLocaleString('es-CO');
@@ -212,6 +214,69 @@ function hoyStr() {
 function ayerStr() {
   const d = new Date();
   return dateToStr(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1));
+}
+
+function desplazarFechaStr(fechaIso, dias) {
+  const match = String(fechaIso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '';
+  const [, year, month, day] = match;
+  const fecha = new Date(Number(year), Number(month) - 1, Number(day) + dias);
+  return Number.isNaN(fecha.getTime()) ? '' : dateToStr(fecha);
+}
+
+function moduloExentoRestriccionHistorial(modulo) {
+  return modulo === 'faltantes';
+}
+
+function fechaMinimaVisible() {
+  if (configHistorialCompleto) return null;
+  return desplazarFechaStr(hoyStr(), -HISTORIAL_DIAS_VISIBLES);
+}
+
+function fechaFueraDeRangoVisible(fecha, modulo = currentModule) {
+  if (!fecha || configHistorialCompleto || moduloExentoRestriccionHistorial(modulo)) return false;
+  const minima = fechaMinimaVisible();
+  return Boolean(minima && fecha < minima);
+}
+
+function mensajeFechaFueraDeRango() {
+  const minima = fechaMinimaVisible();
+  return `No es posible visualizar datos anteriores a ${formatFechaVisual(minima)}. Activa "Ver historial completo" desde Admin para consultarlos.`;
+}
+
+function actualizarLimiteVisualFecha(modulo = currentModule) {
+  const input = document.getElementById('fecha');
+  if (!input) return;
+  if (moduloExentoRestriccionHistorial(modulo) || configHistorialCompleto) {
+    input.removeAttribute('min');
+    return;
+  }
+  const minima = fechaMinimaVisible();
+  if (minima) {
+    input.min = minima;
+  } else {
+    input.removeAttribute('min');
+  }
+}
+
+function normalizarFechaVisible(fecha, modulo = currentModule) {
+  if (!fecha) return hoyStr();
+  return fechaFueraDeRangoVisible(fecha, modulo) ? hoyStr() : fecha;
+}
+
+function cambiarFechaPorDelta(deltaDias) {
+  const fechaInput = document.getElementById('fecha');
+  if (!fechaInput?.value) return;
+  const actual = new Date(`${fechaInput.value}T00:00:00`);
+  if (Number.isNaN(actual.getTime())) return;
+  actual.setDate(actual.getDate() + deltaDias);
+  const nuevaFecha = dateToStr(actual);
+  if (fechaFueraDeRangoVisible(nuevaFecha, currentModule)) {
+    mostrarMensaje(mensajeFechaFueraDeRango(), 'advertencia');
+    return;
+  }
+  fechaInput.value = nuevaFecha;
+  fechaInput.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 function mostrarMensaje(texto, tipo) {
@@ -2131,9 +2196,9 @@ function _persistirFechasModulo() {
 }
 
 function setSharedModuleDate(fecha) {
-  const activa = fecha || hoyStr();
+  const activa = normalizarFechaVisible(fecha || hoyStr(), currentModule);
   Object.keys(MODULE_META).forEach(modulo => {
-    moduleDates[modulo] = activa;
+    moduleDates[modulo] = normalizarFechaVisible(activa, modulo);
   });
   _persistirFechasModulo();
 }
@@ -2142,6 +2207,8 @@ function aplicarFechaModulo(modulo, usarDefault = false) {
   if (usarDefault || !moduleDates[modulo]) {
     setSharedModuleDate(sugerirFechaModulo(modulo));
   }
+  moduleDates[modulo] = normalizarFechaVisible(moduleDates[modulo], modulo);
+  actualizarLimiteVisualFecha(modulo);
   document.getElementById('fecha').value = moduleDates[modulo];
   actualizarDiaFecha(moduleDates[modulo]);
 }
@@ -2207,10 +2274,21 @@ async function verificarFechaActual() {
   const btnGuardar = document.getElementById('btn-guardar');
 
   if (currentModule === 'faltantes') {
+    actualizarLimiteVisualFecha(currentModule);
     estado.textContent = '';
     estado.className = 'fecha-estado';
     btnGuardar.disabled = true;
     guardarEstadoModulo(currentModule, hoyStr(), { existe: true, solo_lectura: true });
+    return;
+  }
+
+  actualizarLimiteVisualFecha(currentModule);
+
+  if (fechaFueraDeRangoVisible(fecha, currentModule)) {
+    estado.textContent = mensajeFechaFueraDeRango();
+    estado.className = 'fecha-estado existe';
+    btnGuardar.disabled = true;
+    guardarEstadoModulo(currentModule, fecha, { existe: false, solo_lectura: true, limite_historial: true });
     return;
   }
 
@@ -3625,10 +3703,24 @@ async function ultimoRegistro() {
   try {
     const res = await fetch(`/api/modulos/${currentModule}/ultima`);
     const data = await res.json();
-    mostrarMensaje(
-      data.fecha ? `Último registro de ${MODULE_META[currentModule].label}: ${data.fecha}` : `Sin registros en ${MODULE_META[currentModule].label}.`,
-      data.fecha ? 'ok' : 'advertencia'
-    );
+    if (!data.fecha) {
+      mostrarMensaje(`Sin registros en ${MODULE_META[currentModule].label}.`, 'advertencia');
+      return;
+    }
+    if (fechaFueraDeRangoVisible(data.fecha, currentModule)) {
+      mostrarMensaje('El último registro está fuera del rango visible. Activa "Ver historial completo" desde Admin para consultarlo.', 'advertencia');
+      return;
+    }
+
+    const fechaAnterior = moduleDates[currentModule];
+    if (currentModule === 'caja') guardarDraftCaja(fechaAnterior);
+    if (currentModule === 'contadores') guardarDraftContadores(fechaAnterior);
+    setSharedModuleDate(data.fecha);
+    document.getElementById('fecha').value = moduleDates[currentModule];
+    actualizarDiaFecha(moduleDates[currentModule]);
+    await cargarVistaModulo(currentModule, moduleDates[currentModule]);
+    await verificarFechaActual();
+    mostrarMensaje(`Último registro de ${MODULE_META[currentModule].label}: ${formatFechaVisual(data.fecha)}`, 'ok');
   } catch {
     mostrarMensaje('Error al consultar el último registro.', 'error');
   }
@@ -3686,6 +3778,7 @@ async function ingresarAdmin() {
     document.getElementById('admin-sede').value = settings.sede || '';
     document.getElementById('admin-data-dir').value = settings.data_dir || '';
     document.getElementById('admin-excluir-monedas-viejos-base').checked = Boolean(settings.excluir_monedas_viejos_base);
+    document.getElementById('admin-historial-completo').checked = Boolean(settings.historial_completo);
     actualizarPreviewRutaAdmin();
     actualizarPreviewHojasAdmin();
   } catch { /* defaults */ }
@@ -3711,6 +3804,7 @@ async function guardarAdmin() {
     sede: document.getElementById('admin-sede').value.trim(),
     data_dir: document.getElementById('admin-data-dir').value.trim(),
     excluir_monedas_viejos_base: document.getElementById('admin-excluir-monedas-viejos-base')?.checked || false,
+    historial_completo: document.getElementById('admin-historial-completo')?.checked || false,
   };
 
   try {
@@ -3764,6 +3858,7 @@ async function guardarAdmin() {
     configSede = body.sede || 'Principal';
     configDataDir = body.data_dir;
     configExcluirMonedasViejosBase = Boolean(body.excluir_monedas_viejos_base);
+    configHistorialCompleto = Boolean(body.historial_completo);
     await cargarBonusNames();
     await cargarLoanNames();
     await cargarExpenseConcepts();
@@ -3847,6 +3942,7 @@ async function init() {
     configSede = settings.sede || 'Principal';
     configDataDir = settings.data_dir || '';
     configExcluirMonedasViejosBase = Boolean(settings.excluir_monedas_viejos_base);
+    configHistorialCompleto = Boolean(settings.historial_completo);
     enabledModules = settings.enabled_modules || ['caja', 'gastos'];
     defaultModule = settings.default_module || enabledModules[0];
   } catch { /* defaults */ }
@@ -3949,10 +4045,19 @@ async function init() {
 
   document.getElementById('fecha').addEventListener('change', e => {
     const fechaAnterior = moduleDates[currentModule];
+    const fechaObjetivo = e.target.value;
+    if (fechaFueraDeRangoVisible(fechaObjetivo, currentModule)) {
+      const fechaRestaurada = normalizarFechaVisible(fechaAnterior || hoyStr(), currentModule);
+      e.target.value = fechaRestaurada;
+      setSharedModuleDate(fechaRestaurada);
+      actualizarDiaFecha(fechaRestaurada);
+      mostrarMensaje(mensajeFechaFueraDeRango(), 'advertencia');
+      return;
+    }
     if (currentModule === 'caja') guardarDraftCaja(fechaAnterior);
     if (currentModule === 'contadores') guardarDraftContadores(fechaAnterior);
-    setSharedModuleDate(e.target.value);
-    actualizarDiaFecha(e.target.value);
+    setSharedModuleDate(fechaObjetivo);
+    actualizarDiaFecha(fechaObjetivo);
     if (currentModule !== 'caja') resetOverride(currentModule);
     if (currentModule === 'caja') resetOverride('caja');
     if (currentModule === 'bonos') {
@@ -4285,6 +4390,8 @@ async function init() {
   document.addEventListener('pointerdown', interceptarIntentoEdicion, true);
   document.addEventListener('focusin', interceptarIntentoEdicion, true);
   document.addEventListener('click', interceptarIntentoEdicion, true);
+  document.getElementById('btn-fecha-anterior')?.addEventListener('click', () => cambiarFechaPorDelta(-1));
+  document.getElementById('btn-fecha-siguiente')?.addEventListener('click', () => cambiarFechaPorDelta(1));
 
   // Heartbeat: mantiene el servidor informado de que hay una pestaña activa.
   // Si el servidor no recibe heartbeat en ~75 s, se apaga automáticamente.

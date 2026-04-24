@@ -28,7 +28,9 @@
       <h2>Fecha</h2>
       <div class="fecha-row">
         <label for="fecha" id="fecha-label">Fecha del módulo</label>
+        <button id="btn-fecha-anterior" class="btn btn-secondary btn-fecha-nav" type="button" aria-label="Ir un día atrás">◀</button>
         <input type="date" id="fecha" name="fecha" required />
+        <button id="btn-fecha-siguiente" class="btn btn-secondary btn-fecha-nav" type="button" aria-label="Ir un día adelante">▶</button>
         <span id="fecha-dia" class="fecha-dia" aria-live="polite"></span>
         <span id="fecha-estado" class="fecha-estado"></span>
       </div>
@@ -833,11 +835,15 @@
             <span class="campo-config-label">Módulo por defecto al abrir</span>
             <select id="admin-default-module"></select>
           </div>
-          <div class="campo-config">
-            <label><input type="checkbox" id="admin-excluir-monedas-viejos-base" /> Excluir monedas y billetes viejos de la base del siguiente período</label>
-            <p class="modal-desc">Úsalo en locales donde esos valores se apartan y no deben entrar a la caja operativa del día siguiente.</p>
-          </div>
-        </section>
+            <div class="campo-config">
+              <label><input type="checkbox" id="admin-excluir-monedas-viejos-base" /> Excluir monedas y billetes viejos de la base del siguiente período</label>
+              <p class="modal-desc">Úsalo en locales donde esos valores se apartan y no deben entrar a la caja operativa del día siguiente.</p>
+            </div>
+            <div class="campo-config">
+              <label><input type="checkbox" id="admin-historial-completo" /> Ver historial completo (desactiva límite de 5 días)</label>
+              <p class="modal-desc">Si está desactivado, la visualización manual queda limitada a los últimos 5 días corridos.</p>
+            </div>
+          </section>
         <section class="admin-section">
           <h4 class="admin-section-title">Archivo Anual</h4>
           <div class="campo-config">

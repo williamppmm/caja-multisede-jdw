@@ -21,6 +21,7 @@ _DEFAULTS = {
     "enabled_modules": ["caja", "gastos"],
     "default_module": "caja",
     "excluir_monedas_viejos_base": False,
+    "historial_completo": False,
 }
 
 _settings_cache: dict | None = None
@@ -63,6 +64,7 @@ def _resolver_settings() -> dict:
             data.get("excluir_monedas_viejos_base", False),
         )
     )
+    data["historial_completo"] = bool(data.get("historial_completo", False))
     return data
 
 
@@ -96,6 +98,7 @@ def save_settings(data: dict) -> None:
         "enabled_modules",
         "default_module",
         "excluir_monedas_viejos_base",
+        "historial_completo",
     }
     existing: dict = {}
     if SETTINGS_PATH.exists():
@@ -112,6 +115,8 @@ def save_settings(data: dict) -> None:
         cleaned["data_dir"] = _normalizar_data_dir(cleaned["data_dir"])
     if "excluir_monedas_viejos_base" in cleaned:
         cleaned["excluir_monedas_viejos_base"] = bool(cleaned["excluir_monedas_viejos_base"])
+    if "historial_completo" in cleaned:
+        cleaned["historial_completo"] = bool(cleaned["historial_completo"])
 
     merged = {**existing, **cleaned}
 
