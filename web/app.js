@@ -50,6 +50,9 @@ let cajaDrafts = {};
 let contadorCatalog = [];
 let contadoresDrafts = {};
 let contadoresLocked = false;
+const ESPECIAL_AYER_SESSION_KEY = 'especial_arranque_ayer_caja_plataformas_contadores_resumen';
+const ESPECIAL_MODULOS_AYER_LIBRE = ['caja', 'plataformas', 'contadores'];
+const ESPECIAL_MODULOS_ARRANQUE_AYER = ['caja', 'plataformas', 'contadores', 'resumen'];
 let _sessionStorageWarningShown = false;
 const HISTORIAL_DIAS_VISIBLES = 5;
 
@@ -363,16 +366,22 @@ function mostrarConfirmacion(texto, onConfirm) {
   el.querySelector('.confirm-ok').focus();
 }
 
-function requiereConfirmacionCorreccionHoy(modulo, fecha) {
-  if (!['caja', 'plataformas', 'contadores'].includes(modulo) || fecha !== hoyStr()) return false;
+function fechaCorreccionLibreModulo(modulo) {
+  if (ESPECIAL_MODULOS_AYER_LIBRE.includes(modulo)) return ayerStr();
+  return hoyStr();
+}
+
+function requiereConfirmacionCorreccion(modulo, fecha) {
+  if (!['caja', 'plataformas', 'contadores'].includes(modulo) || fecha !== fechaCorreccionLibreModulo(modulo)) return false;
   const estadoActual = obtenerEstadoModulo(modulo, fecha);
   return Boolean(estadoActual?.existe);
 }
 
-function mostrarConfirmacionCorreccionHoy(modulo, fecha, onConfirm) {
+function mostrarConfirmacionCorreccion(modulo, fecha, onConfirm) {
   const label = MODULE_META[modulo]?.label || modulo;
+  const periodo = fecha === ayerStr() && ESPECIAL_MODULOS_AYER_LIBRE.includes(modulo) ? 'ayer' : 'hoy';
   mostrarConfirmacion(
-    `Ya guardaste ${label} hoy. ¿Deseas guardar una corrección?`,
+    `Ya guardaste ${label} ${periodo}. ¿Deseas guardar una corrección?`,
     onConfirm,
   );
 }
@@ -478,7 +487,9 @@ function obtenerEstadoModulo(modulo, fecha) {
 
 function requiereAutorizacionParaFecha(modulo, fecha, data = null) {
   if (!modulo || !fecha || fecha > hoyStr() || isOverrideActive(modulo, fecha)) return false;
-  if (fecha === hoyStr() && ['caja', 'plataformas', 'contadores'].includes(modulo)) return false;
+  if (ESPECIAL_MODULOS_AYER_LIBRE.includes(modulo)) {
+    return fecha !== ayerStr();
+  }
   if (modulo === 'caja') {
     if (fecha === ayerStr() && !data?.existe) return false;
     return true;
@@ -732,8 +743,8 @@ function moverAlSiguiente(inputActual) {
 
   if (inputActual?.id === 'billetes_viejos') {
     const fecha = document.getElementById('fecha')?.value || '';
-    if (currentModule === 'caja' && requiereConfirmacionCorreccionHoy('caja', fecha)) {
-      mostrarConfirmacionCorreccionHoy('caja', fecha, () => guardar({ confirmado: true }));
+    if (currentModule === 'caja' && requiereConfirmacionCorreccion('caja', fecha)) {
+      mostrarConfirmacionCorreccion('caja', fecha, () => guardar({ confirmado: true }));
       return;
     }
     document.getElementById('btn-guardar')?.focus();
@@ -2058,7 +2069,7 @@ function validarPlataformas() {
   const deportVal = isNaN(deport) ? 0 : deport;
   const fecha = document.getElementById('fecha')?.value || '';
   if (practiVal < 0) return 'La venta de Practisistemas no puede ser negativa.';
-  if (practiVal === 0 && deportVal === 0 && fecha !== hoyStr() && !isOverrideActive('plataformas', fecha)) {
+  if (practiVal === 0 && deportVal === 0 && fecha !== ayerStr() && !isOverrideActive('plataformas', fecha)) {
     return 'Debes ingresar al menos un valor en Plataformas.';
   }
   return null;
@@ -2203,6 +2214,40 @@ function setSharedModuleDate(fecha) {
   _persistirFechasModulo();
 }
 
+function isEspecialArranqueAyerActivo() {
+  return safeSessionGetItem(ESPECIAL_AYER_SESSION_KEY) === '1';
+}
+
+function setEspecialArranqueAyerActivo(activo) {
+  if (activo) {
+    safeSessionSet(ESPECIAL_AYER_SESSION_KEY, '1');
+  } else {
+    safeSessionRemove(ESPECIAL_AYER_SESSION_KEY);
+  }
+}
+
+function aplicarEstadoEspecialInicial() {
+  setSharedModuleDate(hoyStr());
+  ESPECIAL_MODULOS_ARRANQUE_AYER.forEach((modulo) => {
+    moduleDates[modulo] = ayerStr();
+  });
+  _persistirFechasModulo();
+  setEspecialArranqueAyerActivo(true);
+}
+
+function normalizarEspecialSiAplica(modulo) {
+  if (!isEspecialArranqueAyerActivo()) return;
+  if (ESPECIAL_MODULOS_ARRANQUE_AYER.includes(modulo)) {
+    ESPECIAL_MODULOS_ARRANQUE_AYER.forEach((target) => {
+      moduleDates[target] = ayerStr();
+    });
+    _persistirFechasModulo();
+    return;
+  }
+  setSharedModuleDate(hoyStr());
+  setEspecialArranqueAyerActivo(false);
+}
+
 function aplicarFechaModulo(modulo, usarDefault = false) {
   if (usarDefault || !moduleDates[modulo]) {
     setSharedModuleDate(sugerirFechaModulo(modulo));
@@ -2237,6 +2282,7 @@ async function activarModulo(modulo) {
   safeSessionSet('lastModule', currentModule);
   renderTabs();
   actualizarPaneles();
+  normalizarEspecialSiAplica(currentModule);
   aplicarFechaModulo(currentModule);
   if (currentModule === 'bonos') {
     resetQuickEditMode('bonos');
@@ -2346,10 +2392,10 @@ async function verificarFechaActual() {
     }
 
     if (currentModule === 'plataformas') {
-      if (fecha === hoyStr()) {
+      if (fecha === ayerStr()) {
         estado.textContent = data.existe
-          ? 'Puedes seguir corrigiendo plataformas hoy.'
-          : 'Puedes registrar plataformas libremente hoy.';
+          ? 'Puedes seguir corrigiendo plataformas ayer.'
+          : 'Puedes registrar plataformas libremente ayer.';
         estado.className = 'fecha-estado libre';
         return;
       }
@@ -2366,15 +2412,15 @@ async function verificarFechaActual() {
     }
 
     if (currentModule === 'contadores') {
-      if (fecha === hoyStr()) {
+      if (fecha === ayerStr()) {
         estado.textContent = data.existe
-          ? 'Puedes seguir corrigiendo contadores hoy.'
+          ? 'Puedes seguir corrigiendo contadores ayer.'
           : 'Fecha disponible para capturar contadores.';
         estado.className = 'fecha-estado libre';
         return;
       }
-      if (data.existe && !isOverrideActive('contadores', fecha)) {
-        estado.textContent = `Contadores de ${formatFechaVisual(fecha)} ya existen.`;
+      if (!isOverrideActive('contadores', fecha)) {
+        estado.textContent = `Contadores en ${formatFechaVisual(fecha)} requiere admin.`;
         estado.className = 'fecha-estado existe';
         return;
       }
@@ -2389,14 +2435,14 @@ async function verificarFechaActual() {
     }
 
     if (currentModule === 'caja') {
-      if (fecha === hoyStr()) {
+      if (fecha === ayerStr()) {
         estado.textContent = data.existe
-          ? 'Puedes seguir corrigiendo caja hoy.'
-          : 'Puedes registrar caja libremente hoy.';
+          ? 'Puedes seguir corrigiendo caja ayer.'
+          : 'Puedes registrar caja libremente ayer.';
         estado.className = 'fecha-estado libre';
         return;
       }
-      const cajaLibre = fecha === ayerStr();
+      const cajaLibre = false;
       if (data.existe && !isOverrideActive('caja', fecha)) {
         estado.textContent = `La caja de ${formatFechaVisual(fecha)} ya existe y requiere admin para corregirse.`;
         estado.className = 'fecha-estado existe';
@@ -2459,14 +2505,18 @@ async function confirmarAccionAdmin() {
 }
 
 async function cargarDatosCaja(fecha) {
-  const cajaLibre = fecha === hoyStr() || fecha === ayerStr();
+  const cajaLibre = fecha === ayerStr();
   try {
     const estadoRes = await fetch(`/api/modulos/caja/fecha/${fecha}/estado`);
     const estado = estadoRes.ok ? await estadoRes.json() : { existe: false };
 
     if (!estado.existe) {
       setCajaEditable(cajaLibre || isOverrideActive('caja', fecha));
-      if (!aplicarDraftCaja(fecha)) limpiarCaja();
+      if (cajaLibre || isOverrideActive('caja', fecha)) {
+        if (!aplicarDraftCaja(fecha)) limpiarCaja();
+      } else {
+        limpiarCaja();
+      }
       return;
     }
 
@@ -2489,9 +2539,13 @@ async function cargarDatosCaja(fecha) {
     calcularCaja();
     await cargarRecaudoResumen(fecha);
     eliminarDraftCaja(fecha);
-    setCajaEditable(fecha === hoyStr() || Boolean(isOverrideActive('caja', fecha)));
+    setCajaEditable(fecha === ayerStr() || Boolean(isOverrideActive('caja', fecha)));
   } catch {
-    if (!aplicarDraftCaja(fecha)) limpiarCaja();
+    if ((cajaLibre || isOverrideActive('caja', fecha)) && aplicarDraftCaja(fecha)) {
+      // Draft aplicado
+    } else {
+      limpiarCaja();
+    }
     await cargarRecaudoResumen(fecha);
     setCajaEditable(cajaLibre || isOverrideActive('caja', fecha));
   }
@@ -2544,6 +2598,7 @@ async function cargarDatosModuloItems(modulo, fecha) {
 }
 
 async function cargarDatosContadores(fecha) {
+  const contadoresLibre = fecha === ayerStr() || isOverrideActive('contadores', fecha);
   try {
     const res = await fetch(`/api/modulos/contadores/fecha/${fecha}/datos?t=${Date.now()}`, { cache: 'no-store' });
     if (!res.ok) {
@@ -2552,17 +2607,17 @@ async function cargarDatosContadores(fecha) {
     }
     const data = await res.json();
     renderContadores(data.items || [], data.total_resultado || 0);
-    if (!data.existe && !isOverrideActive('contadores', fecha)) {
+    if (!data.existe && contadoresLibre) {
       setContadoresEditable(true);
       applyContadoresDraft(fecha);
     } else {
-      setContadoresEditable(fecha === hoyStr() || Boolean(isOverrideActive('contadores', fecha)) || !data.existe);
-      if (!data.existe) applyContadoresDraft(fecha);
+      setContadoresEditable(contadoresLibre);
+      if (!data.existe && contadoresLibre) applyContadoresDraft(fecha);
     }
   } catch {
     limpiarFormularioContadores();
-    setContadoresEditable(true);
-    applyContadoresDraft(fecha);
+    setContadoresEditable(contadoresLibre);
+    if (contadoresLibre) applyContadoresDraft(fecha);
   }
 }
 
@@ -3197,7 +3252,7 @@ async function guardarContadores() {
   const res = await fetch('/api/modulos/contadores/guardar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha, items, forzar: fecha === hoyStr() || isOverrideActive('contadores', fecha) || items.some(i => i.usar_referencia_critica) }),
+    body: JSON.stringify({ fecha, items, forzar: fecha === ayerStr() || isOverrideActive('contadores', fecha) || items.some(i => i.usar_referencia_critica) }),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -3595,8 +3650,14 @@ async function guardar({ confirmado = false } = {}) {
     return;
   }
 
-  if (!confirmado && requiereConfirmacionCorreccionHoy(currentModule, fecha)) {
-    mostrarConfirmacionCorreccionHoy(
+  const estadoActual = obtenerEstadoModulo(currentModule, fecha);
+  if (ESPECIAL_MODULOS_AYER_LIBRE.includes(currentModule) && requiereAutorizacionParaFecha(currentModule, fecha, estadoActual)) {
+    bloquearIntentoEdicion(document.getElementById('btn-guardar'));
+    return;
+  }
+
+  if (!confirmado && requiereConfirmacionCorreccion(currentModule, fecha)) {
+    mostrarConfirmacionCorreccion(
       currentModule,
       fecha,
       () => guardar({ confirmado: true }),
@@ -3629,7 +3690,7 @@ async function guardar({ confirmado = false } = {}) {
           billetes,
           total_monedas: parsePositivo('total_monedas'),
           billetes_viejos: parsePositivo('billetes_viejos'),
-          forzar: fecha === hoyStr() || isOverrideActive('caja', fecha),
+          forzar: fecha === ayerStr() || isOverrideActive('caja', fecha),
         }),
       });
     } else if (currentModule === 'plataformas') {
@@ -3640,7 +3701,7 @@ async function guardar({ confirmado = false } = {}) {
           fecha,
           venta_practisistemas: parsePositivo('venta_practisistemas'),
           venta_deportivas: parseNumeroInput('venta_deportivas', true) || 0,
-          forzar: fecha === hoyStr() || isOverrideActive('plataformas', fecha),
+          forzar: fecha === ayerStr() || isOverrideActive('plataformas', fecha),
         }),
       });
     } else if (currentModule === 'contadores') {
@@ -3868,11 +3929,15 @@ async function guardarAdmin() {
     enabledModules.forEach(modulo => {
       if (!moduleDates[modulo]) moduleDates[modulo] = sugerirFechaModulo(modulo);
     });
+    if (!isEspecialArranqueAyerActivo()) {
+      aplicarEstadoEspecialInicial();
+    }
     _persistirFechasModulo();
     currentModule = enabledModules.includes(currentModule) ? currentModule : defaultModule;
     renderTabs();
     actualizarPaneles();
     aplicarModoEntrada();
+    normalizarEspecialSiAplica(currentModule);
     aplicarFechaModulo(currentModule);
     await cargarVistaModulo(currentModule, moduleDates[currentModule]);
     await verificarFechaActual();
@@ -3967,6 +4032,8 @@ async function init() {
   if (_isReload) {
     cajaDrafts = safeSessionGetJson('cajaDrafts', {});
     contadoresDrafts = safeSessionGetJson('contadoresDrafts', {});
+  } else {
+    aplicarEstadoEspecialInicial();
   }
   const _savedModule = safeSessionGetItem('lastModule');
   currentModule = (_savedModule && enabledModules.includes(_savedModule))
@@ -3976,6 +4043,7 @@ async function init() {
   aplicarModoEntrada();
   renderTabs();
   actualizarPaneles();
+  normalizarEspecialSiAplica(currentModule);
   aplicarFechaModulo(currentModule);
   actualizarBonosVisuales();
   actualizarPrestamosVisuales();
