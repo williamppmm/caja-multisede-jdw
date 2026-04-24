@@ -73,6 +73,18 @@ Resultado esperado:
 - la app informa archivo ocupado
 - no corrompe el libro
 
+### B-03 — Encabezado congelado en libros existentes
+
+1. tomar un libro anual ya existente de la sede
+2. guardar un modulo que escriba en ese libro desde la app
+3. cerrar y volver a abrir el `.xlsx` en Excel
+
+Resultado esperado:
+
+- la hoja abre con encabezados visibles arriba
+- la congelacion queda en `A2`
+- no queda anclada visualmente a una fila vieja del historial
+
 ## C. Caja
 
 ### C-01 — Guardado normal

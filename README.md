@@ -258,6 +258,13 @@ Eso implica limites reales:
 - Dropbox / OneDrive no resuelven concurrencia fuerte por si solos
 - si dos equipos de la misma sede escriben el mismo libro casi al mismo tiempo, sigue existiendo riesgo operativo
 
+Como mejora de usabilidad, la app preserva la presentacion minima de las hojas al volver a escribir libros existentes:
+
+- encabezados congelados con `A2`
+- anchos de columna por modulo
+
+La decision actual prioriza que Excel abra con encabezados visibles arriba, no forzar la vista al ultimo registro.
+
 ## Build y `.spec`
 
 El `.spec` forma parte del proceso oficial de empaquetado y debe existir en la rama que produce ese ejecutable.

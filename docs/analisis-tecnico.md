@@ -74,6 +74,14 @@ Este servicio:
 - administra un lock local `.lock`
 - mantiene compatibilidad con algunos formatos legacy
 
+Ademas, al reusar hojas existentes o legacy, el servicio reaplica una presentacion minima estable:
+
+- encabezados congelados con `A2`
+- anchos de columna por modulo
+- normalizacion de la vista para que Excel vuelva a abrir arriba
+
+Esto es intencional. Se prioriza preservar encabezados visibles al explorar el libro, aunque no se fuerce abrir cerca del ultimo registro, porque ese enfoque terminaba rompiendo la vista congelada en algunos workbooks reales.
+
 ## Diseno de los libros
 
 Dos libros por sede y ano:
