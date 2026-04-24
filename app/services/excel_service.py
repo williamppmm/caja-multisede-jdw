@@ -10,6 +10,7 @@ from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.worksheet.views import Selection
 
 from app.config import ENCABEZADOS, HOJA_REGISTROS, get_consolidado_path, get_excel_path, normalizar_sede_archivo
 from app.services.settings_service import get_settings
@@ -345,6 +346,14 @@ def _escribir_encabezados(ws, modulo: str):
 def _asegurar_presentacion_hoja(ws, modulo: str) -> None:
     if ws.freeze_panes != "A2":
         ws.freeze_panes = "A2"
+    if ws.sheet_view.pane is not None:
+        ws.sheet_view.pane.topLeftCell = "A2"
+        ws.sheet_view.pane.activePane = "bottomLeft"
+        ws.sheet_view.pane.state = "frozen"
+    ws.sheet_view.topLeftCell = None
+    ws.sheet_view.selection = [
+        Selection(pane="bottomLeft", activeCell="A1", sqref="A1")
+    ]
 
     if modulo == "bonos":
         widths = {"A": 12, "B": 12, "C": 28, "D": 14, "E": 22}
