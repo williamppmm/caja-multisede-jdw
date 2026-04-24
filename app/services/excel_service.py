@@ -346,12 +346,42 @@ def _escribir_encabezados(ws, modulo: str):
         ws.column_dimensions[col].width = width
 
 
+def _asegurar_presentacion_hoja(ws, modulo: str) -> None:
+    if ws.freeze_panes != "A2":
+        ws.freeze_panes = "A2"
+
+    if modulo == "bonos":
+        widths = {"A": 12, "B": 12, "C": 28, "D": 14, "E": 22}
+    elif modulo == "prestamos":
+        widths = {"A": 12, "B": 12, "C": 28, "D": 18, "E": 14, "F": 22}
+    elif modulo == "movimientos":
+        widths = {"A": 12, "B": 12, "C": 16, "D": 28, "E": 14, "F": 28, "G": 22}
+    elif modulo == "plataformas":
+        widths = {"A": 14, "B": 18, "C": 18, "D": 18, "E": 22}
+    elif modulo == "contadores":
+        widths = {
+            "A": 14, "B": 20, "C": 26, "D": 14, "E": 12,
+            "F": 12, "G": 12, "H": 14, "I": 12, "J": 12,
+            "K": 12, "L": 14, "M": 18, "N": 30, "O": 18, "P": 22,
+        }
+    elif modulo == "cuadre":
+        widths = {
+            "A": 14, "B": 14, "C": 16, "D": 16, "E": 16,
+            "F": 16, "G": 14, "H": 14, "I": 16, "J": 16,
+            "K": 14, "L": 16, "M": 16, "N": 14, "O": 16,
+            "P": 16, "Q": 16, "R": 16, "S": 22,
+        }
+    else:
+        widths = {"A": 14, "B": 16, "C": 22, "D": 14, "E": 10, "F": 14, "G": 14, "H": 22}
+
+    for col, width in widths.items():
+        ws.column_dimensions[col].width = width
+
+
 def _marcar_celda_activa(ws, row_num: int) -> None:
-    ref = f"A{max(int(row_num or 1), 1)}"
     try:
-        ws.sheet_view.selection[0].activeCell = ref
-        ws.sheet_view.selection[0].sqref = ref
-    except (IndexError, AttributeError, TypeError, ValueError):
+        ws.parent.active = ws.parent.index(ws)
+    except (AttributeError, ValueError, TypeError):
         pass
 
 
@@ -378,7 +408,9 @@ def _obtener_hojas_para_lectura(wb, modulo: str):
 def _asegurar_hoja(wb, modulo: str):
     hoja_destino = _obtener_nombre_hoja_seccion(modulo)
     if hoja_destino in wb.sheetnames:
-        return wb[hoja_destino]
+        ws = wb[hoja_destino]
+        _asegurar_presentacion_hoja(ws, modulo)
+        return ws
 
     if modulo == "caja":
         for legacy_name in _nombres_legacy_caja():
@@ -386,11 +418,14 @@ def _asegurar_hoja(wb, modulo: str):
                 continue
             if legacy_name in wb.sheetnames:
                 wb[legacy_name].title = hoja_destino
-                return wb[hoja_destino]
+                ws = wb[hoja_destino]
+                _asegurar_presentacion_hoja(ws, modulo)
+                return ws
 
         if _puede_migrar_desde_registros_diarios(wb):
             ws_legacy = wb[HOJA_REGISTROS]
             ws_legacy.title = hoja_destino
+            _asegurar_presentacion_hoja(ws_legacy, modulo)
             return ws_legacy
 
     ws = wb.create_sheet(hoja_destino)
@@ -1411,7 +1446,9 @@ def _ts_matches(cell_val, ts_str: str) -> bool:
 def _obtener_hoja_existente_modulo(wb, modulo: str):
     for nombre in _nombres_lectura_modulo(modulo):
         if nombre in wb.sheetnames:
-            return wb[nombre]
+            ws = wb[nombre]
+            _asegurar_presentacion_hoja(ws, modulo)
+            return ws
     return None
 
 
