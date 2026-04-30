@@ -411,6 +411,21 @@ input[type="number"]::-webkit-outer-spin-button {
   font-size: 0.95rem;
 }
 
+.draft-alert {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 7px;
+  border-left: 4px solid #f1c40f;
+  background: #fffbea;
+  color: #7d6608;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.draft-alert.oculto {
+  display: none;
+}
+
 .tabs-modulo {
   display: flex;
   gap: 10px;

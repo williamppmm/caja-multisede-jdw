@@ -1022,6 +1022,28 @@ function draftCajaTieneContenido(draft) {
     || String(draft.billetes_viejos || '').trim() !== '';
 }
 
+function obtenerFechasCajaDraftPendientes() {
+  return Object.entries(cajaDrafts || {})
+    .filter(([, draft]) => draftCajaTieneContenido(draft))
+    .map(([fecha]) => fecha)
+    .sort();
+}
+
+function actualizarAvisoCajaSinGuardar() {
+  const alerta = document.getElementById('caja-draft-alert');
+  if (!alerta) return;
+
+  const fechas = obtenerFechasCajaDraftPendientes();
+  if (!fechas.length) {
+    alerta.classList.add('oculto');
+    alerta.textContent = '';
+    return;
+  }
+
+  alerta.textContent = 'Estás haciendo cambios en Caja, pero aún no has guardado en el sistema.';
+  alerta.classList.remove('oculto');
+}
+
 function draftContadoresTieneContenido(draft) {
   if (!draft?.items?.length) return false;
   return draft.items.some(item =>
@@ -2104,12 +2126,14 @@ function guardarDraftCaja(fechaOverride = null) {
   if (!fecha || cajaLocked) return;
   cajaDrafts[fecha] = obtenerDraftCajaActual();
   safeSessionSet('cajaDrafts', JSON.stringify(cajaDrafts));
+  actualizarAvisoCajaSinGuardar();
 }
 
 function eliminarDraftCaja(fecha) {
   if (!fecha) return;
   delete cajaDrafts[fecha];
   safeSessionSet('cajaDrafts', JSON.stringify(cajaDrafts));
+  actualizarAvisoCajaSinGuardar();
 }
 
 function aplicarDraftCaja(fecha) {
@@ -3982,6 +4006,7 @@ async function init() {
   actualizarMovimientosVisuales();
   await cargarVistaModulo(currentModule, moduleDates[currentModule]);
   await verificarFechaActual();
+  actualizarAvisoCajaSinGuardar();
 
   document.querySelectorAll('.input-billete').forEach(inp => {
     formatearInputNumerico(inp, false, true);
