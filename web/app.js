@@ -4599,7 +4599,7 @@ async function init() {
   document.addEventListener('click', interceptarIntentoEdicion, true);
 
   // Heartbeat: mantiene el servidor informado de que hay una pestaña activa.
-  // Si el servidor no recibe heartbeat en ~75 s, se apaga automáticamente.
+  // Si el servidor no recibe heartbeat en ~1 h, se apaga automáticamente.
   function enviarHeartbeat() {
     navigator.sendBeacon('/api/app/heartbeat');
   }
