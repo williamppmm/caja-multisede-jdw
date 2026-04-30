@@ -2180,7 +2180,8 @@ async function obtenerFechaSugeridaSede() {
       if (data.fecha) {
         const d = new Date(data.fecha + 'T12:00:00');
         d.setDate(d.getDate() + 1);
-        return d.toISOString().slice(0, 10);
+        const sugerida = d.toISOString().slice(0, 10);
+        return sugerida > hoyStr() ? hoyStr() : sugerida;
       }
     }
   } catch { /* fallback */ }
