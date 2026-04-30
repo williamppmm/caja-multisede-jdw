@@ -20,7 +20,7 @@ router = APIRouter()
 # normal. La encapsulamos para que quede explícito que es una decisión
 # operativa y no un cierre abrupto accidental.
 
-HEARTBEAT_TIMEOUT = 75  # segundos sin heartbeat → apagar
+HEARTBEAT_TIMEOUT = 12 * 60 * 60  # 12 horas sin heartbeat → apagar
 _last_heartbeat = time.monotonic()
 _heartbeat_started = False
 _heartbeat_lock = threading.Lock()
