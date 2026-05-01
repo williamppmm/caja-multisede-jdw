@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Este documento define una base de pruebas funcionales y operativas para validar el comportamiento actual de CajaJDW antes de considerar el sistema estable para uso continuo o antes de introducir cambios importantes.
+Este documento define una base de pruebas funcionales y operativas para validar `version-usuario` antes de considerar el sistema estable para uso continuo o antes de introducir cambios importantes.
 
 Las pruebas están organizadas por:
 
@@ -11,6 +11,8 @@ Las pruebas están organizadas por:
 - módulos funcionales
 - concurrencia
 - regresión operativa
+
+El plan está orientado a una instalación de sede. No cubre procesos exclusivos de `main`, como super admin multisede, respaldos automáticos multisede, referencias externas de plataformas o Faltantes.
 
 ## Alcance
 
@@ -34,7 +36,7 @@ No cubre todavía:
 Antes de iniciar las pruebas:
 
 1. Preparar una carpeta de pruebas dedicada, preferiblemente en Dropbox.
-2. Configurar al menos dos sedes de prueba si se quiere validar separación por sede.
+2. Configurar una sede de prueba.
 3. Tener un libro Excel de prueba por sede o permitir que la app lo cree.
 4. Verificar que el equipo tenga permisos de lectura y escritura sobre la carpeta.
 5. Confirmar que el archivo no esté abierto en Excel al inicio.
@@ -220,6 +222,23 @@ Pasos:
 Resultado esperado:
 
 - la app bloquea el guardado
+
+## CJ-06 — Aviso persistente de Caja sin guardar
+
+Prioridad: Alta
+
+Pasos:
+
+1. Abrir `Caja`.
+2. Ingresar valores en billetes, monedas o billetes viejos.
+3. No pulsar `Guardar`.
+4. Cambiar de foco o permanecer en la pantalla.
+
+Resultado esperado:
+
+- aparece un aviso persistente indicando que Caja tiene cambios sin guardar
+- no se crea ni actualiza ninguna fila en Excel hasta pulsar `Guardar`
+- después de guardar o limpiar, el aviso desaparece
 
 ## Pruebas de Plataformas
 
@@ -678,6 +697,39 @@ Resultado esperado:
 - el `Cuadre` afectado se resincroniza
 - si la corrección de `Caja` cambia `base_nueva`, también se recalcula el siguiente `Cuadre`
 
+## Pruebas de Resumen
+
+## RS-01 — Resumen de período en solo lectura
+
+Prioridad: Alta
+
+Pasos:
+
+1. Tener registros guardados en varios módulos para una fecha.
+2. Abrir el módulo `Resumen`.
+3. Consultar la misma fecha.
+
+Resultado esperado:
+
+- el Resumen muestra el período operativo calculado
+- los totales coinciden con los datos guardados
+- no aparece acción de guardado ni se modifica Excel
+
+## RS-02 — Panel informativo de recaudo
+
+Prioridad: Media
+
+Pasos:
+
+1. Configurar una sede con separación de monedas y billetes viejos.
+2. Guardar Caja en varias fechas.
+3. Abrir `Resumen`.
+
+Resultado esperado:
+
+- el panel de recaudo muestra acumulado, entregado y pendiente si aplica
+- en `version-usuario` no hay acciones para registrar entregas ni cerrar ciclos
+
 ## Pruebas de Excel y persistencia
 
 ## EX-01 — Libro abierto en Excel
@@ -737,6 +789,36 @@ Resultado esperado:
 - no se inicia un segundo servidor
 - el navegador se abre (o se reutiliza la pestaña existente) apuntando a la instancia ya activa
 
+## DR-01B — Jornada con pestaña abierta
+
+Prioridad: Alta
+
+Pasos:
+
+1. Abrir la aplicación.
+2. Dejar la pestaña abierta sin registrar datos por un periodo largo.
+3. Volver a registrar una operación.
+
+Resultado esperado:
+
+- mientras la pestaña siga abierta y enviando heartbeat, la app continúa disponible
+- el registro posterior se guarda normalmente
+
+## DR-01C — Cierre normal con Finalizar
+
+Prioridad: Alta
+
+Pasos:
+
+1. Abrir la aplicación.
+2. Pulsar `Finalizar`.
+3. Confirmar el cierre.
+
+Resultado esperado:
+
+- el servidor recibe `/api/app/shutdown`
+- la aplicación se cierra sin dejar una instancia activa
+
 ## DR-02 — Dos equipos de la misma sede
 
 Prioridad: Alta
@@ -776,15 +858,19 @@ Después de tocar código, ejecutar al menos:
 2. PG-02
 3. PG-03
 4. CJ-01
-5. BN-03
-6. PR-04
-7. CT-03
-8. CT-04
-9. CQ-00
-10. CQ-03
-11. CQ-05
-12. DR-01
-13. EX-01
+5. CJ-06
+6. BN-03
+7. PR-04
+8. CT-03
+9. CT-04
+10. CQ-00
+11. CQ-03
+12. CQ-05
+13. RS-01
+14. DR-01
+15. DR-01B
+16. DR-01C
+17. EX-01
 
 ## Registro de resultados
 

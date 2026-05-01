@@ -2,7 +2,9 @@
 
 ## Resumen ejecutivo
 
-CajaJDW es una aplicación local orientada a captura operativa y respaldo en Excel. Su diseño actual prioriza velocidad de adopción, compatibilidad con la forma de trabajo tradicional en hojas de cálculo y facilidad de explotación posterior con Excel o Power Query.
+CajaJDW en `version-usuario` es una aplicación local orientada a captura operativa de una sede y respaldo en Excel. Su diseño actual prioriza velocidad de adopción, compatibilidad con la forma de trabajo tradicional en hojas de cálculo y facilidad de explotación posterior con Excel o Power Query.
+
+El criterio de esta documentación es analizar la versión que usa el operador de sede. No incluye responsabilidades exclusivas de `main`, como super admin multisede, respaldos automáticos multisede, referencias externas de plataformas o Faltantes.
 
 La arquitectura es adecuada para un escenario con:
 
@@ -175,8 +177,9 @@ Responsabilidades:
 
 Observación:
 
-- el heartbeat activa un watchdog: si no llega ninguno en 75 s el proceso termina solo
-- esto cubre el caso de cierre de navegador sin usar el botón Finalizar
+- el heartbeat activa un watchdog: si no llega ninguno en unas 12 horas, el proceso termina solo
+- esta tolerancia permite dejar la aplicación abierta durante una jornada laboral con periodos largos sin captura
+- cerrar la pestaña con la X no ejecuta el mismo flujo que el botón Finalizar; Finalizar sigue siendo el apagado normal
 
 ## Servicios por módulo
 
@@ -302,6 +305,7 @@ El frontend es una SPA simple sin framework.
 - consumo de API
 - borradores temporales de Caja y Contadores
 - render del Cuadre
+- aviso persistente de Caja con borrador sin guardar
 - administración de catálogos
 
 Ventajas:
@@ -378,6 +382,7 @@ Lo menos portable:
 ## Alta prioridad
 
 - corrección de fechas existentes
+- aviso persistente de Caja sin guardar
 - guardado concurrente con libro abierto
 - comportamiento de Contadores con referencia crítica
 - préstamos con varios ciclos de deuda

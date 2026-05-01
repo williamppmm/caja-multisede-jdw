@@ -1,6 +1,8 @@
 # Especificación Funcional — CajaJDW
 
-Documento de referencia exhaustiva del comportamiento de la aplicación. Describe cada módulo, cada regla de negocio, cada validación y cada comportamiento específico tal como está implementado. Dirigido a quien necesite entender con precisión cómo funciona el sistema, ya sea para operar, probar o continuar desarrollando.
+Documento de referencia del comportamiento de `version-usuario`. Describe los módulos, reglas de negocio, validaciones y comportamientos visibles para una instalación operativa de sede.
+
+Esta documentación no cubre procesos exclusivos de `main` como administración multisede, respaldos automáticos de super admin, referencias externas de plataformas o Faltantes. Cuando se menciona un detalle técnico, debe servir para explicar una regla operativa o un riesgo visible para el usuario.
 
 ---
 
@@ -14,17 +16,21 @@ Al ejecutar `CajaJDW.exe` (o `python launcher.py`):
 2. **Si ya hay una instancia corriendo:** se abre el navegador apuntando a `http://127.0.0.1:8000` y el proceso termina. No se inicia ningún servidor adicional.
 3. **Si el puerto está libre:** se busca el primer puerto disponible entre `8000` y `8009`. Se inicia Uvicorn con FastAPI en ese puerto. En paralelo, un hilo verifica cada 500 ms si el servidor ya responde; en cuanto lo hace, abre el navegador. El tiempo típico de arranque hasta que la UI es usable es de 2 a 4 segundos.
 
-### 1.2 Heartbeat y auto-apagado
+### 1.2 Heartbeat, inactividad y auto-apagado
 
-Mientras el navegador tenga la pestaña abierta, envía automáticamente un `POST /api/app/heartbeat` cada **30 segundos**. Este ping activa un watchdog en el servidor: si transcurren **75 segundos** sin recibir ningún heartbeat, el proceso termina por sí solo (`os._exit(0)`).
+Mientras el navegador tenga la pestaña abierta, envía automáticamente un `POST /api/app/heartbeat` cada **30 segundos**. Este ping activa un watchdog en el servidor: si transcurren aproximadamente **12 horas** sin recibir ningún heartbeat, el proceso termina por sí solo (`os._exit(0)`).
 
-Esto cubre el caso en que el usuario cierra el navegador sin usar el botón **Finalizar**. El servidor no queda huérfano.
+Esta ventana amplia existe porque la aplicación puede permanecer abierta durante toda la jornada laboral aunque no haya nada que registrar por largos periodos.
 
 Si el usuario deja la pestaña abierta y se aleja, el heartbeat sigue enviándose; el servidor no se apaga.
+
+Si el usuario cierra la pestaña con la X, no se ejecuta el flujo normal de **Finalizar**. El servidor se apagará solo únicamente cuando deje de recibir heartbeats durante el tiempo configurado.
 
 ### 1.3 Cierre explícito
 
 El botón **Finalizar** en la interfaz pide confirmación y luego envía `POST /api/app/shutdown`. El servidor responde, lanza un `threading.Timer(0.3, os._exit, args=(0,))` y retorna. La UI muestra "La aplicación se está cerrando..." y llama a `window.close()` 300 ms después.
+
+Para operación normal, **Finalizar** es la forma recomendada de apagar la aplicación.
 
 ---
 
@@ -93,6 +99,14 @@ La aplicación mantiene una **fecha única compartida** entre todos los módulos
 ### 3.2 Persistencia de borradores en sesión
 
 Los módulos **Caja** y **Contadores** guardan sus borradores en `sessionStorage` automáticamente mientras el usuario escribe. Si la página se recarga, los valores no se pierden. Los borradores se eliminan cuando el usuario guarda o limpia el formulario.
+
+En **Caja**, si existen datos en borrador sin guardar, la interfaz muestra un aviso persistente:
+
+```text
+Estás haciendo cambios en Caja, pero aún no has guardado en el sistema.
+```
+
+Este aviso no guarda datos en Excel. Solo advierte que hay una captura pendiente. La Caja se persiste únicamente cuando el usuario pulsa **Guardar** y el backend confirma la escritura.
 
 ### 3.3 Módulo activo
 
@@ -615,6 +629,19 @@ La interfaz muestra:
 | Fecha cuadre | Fecha inicio período | Base anterior | Total contadores | Practisistemas | Deportivas | Bonos | Gastos | Préstamos salida | Préstamos entrada | Neto préstamos | Mov. ingresos | Mov. salidas | Neto movimientos | Caja teórica | Caja física | Diferencia | Base nueva | Timestamp |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
+### 11.8 Resumen operativo
+
+El módulo **Resumen** es de solo lectura. Calcula y muestra el mismo período operativo que usaría el cuadre para una fecha, pero no guarda información en Excel.
+
+Muestra:
+
+- período consultado
+- Plataformas, Bonos, Gastos, Préstamos y Movimientos acumulados
+- desglose de Caja cuando existe registro para la fecha
+- aviso cuando el período acumula varios días
+
+Si la sede tiene configurada separación de recaudo para monedas y billetes viejos, el Resumen también muestra un panel informativo de recaudo pendiente. En `version-usuario` ese panel no permite registrar entregas ni cerrar ciclos; esas acciones pertenecen a administración.
+
 ---
 
 ## 12. Persistencia general — Archivos Excel
@@ -722,8 +749,14 @@ Todos bajo el prefijo `/api`.
 | GET | `/api/modulos/cuadre/calcular/{fecha}` | Calcula cuadre sin guardar |
 | GET | `/api/modulos/cuadre/fecha/{fecha}/estado` | Estado del cuadre para una fecha |
 | GET | `/api/modulos/cuadre/fecha/{fecha}/datos` | Datos del cuadre guardado |
-| POST | `/api/modulos/bonos/editar-ultimo` | Edita el último bono de la fecha |
-| POST | `/api/modulos/bonos/eliminar-ultimo` | Elimina el último bono de la fecha |
+| POST | `/api/modulos/bonos/ultimo/editar` | Edita el último bono de la fecha |
+| POST | `/api/modulos/bonos/ultimo/eliminar` | Elimina el último bono de la fecha |
+| POST | `/api/modulos/gastos/ultimo/editar` | Edita el último gasto de la fecha |
+| POST | `/api/modulos/gastos/ultimo/eliminar` | Elimina el último gasto de la fecha |
+| POST | `/api/modulos/prestamos/ultimo/editar` | Edita el último préstamo o pago de la fecha |
+| POST | `/api/modulos/prestamos/ultimo/eliminar` | Elimina el último préstamo o pago de la fecha |
+| POST | `/api/modulos/movimientos/ultimo/editar` | Edita el último movimiento de la fecha |
+| POST | `/api/modulos/movimientos/ultimo/eliminar` | Elimina el último movimiento de la fecha |
 | GET | `/api/modulos/contadores/catalogo` | Obtiene el catálogo de ítems |
 | POST | `/api/modulos/contadores/catalogo` | Guarda el catálogo de ítems |
 | POST | `/api/modulos/contadores/pausa` | Pausa o reactiva un ítem |

@@ -1,8 +1,17 @@
-# CajaJDW — Capturadora Multimódulo
+# CajaJDW — Versión Usuario
 
-Aplicación local para capturar información diaria de caja por sede y guardarla en archivos Excel anuales, pensados tanto como respaldo operativo como fuente para análisis posterior en Excel o Power Query.
+Aplicación local para capturar la operación diaria de una sede y guardarla en archivos Excel anuales, pensados tanto como respaldo operativo como fuente para análisis posterior en Excel o Power Query.
 
-La app corre localmente en cada equipo, abre una interfaz web en el navegador y escribe sobre libros Excel anuales por sede dentro de una carpeta compartida, por ejemplo Dropbox.
+Esta rama documenta y construye la versión de usuario: una instalación local para una sede, orientada a registro diario, consulta de Resumen y operación normal desde el navegador.
+
+La app corre localmente en cada equipo, abre una interfaz web en el navegador y escribe sobre libros Excel anuales de la sede configurada dentro de una carpeta compartida, por ejemplo Dropbox.
+
+## Criterio de esta documentación
+
+- Describe la operación de `version-usuario`, no la administración multisede de `main`.
+- Prioriza instrucciones y reglas útiles para el operador de sede.
+- Mantiene detalles técnicos solo cuando explican un comportamiento visible o un riesgo operativo.
+- No documenta procesos exclusivos de super admin como respaldos automáticos multisede, referencias externas de plataformas o Faltantes.
 
 ## Qué hace
 
@@ -14,6 +23,8 @@ La app corre localmente en cada equipo, abre una interfaz web en el navegador y 
 - Registra movimientos extraordinarios.
 - Registra contadores por ítem.
 - Calcula el cuadre del período.
+- Consulta el Resumen del período sin guardar cambios.
+- Muestra recaudo pendiente en modo informativo cuando la sede lo tiene habilitado.
 - Guarda todo en archivos Excel anuales por sede.
 
 ## Enfoque de trabajo
@@ -104,7 +115,9 @@ Características del EXE:
 - no requiere consola visible
 - detecta un puerto libre entre 8000 y 8009
 - instancia única: si ya está corriendo, el segundo clic solo abre el navegador sin iniciar un servidor nuevo
-- se apaga automáticamente si el navegador se cierra (watchdog de 75 s sin heartbeat)
+- se mantiene activa durante la jornada si la pestaña sigue abierta
+- si el navegador deja de enviar heartbeat por unas 12 horas, el servidor se apaga automáticamente
+- **Finalizar** es la acción normal de apagado; cerrar la pestaña con la X no ejecuta el mismo flujo, solo deja que el watchdog actúe si ya no llegan heartbeats
 
 `Iniciar Caja.bat` usa el mismo `launcher.py`, así que en desarrollo conserva ese comportamiento de arranque.
 
@@ -127,6 +140,18 @@ La configuración local se reparte entre:
 - `data/settings.json`
 - `data/startup_state.json`
 
+## Borradores y aviso de Caja sin guardar
+
+`Caja` y `Contadores` conservan borradores en la sesión del navegador mientras el operador escribe. Si la página se recarga, la captura puede restaurarse.
+
+En `Caja`, cuando hay datos en borrador que todavía no han sido guardados, la interfaz muestra un aviso persistente:
+
+```text
+Estás haciendo cambios en Caja, pero aún no has guardado en el sistema.
+```
+
+El objetivo del aviso es evitar que el operador haga el arqueo y olvide pulsar **Guardar**. No hay autoguardado de Caja en Excel; el guardado sigue siendo una acción explícita del usuario.
+
 ## Módulos disponibles
 
 | Módulo | Uso principal | Regla de edición |
@@ -139,6 +164,7 @@ La configuración local se reparte entre:
 | `Movimientos` | Ingresos y salidas extraordinarias | fecha actual libre (editar/eliminar último incluido); otra fecha requiere admin |
 | `Contadores` | Captura por ítem con referencias | si la fecha ya existe, requiere admin |
 | `Cuadre` | Consolidación del período | si ya existe, corregir requiere admin |
+| `Resumen` | Consulta consolidada del período | solo lectura |
 
 ## Catálogos locales
 
@@ -160,9 +186,9 @@ También se pueden administrar desde la interfaz:
 - editar catálogos de gastos, préstamos, movimientos y contadores
 - pausar ítems de Contadores sin eliminar su historial
 
-## Uso con varias sedes
+## Uso por sede
 
-Cada sede debe escribir en su propio libro anual.
+Cada instalación de esta versión debe trabajar con una sola sede configurada. Si existen varias sedes, cada una debe escribir en su propio libro anual.
 
 Ventajas:
 
@@ -253,6 +279,8 @@ El proyecto ya es usable como herramienta operativa diaria si se trabaja por sed
 Puntos auditados en esta versión:
 
 - flujo local estable con launcher, instancia única y cierre automático por heartbeat
+- tolerancia de inactividad extendida para jornadas de trabajo largas con la pestaña abierta
+- aviso persistente cuando Caja tiene cambios sin guardar
 - configuración administrativa más completa, incluyendo estado inicial del sistema
 - persistencia operativa en `Contadores_{sede}_{año}.xlsx` y cuadre en `Consolidado_{sede}_{año}.xlsx`
 - catálogos locales editables desde la propia app
