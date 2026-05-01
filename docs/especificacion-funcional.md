@@ -40,13 +40,13 @@ En general la sesion usa una fecha compartida entre modulos.
 
 En `main`, cuando hay sede activa:
 
-- la primera carga de esa sede puede sugerir el dia siguiente al ultimo `Cuadre`
+- la primera carga de esa sede puede sugerir el dia siguiente al ultimo `Cuadre`, sin pasar de hoy
 - una recarga posterior (`F5`) dentro de la misma sede conserva la fecha que ya estaba usando la sesion
 - al cambiar de sede, se recalcula la sugerencia inicial propia de esa sede
 
 Excepcion:
 
-- en `respaldo-version-especial`, durante la primera interaccion:
+- en `respaldo-version-especial`, durante el estado especial inicial:
   - `Caja`
   - `Plataformas`
   - `Contadores`
@@ -68,6 +68,24 @@ Las contrasenas visibles en el frontend deben entenderse como:
 - aviso de que se intenta editar en una fecha no prevista
 
 No son autenticacion fuerte.
+
+### Autorizacion por modulo
+
+| Accion | Requiere autorizacion |
+|---|---|
+| Guardar `Caja` en `hoy()` | no |
+| Guardar `Caja` en fecha anterior | si |
+| Guardar `Contadores` en `hoy()` | no |
+| Guardar `Contadores` en fecha anterior | si |
+| Editar o eliminar un bono del dia | si |
+| Editar o eliminar un gasto del dia | si |
+| Editar o eliminar un prestamo o pago del dia | si |
+| Editar o eliminar un movimiento del dia | si |
+| Guardar `Cuadre` manualmente | si |
+| Ingresar referencia critica en `Contadores` | si |
+| Pausar un item en `Contadores` | no |
+| Registrar entrega de recaudo | si (solo `main`) |
+| Cerrar ciclo de recaudo | si (solo `main`) |
 
 ## 4. Modulos
 
@@ -104,6 +122,14 @@ Campos:
 - Practisistemas
 - Deportivas
 
+Referencias externas (solo `main`):
+
+- `main` puede leer referencias de plataformas desde archivos Excel externos
+- los archivos de referencia son `Ventas_dia_Practisistemas.xlsx` y `Ventas_dia_Bet.xlsm`
+- el super admin configura rutas globales para esos archivos y, por sede, los encabezados que identifican sus valores
+- cuando no existe un `Cuadre` intermedio en el periodo, los valores se acumulan sumando todos los dias del periodo
+- en `version-usuario` este mecanismo no existe; el operador ingresa los valores manualmente
+
 Persistencia:
 
 - hoja `Plataformas`
@@ -119,6 +145,13 @@ Reglas:
 - se pueden registrar multiples gastos el mismo dia
 - cada gasto agrega una fila nueva
 - los conceptos nuevos se agregan al catalogo local para autocompletado
+
+Edicion y eliminacion:
+
+- la lista del dia muestra los gastos en orden cronologico inverso
+- cualquier gasto del dia puede editarse o eliminarse con autorizacion de admin
+- la operacion identifica el registro por su timestamp exacto
+- tras editar o eliminar, el total del dia se recalcula automaticamente
 
 Persistencia:
 
@@ -136,6 +169,13 @@ Reglas:
 - se muestra acumulado diario por cliente
 - el cliente se agrega al catalogo local `data/bonos_clientes.json`
 - el nombre se normaliza como NomPropio
+
+Edicion y eliminacion:
+
+- la lista del dia muestra los bonos en orden cronologico inverso
+- cualquier bono del dia puede editarse o eliminarse con autorizacion de admin
+- la operacion identifica el registro por su timestamp exacto
+- tras editar o eliminar, el acumulado diario por cliente se recalcula automaticamente
 
 ### Autocompletado de clientes y personas
 
@@ -162,9 +202,22 @@ Proposito:
 
 Reglas:
 
-- el saldo pendiente se calcula desde el historico
+- el saldo pendiente se calcula recorriendo todo el historico de esa persona
 - un pago no puede superar el saldo pendiente
 - las personas se agregan al catalogo local y se normalizan como NomPropios
+
+Ciclo visible:
+
+- la UI muestra el ciclo activo visible de la persona, calculado desde su historico
+- cada fila indica si es prestamo o pago, el monto y el saldo acumulado tras esa operacion
+- las operaciones cuyo saldo quedo en cero se muestran tachadas visualmente para distinguirlas de las activas
+- el saldo pendiente actual se calcula en tiempo real antes de registrar un nuevo movimiento
+
+Edicion y eliminacion:
+
+- cualquier registro del dia puede editarse o eliminarse con autorizacion de admin
+- la operacion identifica el registro por su timestamp exacto
+- tras editar o eliminar, el saldo pendiente se recalcula desde el historial completo
 
 Persistencia:
 
@@ -181,6 +234,13 @@ Reglas:
 - multiples movimientos por dia
 - conceptos nuevos se agregan al catalogo local
 - el resumen muestra total ingresos, total salidas y neto
+
+Edicion y eliminacion:
+
+- la lista del dia muestra los movimientos en orden cronologico inverso
+- cualquier movimiento del dia puede editarse o eliminarse con autorizacion de admin
+- la operacion identifica el registro por su timestamp exacto
+- tras editar o eliminar, el resumen neto del dia se recalcula automaticamente
 
 Persistencia:
 
@@ -207,8 +267,16 @@ La pausa temporal por fecha vive en:
 La referencia vigente de cada item puede venir de:
 
 - ultimo registro guardado
-- estado inicial
+- estado inicial (`startup_state.json`)
 - referencia critica autorizada
+
+Orden de resolucion (de mayor a menor prioridad):
+
+1. referencia critica autorizada, si fue ingresada para esa fecha o la ultima anterior disponible
+2. ultimo registro guardado, cuando existe historial previo del item
+3. estado inicial definido en `startup_state.json`, cuando no hay historial
+
+La referencia critica sobreescribe la referencia normal desde la fecha en que se autorizo. Se usa cuando los contadores fisicos fueron reiniciados o presentaron una incoherencia reconocida. El sistema exige completar este paso antes de permitir el guardado en esos casos.
 
 #### Yield y resultado
 
@@ -322,15 +390,38 @@ Persistencia:
 
 ## 5. Resincronizacion de Cuadre
 
-Cuando un periodo ya tiene `Caja` y `Contadores` listos, el sistema puede autoguardar su `Cuadre`.
+### Autoguardado
 
-Cuando se corrige informacion que afecta un periodo ya cuadrado:
+Cuando un periodo ya tiene tanto `Caja` como `Contadores` guardados, el sistema intenta autoguardar el `Cuadre` de ese periodo sin que el operador tenga que pulsarlo manualmente.
 
-- se resincroniza el `Cuadre` cuyo periodo contiene esa fecha
+Esto ocurre:
 
-Si la correccion es en `Caja` y cambia la `base_nueva`:
+- al guardar `Caja` en modo normal (sin forzar)
+- al guardar `Contadores` en cualquier modo
+
+El orden en que se guardan `Caja` y `Contadores` no importa. Ambos modulos disparan la misma verificacion al terminar. Cuando el segundo en guardarse detecta que el primero ya existe, el `Cuadre` se crea automaticamente.
+
+### Resincronizacion por correccion
+
+Cuando se corrige informacion que afecta un periodo ya cerrado:
+
+- se identifica el `Cuadre` cuyo periodo contiene la fecha corregida
+- ese `Cuadre` se recalcula con los datos actualizados
+
+Si la correccion es en `Caja` (con autorizacion) y el recalculo cambia `base_nueva`:
 
 - tambien se resincroniza el siguiente `Cuadre`
+
+La cascada se detiene ahi de forma intencional. No se propaga mas alla del siguiente cierre para evitar efectos no controlados sobre periodos mas antiguos.
+
+### Distincion entre modos
+
+| Accion del operador | Efecto sobre Cuadre |
+|---|---|
+| Guardar `Caja` normal | autoguarda Cuadre si Contadores ya existe para el periodo |
+| Guardar `Contadores` | autoguarda Cuadre si Caja ya existe para el periodo |
+| Corregir `Caja` con autorizacion | resincroniza Cuadre del periodo + siguiente si cambia base_nueva |
+| Corregir `Contadores` con autorizacion | resincroniza Cuadre del periodo solamente |
 
 ## 6. Recaudo de billetes viejos y monedas
 
@@ -413,36 +504,56 @@ La aplicacion ya tiene mitigaciones de locking y validacion, pero el riesgo estr
 
 ## 9. Diferencias entre ramas
 
+### Tabla comparativa
+
+| Funcionalidad | `main` | `version-usuario` | `respaldo-version-especial` |
+|---|---|---|---|
+| Rol | super admin multisede | operador diario | operador con cierre nocturno |
+| Multisede | si | no | no |
+| Modulo `Faltantes` | si | no | no |
+| Modulo `Resumen` | no | si | si |
+| Respaldos automaticos | si (10 min arranque, cada 4 h) | no | no |
+| Retencion de respaldos | 3 dias por sede | — | — |
+| Referencias externas de plataformas | si, rutas globales y mapeo por sede | no | no |
+| Recaudo: registrar entregas | si | no | no |
+| Recaudo: cerrar ciclos | si | no | no |
+| Recaudo: panel informativo | si | si (solo lectura) | si (solo lectura) |
+| Fecha al arrancar | sugerida por sede (dia siguiente al ultimo Cuadre, sin pasar de hoy) | hoy | ayer en modulos de cierre durante el estado especial inicial |
+| Port | 8001 | 8000 | 8000 |
+| Mutex | independiente del usuario del equipo | por usuario del equipo | por usuario del equipo |
+| Ejecutable | `CajaSuperAdmin.exe` | `CajaJDW.exe` | `CajaJDW.exe` |
+| Spec de empaquetado | `CajaSuperAdmin.spec` | `CajaJDW.spec` | `CajaJDW.spec` |
+
 ### `main`
 
-- super admin con acceso a multisede
-- respaldos automaticos programados (10 min arranque, cada 4 h, retencion 3 dias)
-- referencias externas de plataformas por sede
-- administracion de recaudo (registrar entregas, cerrar ciclos)
-- port 8001, mutex independiente del usuario
-- `CajaSuperAdmin.spec` / `CajaSuperAdmin.exe`
+- acceso a todas las sedes registradas en `data/settings.json`
+- puede corregir datos de cualquier sede sin importar en que equipo corren
+- ejecuta respaldos automaticos: primer intento 10 min despues del arranque, luego cada 4 horas
+- retencion de 3 dias por sede en la carpeta de backup
+- puede leer referencias externas de plataformas con rutas globales y mapeo por sede
+- puede registrar entregas y cerrar ciclos de recaudo
+- expone el modulo `Faltantes` para seguimiento operativo de diferencias historicas
 
 ### `version-usuario`
 
-- operacion diaria por sede
-- modulo `Resumen`
-- panel de recaudo solo lectura
-- port 8000
-- `CajaJDW.spec` / `CajaJDW.exe`
+- trabaja sobre una sola sede a la vez
+- captura diaria de todos los modulos operativos
+- modulo `Resumen` para consulta consolidada de periodos
+- panel de recaudo en modo solo lectura cuando la sede lo tiene habilitado
+- no tiene acceso a administracion de respaldos ni de recaudo
 
 ### `respaldo-version-especial`
 
-- base de `version-usuario`
-- en la primera interaccion del dia, `Caja`, `Plataformas`, `Contadores` y `Resumen` abren en `ayer()`
-- util como variante de cierre nocturno
-- port 8000
-- `CajaJDW.spec` / `CajaJDW.exe`
+- derivada de `version-usuario`, comparte su base de codigo
+- diferencia funcional unica: durante el estado especial inicial, los modulos `Caja`, `Plataformas`, `Contadores` y `Resumen` abren en `ayer()` en lugar de `hoy()`
+- util para operadores que hacen el cierre al inicio del dia siguiente en lugar de al final del dia anterior
+- al salir de esos modulos hacia otro flujo, la fecha vuelve a `hoy()` normalmente
 
 Nota de mantenimiento:
 
 - la rama especial se mantiene reconstruyendola sobre la base mas nueva de `version-usuario`
-- despues se reaplica solo su diferencia propia
-- no conviene dejarla divergir durante muchas tandas seguidas
+- se reaplica solo su diferencia propia (la logica de `ayer()` en el estado especial inicial)
+- no conviene dejarla divergir durante muchas tandas seguidas para simplificar el rebase
 
 ## 10. API REST de referencia
 
@@ -471,8 +582,14 @@ Nota de mantenimiento:
 - `GET /api/modulos/cuadre/calcular/{fecha}`
 - `GET /api/modulos/cuadre/fecha/{fecha}/estado`
 - `GET /api/modulos/cuadre/fecha/{fecha}/datos`
-- `POST /api/modulos/bonos/editar-ultimo`
-- `POST /api/modulos/bonos/eliminar-ultimo`
+- `POST /api/modulos/bonos/registro/editar`
+- `POST /api/modulos/bonos/registro/eliminar`
+- `POST /api/modulos/gastos/registro/editar`
+- `POST /api/modulos/gastos/registro/eliminar`
+- `POST /api/modulos/prestamos/registro/editar`
+- `POST /api/modulos/prestamos/registro/eliminar`
+- `POST /api/modulos/movimientos/registro/editar`
+- `POST /api/modulos/movimientos/registro/eliminar`
 - `GET /api/modulos/contadores/catalogo`
 - `POST /api/modulos/contadores/catalogo`
 - `POST /api/modulos/contadores/pausa`

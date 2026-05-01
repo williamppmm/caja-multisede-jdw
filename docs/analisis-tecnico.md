@@ -192,7 +192,7 @@ Contiene la logica para construir filas, guardar Caja, guardar Plataformas y pre
 
 - [bonos_service.py](C:\Users\User\Desktop\Caja\app\services\bonos_service.py)
 
-Maneja registro, consulta, edicion y eliminacion del ultimo bono de la fecha.
+Maneja registro, consulta, edicion y eliminacion de bonos por registro del dia.
 
 ### Prestamos
 
@@ -238,6 +238,18 @@ Responsabilidades:
 - detectar alertas
 - exigir referencia critica si hay decrementos frente a referencia
 
+Resolucion de referencia por item:
+
+El servicio reconstruye la referencia vigente para cada item siguiendo esta prioridad:
+
+1. referencia critica autorizada para esa fecha o la ultima anterior disponible
+2. ultimo registro guardado en el historial del item
+3. estado inicial definido en `startup_state.json` cuando no hay historial
+
+La referencia critica sobreescribe la referencia normal. Se exige cuando el sistema detecta un decremento frente a la referencia vigente, lo que indica un posible reset fisico de los contadores.
+
+Cuando un item esta pausado en la fecha consultada, las entradas y salidas adoptan los valores de la referencia vigente, resultando en yield cero para ese item. El jackpot sigue su propia logica independiente.
+
 ### Cuadre
 
 - [cuadre_service.py](C:\Users\User\Desktop\Caja\app\services\cuadre_service.py)
@@ -250,9 +262,25 @@ Responsabilidades:
 - comparar caja teorica vs caja fisica
 - guardar el resultado final del cierre
 
-Punto tecnico importante:
+Mecanismo de autoguardado:
 
-- si una correccion en `Caja` cambia `base_nueva`, se resincroniza el siguiente cierre afectado
+`autoguardar_cuadre_si_listo(fecha)` se dispara al terminar de guardar `Caja` (modo normal) y al terminar de guardar `Contadores`. Verifica si ambos modulos ya tienen datos para el periodo. Si los tiene, crea el `Cuadre` automaticamente sin intervencion del operador.
+
+El orden de guardado entre `Caja` y `Contadores` no afecta el resultado. Ambos modulos disparan la misma verificacion al guardar.
+
+Mecanismo de resincronizacion:
+
+Cuando se corrige `Caja` con autorizacion (forzar=True), `sincronizar_cadena_caja(fecha)` recalcula el `Cuadre` del periodo afectado. Si `base_nueva` cambia tras el recalculo, tambien resincroniza el siguiente `Cuadre`. La cascada se detiene ahi intencionalmente para no propagar efectos sobre periodos mas antiguos.
+
+Cuando se corrige `Contadores` con autorizacion, `sincronizar_cuadre_afectado(fecha)` recalcula el `Cuadre` del periodo. No propaga al siguiente.
+
+Funciones clave:
+
+- `autoguardar_cuadre_si_listo(fecha)` — crea Cuadre automaticamente cuando Caja y Contadores ya existen
+- `sincronizar_cadena_caja(fecha)` — resincroniza hasta dos Cuadres por correccion de Caja
+- `sincronizar_cuadre_afectado(fecha)` — resincroniza el Cuadre que contiene la fecha
+- `buscar_fecha_cuadre_afectado(fecha)` — identifica que Cuadre cubre una fecha dada
+- `sincronizar_cuadre_guardado(fecha_cuadre)` — recalcula y sobreescribe un Cuadre existente
 
 ### Referencias externas de plataformas
 
@@ -260,8 +288,13 @@ Punto tecnico importante:
 
 Responsabilidades:
 
-- mantener referencias por sede de los encabezados de plataformas externas (Practisistemas, Bet)
-- el super admin puede configurar referencias distintas por sede remota
+- mantener rutas globales de archivos de referencia (`Ventas_dia_Practisistemas.xlsx`, `Ventas_dia_Bet.xlsm`)
+- leer los valores de ventas del dia o del periodo desde esos archivos externos
+- el super admin configura esas rutas globales y el mapeo de encabezados por sede desde la interfaz de administracion
+
+Logica de acumulacion:
+
+Cuando no existe un `Cuadre` intermedio en el periodo, los valores de las plataformas externas se acumulan sumando todos los dias del periodo. Esto cubre el caso en que el operador no cuadra todos los dias y el periodo abarca varios dias sin cierre. Solo disponible en `main`.
 
 ### Respaldos automaticos
 

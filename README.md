@@ -204,7 +204,7 @@ Solo en `main` (super admin). Cuando se configura una carpeta de backup:
 
 En `main`, cuando hay una sede activa:
 
-- en la primera carga de esa sede, la fecha sugerida parte del dia siguiente al ultimo `Cuadre`
+- en la primera carga de esa sede, la fecha sugerida parte del dia siguiente al ultimo `Cuadre`, sin pasar de hoy
 - si el usuario ya se movio manualmente a otra fecha y hace `F5`, se conserva esa fecha en la misma sede
 - si cambia de sede, vuelve a aplicarse la sugerencia inicial propia de la nueva sede
 
@@ -340,7 +340,7 @@ Cada rama es una version de produccion con su propio proposito, ejecutable y `.s
 |---|---|---|
 | `main` | Super admin | Auditor, opera multisede, corrige registros historicos |
 | `version-usuario` | Operativa diaria | Caja de la sede, captura del dia |
-| `respaldo-version-especial` | Variante operativa | Igual a `version-usuario` pero arranca en `ayer()` |
+| `respaldo-version-especial` | Variante operativa | Igual a `version-usuario` pero arranca modulos de cierre en `ayer()` durante el estado especial inicial |
 
 Las ramas se retroalimentan entre ellas: una mejora de logica en una rama (ciclo de prestamos, pausa de contadores, preservacion de inputs, validacion de saldo con fecha) se evalua y porta a las demas cuando aplica. El criterio es si el cambio es transversal, exclusivo de auditoria, o exclusivo de operacion diaria.
 

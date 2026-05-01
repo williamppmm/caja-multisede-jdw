@@ -131,6 +131,28 @@ Resultado esperado:
 - el total diario se actualiza
 - el cliente entra al catalogo local normalizado como NomPropio
 
+### BN-02 — Edicion de un bono del dia
+
+1. registrar al menos un bono
+2. seleccionar el registro en la lista
+3. pulsar editar, cambiar el valor
+4. confirmar con autorizacion de admin
+
+Resultado esperado:
+
+- el registro actualiza su valor
+- el acumulado diario por cliente se recalcula correctamente
+
+### BN-03 — Eliminacion de un bono del dia
+
+1. registrar al menos un bono
+2. seleccionar el registro y eliminarlo con autorizacion de admin
+
+Resultado esperado:
+
+- el registro desaparece de la lista del dia
+- el acumulado diario se recalcula y no queda rastro del bono eliminado
+
 ### PR-01 — Prestamo inicial
 
 1. registrar un prestamo para una persona nueva
@@ -148,6 +170,29 @@ Resultado esperado:
 
 - la app bloquea el guardado
 
+### PR-03 — Ciclo visible de Prestamos
+
+1. registrar un prestamo inicial para una persona nueva
+2. registrar un pago parcial para esa misma persona
+3. consultar el ciclo visible de la persona en la UI
+
+Resultado esperado:
+
+- el ciclo visible muestra ambas operaciones en orden cronologico
+- el saldo se actualiza progresivamente despues de cada operacion
+- el prestamo inicial aparece como activo hasta que el saldo llegue a cero
+
+### PR-04 — Edicion de un registro de Prestamo
+
+1. registrar un prestamo o un pago
+2. seleccionar el registro
+3. editar el monto con autorizacion de admin
+
+Resultado esperado:
+
+- el registro actualiza su valor
+- el saldo pendiente se recalcula desde el historico de la persona
+
 ### MV-01 — Movimiento simple
 
 1. registrar un ingreso
@@ -157,6 +202,17 @@ Resultado esperado:
 
 - ambas filas quedan registradas
 - el neto del dia coincide con el calculo manual
+
+### MV-02 — Edicion de un Movimiento
+
+1. registrar un ingreso o salida
+2. seleccionar el registro en la lista
+3. editar el monto o concepto con autorizacion de admin
+
+Resultado esperado:
+
+- el registro se actualiza en la lista
+- el resumen de total ingresos, salidas y neto se recalcula automaticamente
 
 ## E. Contadores
 
@@ -265,6 +321,27 @@ Resultado esperado:
 - la primera carga de la sede usa la fecha sugerida
 - la recarga mantiene la fecha manual elegida en esa misma sede
 - al cambiar a otra sede, se recalcula la sugerencia inicial de esa nueva sede
+
+### E-06 — Fecha sugerida no pasa de hoy
+
+1. en `main`, elegir una sede cuyo ultimo `Cuadre` sea de hoy
+2. abrir la app en primera carga de esa sede
+
+Resultado esperado:
+
+- la fecha sugerida queda en hoy
+- la app no intenta iniciar en manana
+
+### E-07 — Aviso persistente de Caja sin guardar en `version-usuario`
+
+1. en `version-usuario`, modificar algun valor de `Caja`
+2. no pulsar `Guardar`
+3. cambiar de foco o permanecer en la pantalla
+
+Resultado esperado:
+
+- se muestra un aviso persistente de cambios de `Caja` sin guardar
+- el aviso desaparece despues de guardar o limpiar la captura
 
 ## G. Faltantes (`main`)
 

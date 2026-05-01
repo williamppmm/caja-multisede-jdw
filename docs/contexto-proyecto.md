@@ -21,7 +21,7 @@ Excel sigue siendo la fuente de verdad, pero la operación ya ocurre sobre la ap
 |---|---|---|
 | `main` | `CajaSuperAdmin.exe` | supervisión, auditoría, multisede, respaldos |
 | `version-usuario` | `CajaJDW.exe` | captura operativa diaria |
-| `respaldo-version-especial` | `CajaJDW.exe` | misma base de usuario, pero `Caja` y `Resumen` arrancan en `ayer()` durante la primera interacción |
+| `respaldo-version-especial` | `CajaJDW.exe` | misma base de usuario, pero modulos de cierre arrancan en `ayer()` durante el estado especial inicial |
 
 Cada rama es una versión de producción activa, no una feature branch temporal. Tienen su propio ejecutable, su propio `.spec` y su propio ciclo de vida.
 
@@ -129,7 +129,7 @@ Lo que hace hoy:
 
 En `main`, además:
 
-- la primera carga de una sede usa como fecha sugerida el dia siguiente al ultimo `Cuadre`
+- la primera carga de una sede usa como fecha sugerida el dia siguiente al ultimo `Cuadre`, sin pasar de hoy
 - si la sesion ya estaba trabajando otra fecha en esa misma sede, un `F5` conserva esa fecha
 - al cambiar de sede, la sugerencia se recalcula para la nueva sede
 
@@ -225,10 +225,9 @@ Incluye:
 
 Base actualizada de `version-usuario` con una regla extra:
 
-- en la primera interacción de la sesión:
-  - `Caja` arranca en `ayer()`
-  - `Resumen` también puede verse en `ayer()`
-- al pasar a cualquier otro módulo, todo vuelve a `hoy()`
+- durante el estado especial inicial:
+  - `Caja`, `Plataformas`, `Contadores` y `Resumen` arrancan en `ayer()`
+- al pasar a un flujo fuera de esos modulos, todo vuelve a `hoy()`
 
 Patron de mantenimiento:
 
