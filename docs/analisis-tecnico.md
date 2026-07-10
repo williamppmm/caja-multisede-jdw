@@ -178,7 +178,7 @@ Responsabilidades:
 Responsabilidades:
 
 - exponer el panel consolidado del modulo `Faltantes`
-- devolver solo la estructura necesaria para pintar la semana actual, semanas previas del mes y meses previos del ano
+- devolver solo la estructura necesaria para pintar el mes actual y los meses previos del ano
 
 ## Servicios por modulo
 
@@ -319,8 +319,7 @@ Responsabilidades:
 - construir el estado diario del ano actual hasta `hoy()`
 - clasificar dias en torno a la diferencia registrada
 - agrupar la salida por:
-  - semana actual
-  - semanas previas del mes
+  - mes actual
   - meses previos del ano
 - calcular el neto de diferencias por bloque para mostrarlo como badge compacto en frontend
 

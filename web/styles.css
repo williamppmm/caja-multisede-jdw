@@ -1696,7 +1696,7 @@ body.auth-banner-open::before {
 }
 
 .faltantes-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .faltantes-tabla th:nth-child(2),
@@ -1737,10 +1737,6 @@ body.auth-banner-open::before {
   font-weight: 700;
 }
 
-.faltantes-subgrupos {
-  margin-top: 8px;
-}
-
 .faltantes-diferencia-negativa {
   color: #a61d24;
   font-weight: 700;
@@ -1759,12 +1755,6 @@ body.auth-banner-open::before {
 .faltantes-diferencia-hoy {
   color: #9a650d;
   font-weight: 700;
-}
-
-@media (max-width: 920px) {
-  .faltantes-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 720px) {

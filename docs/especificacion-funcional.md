@@ -357,9 +357,9 @@ Estados operativos internos:
 
 Presentacion actual:
 
-- `Semana actual` abierta por defecto
-- `Semanas anteriores del mes` colapsadas
-- `Meses anteriores del ano` colapsados
+- `Mes actual` abierto por defecto, con el detalle de todos sus dias
+- `Meses anteriores del ano` colapsados, cada uno con su propio detalle de dias al expandir
+- ya no hay agrupacion por semana
 - el detalle visible por dia muestra solo:
   - fecha
   - diferencia

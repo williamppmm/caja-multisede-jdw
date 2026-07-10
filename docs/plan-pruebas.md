@@ -354,9 +354,9 @@ Resultado esperado:
 
 - el panel abre sin usar el date picker
 - se ocultan los controles de fecha, guardar y limpiar propios de captura
-- la `Semana actual` aparece visible al entrar
+- el `Mes actual` aparece visible al entrar
 
-### G-02 — Semana actual y dia pendiente
+### G-02 — Mes actual y dia pendiente
 
 1. abrir `Faltantes` en una sede con historico de `Cuadre`
 2. revisar la fila correspondiente a `hoy()`
@@ -365,19 +365,17 @@ Resultado esperado:
 
 - `hoy()` no aparece como diferencia cerrada
 - se muestra como valor pendiente visual
-- los dias previos de la semana muestran su diferencia real
+- los dias previos del mes muestran su diferencia real
 
 ### G-03 — Historico colapsado
 
 1. abrir `Faltantes`
-2. expandir una semana anterior del mes
-3. expandir un mes previo del ano
+2. expandir un mes previo del ano
 
 Resultado esperado:
 
-- las semanas anteriores del mes aparecen colapsadas
 - los meses anteriores del ano aparecen colapsados
-- cada bloque muestra su neto resumido
+- cada bloque de mes muestra su neto resumido
 - al expandir, el detalle diario muestra solo `Fecha` y `Diferencia`
 
 ## H. Recaudo

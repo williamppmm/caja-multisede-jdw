@@ -2723,58 +2723,37 @@ function renderTablaDiasDiferencias(dias = []) {
   `;
 }
 
-function renderGrupoSemanaDiferencias(semana, openDefault = false) {
-  if (!semana) return '';
-  return `
-    <details class="faltantes-detalle" ${openDefault ? 'open' : ''}>
-      <summary>
-        <span>${semana.label}</span>
-        <span class="faltantes-resumen-chip">${fmt(semana.resumen?.neto_diferencias || 0)}</span>
-      </summary>
-      ${renderTablaDiasDiferencias(semana.dias || [])}
-    </details>
-  `;
-}
-
 function renderGrupoMesDiferencias(mes) {
   if (!mes) return '';
-  const semanas = (mes.semanas || []).map(semana => renderGrupoSemanaDiferencias(semana)).join('');
   return `
     <details class="faltantes-detalle">
       <summary>
         <span>${mes.label}</span>
         <span class="faltantes-resumen-chip">${fmt(mes.resumen?.neto_diferencias || 0)}</span>
       </summary>
-      <div class="faltantes-subgrupos">
-        ${semanas || '<p class="modulo-ayuda">Sin semanas con datos para este mes.</p>'}
-      </div>
+      ${renderTablaDiasDiferencias(mes.dias || [])}
     </details>
   `;
 }
 
 function limpiarPanelFaltantes() {
-  document.getElementById('faltantes-semana-actual-label').textContent = 'Semana actual';
-  document.getElementById('faltantes-semana-actual').innerHTML = '<p class="modulo-ayuda">No hay datos disponibles todavía.</p>';
-  document.getElementById('faltantes-semanas-mes').innerHTML = '<p class="modulo-ayuda">No hay semanas previas para este mes.</p>';
+  document.getElementById('faltantes-mes-actual-label').textContent = 'Mes actual';
+  document.getElementById('faltantes-mes-actual').innerHTML = '<p class="modulo-ayuda">No hay datos disponibles todavía.</p>';
   document.getElementById('faltantes-meses-previos').innerHTML = '<p class="modulo-ayuda">Aún no hay meses previos con historial este año.</p>';
-  actualizarBadgeDiferencias(document.getElementById('faltantes-semana-actual-badge'), 0);
+  actualizarBadgeDiferencias(document.getElementById('faltantes-mes-actual-badge'), 0);
 }
 
 function renderPanelFaltantes(data) {
-  const semanaActual = data?.semana_actual || {};
   const mesActual = data?.mes_actual || {};
   const mesesPrevios = data?.meses_previos || [];
 
-  document.getElementById('faltantes-semana-actual-label').textContent = semanaActual.label || 'Semana actual';
-  document.getElementById('faltantes-semana-actual').innerHTML = renderTablaDiasDiferencias(semanaActual.dias || []);
-  document.getElementById('faltantes-semanas-mes').innerHTML = (mesActual.semanas_previas || []).length
-    ? mesActual.semanas_previas.map(semana => renderGrupoSemanaDiferencias(semana)).join('')
-    : '<p class="modulo-ayuda">No hay semanas previas para este mes.</p>';
+  document.getElementById('faltantes-mes-actual-label').textContent = mesActual.label || 'Mes actual';
+  document.getElementById('faltantes-mes-actual').innerHTML = renderTablaDiasDiferencias(mesActual.dias || []);
   document.getElementById('faltantes-meses-previos').innerHTML = mesesPrevios.length
     ? mesesPrevios.map(mes => renderGrupoMesDiferencias(mes)).join('')
     : '<p class="modulo-ayuda">Aún no hay meses previos con historial este año.</p>';
 
-  actualizarBadgeDiferencias(document.getElementById('faltantes-semana-actual-badge'), semanaActual.resumen?.neto_diferencias || 0);
+  actualizarBadgeDiferencias(document.getElementById('faltantes-mes-actual-badge'), mesActual.resumen?.neto_diferencias || 0);
 }
 
 async function cargarPanelFaltantes() {
