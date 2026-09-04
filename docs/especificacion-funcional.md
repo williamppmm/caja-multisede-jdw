@@ -10,7 +10,7 @@ Esta documentación no cubre procesos exclusivos de `main` como administración 
 
 ### 1.1 Arranque
 
-Al ejecutar `CajaJDW.exe` (o `python launcher.py`):
+Al ejecutar `usuario.exe` (o `python launcher.py`):
 
 1. Se verifica si el puerto por defecto (`8000`) ya está en uso.
 2. **Si ya hay una instancia corriendo:** se abre el navegador apuntando a `http://127.0.0.1:8000` y el proceso termina. No se inicia ningún servidor adicional.

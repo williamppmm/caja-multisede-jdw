@@ -106,7 +106,7 @@ scripts/install_windows.ps1
 
 1. Ejecutar `Instalar Caja.bat`.
 2. Ejecutar `Construir EXE.bat`.
-3. El ejecutable quedará en `dist\CajaJDW.exe`.
+3. El ejecutable quedará en `dist\usuario.exe`.
 
 Características del EXE:
 

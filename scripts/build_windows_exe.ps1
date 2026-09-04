@@ -29,8 +29,8 @@ Write-Step "Instalando dependencias de build"
 # registro del sistema), pero tenerla empaquetada hace el EXE autocontenido.
 & $venvPython -m pip install pyinstaller tzdata --quiet
 
-Write-Step "Construyendo ejecutable con CajaJDW.spec"
+Write-Step "Construyendo usuario.exe (CajaJDW.spec)"
 & $venvPython -m PyInstaller --noconfirm --clean $specFile
 
 Write-Host ""
-Write-Host "EXE generado en: $projectRoot\dist\CajaJDW.exe" -ForegroundColor Green
+Write-Host "EXE generado en: $projectRoot\dist\usuario.exe" -ForegroundColor Green
