@@ -65,7 +65,7 @@ exe = EXE(
     a.datas,
     splash.binaries,
     [],
-    name='CajaJDW',
+    name='especial',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
