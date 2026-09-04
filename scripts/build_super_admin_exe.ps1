@@ -26,8 +26,8 @@ Set-Location $projectRoot
 Write-Step "Instalando dependencias de build"
 & $venvPython -m pip install pyinstaller tzdata --quiet
 
-Write-Step "Construyendo CajaSuperAdmin.exe"
+Write-Step "Construyendo admin.exe (CajaSuperAdmin.spec)"
 & $venvPython -m PyInstaller --noconfirm --clean $specFile
 
 Write-Host ""
-Write-Host "EXE generado en: $projectRoot\dist\CajaSuperAdmin.exe" -ForegroundColor Green
+Write-Host "EXE generado en: $projectRoot\dist\admin.exe" -ForegroundColor Green

@@ -19,7 +19,7 @@ Excel sigue siendo la fuente de verdad, pero la operación ya ocurre sobre la ap
 
 | Rama | Ejecutable final | Propósito |
 |---|---|---|
-| `main` | `CajaSuperAdmin.exe` | supervisión, auditoría, multisede, respaldos |
+| `main` | `admin.exe` | supervisión, auditoría, multisede, respaldos |
 | `version-usuario` | `CajaJDW.exe` | captura operativa diaria |
 | `respaldo-version-especial` | `CajaJDW.exe` | misma base de usuario, pero modulos de cierre arrancan en `ayer()` durante el estado especial inicial |
 
@@ -210,6 +210,7 @@ Incluye:
 - respaldos automáticos
 - resincronización de `Cuadre`
 - cascada `Caja -> siguiente Cuadre`
+- módulo `Faltantes`: panel de `Cuadre` histórico agrupado por mes actual + meses previos del año, sin depender del date picker
 
 ### `version-usuario`
 

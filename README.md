@@ -8,7 +8,7 @@ La app sigue usando Excel como fuente de verdad operativa, pero ya centraliza ca
 
 | Rama | Rol principal | Ejecutable | Launcher | Spec versionado en esa rama |
 |---|---|---|---|---|
-| `main` | super admin / multisede | `CajaSuperAdmin.exe` | `launcher_super_admin.py` | `CajaSuperAdmin.spec` |
+| `main` | super admin / multisede | `admin.exe` | `launcher_super_admin.py` | `CajaSuperAdmin.spec` |
 | `version-usuario` | operacion diaria por sede | `CajaJDW.exe` | `launcher.py` | `CajaJDW.spec` |
 | `respaldo-version-especial` | variante operativa con arranque en `ayer()` | `CajaJDW.exe` | `launcher.py` | `CajaJDW.spec` |
 
@@ -78,12 +78,12 @@ El launcher compartido:
 
 Archivo central:
 
-- [launcher_boot.py](C:\Users\User\Desktop\Caja\launcher_boot.py)
+- [launcher_boot.py](launcher_boot.py)
 
 Entrypoints por variante:
 
-- [launcher.py](C:\Users\User\Desktop\Caja\launcher.py)
-- [launcher_super_admin.py](C:\Users\User\Desktop\Caja\launcher_super_admin.py)
+- [launcher.py](launcher.py)
+- [launcher_super_admin.py](launcher_super_admin.py)
 
 ## Persistencia y archivos por sede
 
@@ -165,9 +165,8 @@ Regla de trabajo importante:
 - toma `hoy()` como referencia visual y deja ese dia como pendiente
 - lee la hoja `Cuadre` de `Consolidado_{sede}_{ano}.xlsx`
 - muestra:
-  - semana actual abierta
-  - semanas anteriores del mes colapsadas
-  - meses anteriores del ano colapsados
+  - mes actual abierto, con el detalle de todos sus dias
+  - meses anteriores del ano colapsados, cada uno con su propio detalle al expandir
 - usa el neto de diferencias por bloque como resumen compacto
 - la visualizacion diaria simplificada muestra solo `Fecha` y `Diferencia`
 
@@ -271,8 +270,8 @@ El `.spec` forma parte del proceso oficial de empaquetado y debe existir en la r
 
 ### En `main`
 
-- [CajaSuperAdmin.spec](C:\Users\User\Desktop\Caja\CajaSuperAdmin.spec)
-- build esperado: `CajaSuperAdmin.exe`
+- [CajaSuperAdmin.spec](CajaSuperAdmin.spec)
+- build esperado: `admin.exe`
 
 ### En `version-usuario` y `respaldo-version-especial`
 
@@ -363,6 +362,6 @@ El siguiente salto logico, si crece la operacion, es:
 
 ## Documentacion adicional
 
-- [docs/especificacion-funcional.md](C:\Users\User\Desktop\Caja\docs\especificacion-funcional.md)
-- [docs/analisis-tecnico.md](C:\Users\User\Desktop\Caja\docs\analisis-tecnico.md)
-- [docs/plan-pruebas.md](C:\Users\User\Desktop\Caja\docs\plan-pruebas.md)
+- [docs/especificacion-funcional.md](docs/especificacion-funcional.md)
+- [docs/analisis-tecnico.md](docs/analisis-tecnico.md)
+- [docs/plan-pruebas.md](docs/plan-pruebas.md)

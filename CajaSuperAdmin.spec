@@ -64,7 +64,7 @@ exe = EXE(
     a.datas,
     splash.binaries,
     [],
-    name='CajaSuperAdmin',
+    name='admin',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

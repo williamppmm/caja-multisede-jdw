@@ -33,9 +33,9 @@ Hoy incluye:
 
 Archivos principales:
 
-- [launcher_boot.py](C:\Users\User\Desktop\Caja\launcher_boot.py)
-- [launcher.py](C:\Users\User\Desktop\Caja\launcher.py)
-- [launcher_super_admin.py](C:\Users\User\Desktop\Caja\launcher_super_admin.py)
+- [launcher_boot.py](../launcher_boot.py)
+- [launcher.py](../launcher.py)
+- [launcher_super_admin.py](../launcher_super_admin.py)
 
 `launcher_boot.py` concentra la logica compartida de mutex, seleccion de puerto, splash, poll del servidor, apertura de navegador y apagado controlado.
 
@@ -43,7 +43,7 @@ Archivos principales:
 
 En `main`:
 
-- [CajaSuperAdmin.spec](C:\Users\User\Desktop\Caja\CajaSuperAdmin.spec)
+- [CajaSuperAdmin.spec](../CajaSuperAdmin.spec)
 
 En ramas operativas:
 
@@ -62,7 +62,7 @@ La decision tecnica fuerte del sistema sigue siendo:
 
 La persistencia principal esta en:
 
-- [excel_service.py](C:\Users\User\Desktop\Caja\app\services\excel_service.py)
+- [excel_service.py](../app/services/excel_service.py)
 
 Este servicio:
 
@@ -132,9 +132,9 @@ Lectura recomendada de esta separacion:
 
 Modelos principales:
 
-- [caja_models.py](C:\Users\User\Desktop\Caja\app\models\caja_models.py)
-- [contadores_models.py](C:\Users\User\Desktop\Caja\app\models\contadores_models.py)
-- [cuadre_models.py](C:\Users\User\Desktop\Caja\app\models\cuadre_models.py)
+- [caja_models.py](../app/models/caja_models.py)
+- [contadores_models.py](../app/models/contadores_models.py)
+- [cuadre_models.py](../app/models/cuadre_models.py)
 
 La validacion con Pydantic cubre tipos, no negativos, obligatoriedad y estructura minima del payload.
 
@@ -142,13 +142,13 @@ La validacion con Pydantic cubre tipos, no negativos, obligatoriedad y estructur
 
 ### Router principal
 
-- [modules.py](C:\Users\User\Desktop\Caja\app\routers\modules.py)
+- [modules.py](../app/routers/modules.py)
 
 Agrupa endpoints para guardar registros, consultar estado por fecha, consultar datos guardados, administrar catalogos y ejecutar operaciones especiales.
 
 ### Router de settings
 
-- [settings.py](C:\Users\User\Desktop\Caja\app\routers\settings.py)
+- [settings.py](../app/routers/settings.py)
 
 Responsabilidades:
 
@@ -163,7 +163,7 @@ Responsabilidades:
 
 ### Router de recaudo
 
-- [recaudo.py](C:\Users\User\Desktop\Caja\app\routers\recaudo.py)
+- [recaudo.py](../app/routers/recaudo.py)
 
 Responsabilidades:
 
@@ -173,7 +173,7 @@ Responsabilidades:
 
 ### Router de diferencias
 
-- [diferencias.py](C:\Users\User\Desktop\Caja\app\routers\diferencias.py)
+- [diferencias.py](../app/routers/diferencias.py)
 
 Responsabilidades:
 
@@ -184,31 +184,31 @@ Responsabilidades:
 
 ### Caja y modulos simples
 
-- [caja_service.py](C:\Users\User\Desktop\Caja\app\services\caja_service.py)
+- [caja_service.py](../app/services/caja_service.py)
 
 Contiene la logica para construir filas, guardar Caja, guardar Plataformas y preparar modulos simples por items.
 
 ### Bonos
 
-- [bonos_service.py](C:\Users\User\Desktop\Caja\app\services\bonos_service.py)
+- [bonos_service.py](../app/services/bonos_service.py)
 
 Maneja registro, consulta, edicion y eliminacion de bonos por registro del dia.
 
 ### Prestamos
 
-- [prestamos_service.py](C:\Users\User\Desktop\Caja\app\services\prestamos_service.py)
+- [prestamos_service.py](../app/services/prestamos_service.py)
 
 Registra prestamos y pagos, y valida que un pago no supere el saldo pendiente.
 
 ### Movimientos
 
-- [movimientos_service.py](C:\Users\User\Desktop\Caja\app\services\movimientos_service.py)
+- [movimientos_service.py](../app/services/movimientos_service.py)
 
 Registra ingresos y salidas extraordinarias y resume netos del dia.
 
 ### Catalogos y autocompletado
 
-- [nombres_service.py](C:\Users\User\Desktop\Caja\app\services\nombres_service.py)
+- [nombres_service.py](../app/services/nombres_service.py)
 
 Responsabilidades:
 
@@ -225,7 +225,7 @@ El frontend aplica autocompletado en tres niveles:
 
 ### Contadores
 
-- [contadores_service.py](C:\Users\User\Desktop\Caja\app\services\contadores_service.py)
+- [contadores_service.py](../app/services/contadores_service.py)
 
 Es el modulo de mayor complejidad.
 
@@ -252,7 +252,7 @@ Cuando un item esta pausado en la fecha consultada, las entradas y salidas adopt
 
 ### Cuadre
 
-- [cuadre_service.py](C:\Users\User\Desktop\Caja\app\services\cuadre_service.py)
+- [cuadre_service.py](../app/services/cuadre_service.py)
 
 Responsabilidades:
 
@@ -284,7 +284,7 @@ Funciones clave:
 
 ### Referencias externas de plataformas
 
-- [plataformas_referencia_service.py](C:\Users\User\Desktop\Caja\app\services\plataformas_referencia_service.py)
+- [plataformas_referencia_service.py](../app/services/plataformas_referencia_service.py)
 
 Responsabilidades:
 
@@ -298,7 +298,7 @@ Cuando no existe un `Cuadre` intermedio en el periodo, los valores de las plataf
 
 ### Respaldos automaticos
 
-- [backup_service.py](C:\Users\User\Desktop\Caja\app\services\backup_service.py)
+- [backup_service.py](../app/services/backup_service.py)
 
 Disponible solo en super admin (`is_super_admin_build()`).
 
@@ -311,7 +311,7 @@ Responsabilidades:
 
 ### Diferencias / Faltantes
 
-- [diferencias_service.py](C:\Users\User\Desktop\Caja\app\services\diferencias_service.py)
+- [diferencias_service.py](../app/services/diferencias_service.py)
 
 Responsabilidades:
 
@@ -351,7 +351,7 @@ backup_root/
 
 ### Recaudo
 
-- [recaudo_service.py](C:\Users\User\Desktop\Caja\app\services\recaudo_service.py)
+- [recaudo_service.py](../app/services/recaudo_service.py)
 
 Responsabilidades:
 
@@ -366,7 +366,7 @@ Estado persistido:
 
 ### Configuracion operativa
 
-- [operativa_config_service.py](C:\Users\User\Desktop\Caja\app\services\operativa_config_service.py)
+- [operativa_config_service.py](../app/services/operativa_config_service.py)
 
 Responsabilidades:
 
@@ -378,8 +378,8 @@ Responsabilidades:
 
 Archivos principales:
 
-- [index.html](C:\Users\User\Desktop\Caja\web\index.html)
-- [app.js](C:\Users\User\Desktop\Caja\web\app.js)
+- [index.html](../web/index.html)
+- [app.js](../web/app.js)
 
 El frontend es una SPA simple sin framework.
 

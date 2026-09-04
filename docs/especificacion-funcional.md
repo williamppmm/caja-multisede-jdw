@@ -521,7 +521,7 @@ La aplicacion ya tiene mitigaciones de locking y validacion, pero el riesgo estr
 | Fecha al arrancar | sugerida por sede (dia siguiente al ultimo Cuadre, sin pasar de hoy) | hoy | ayer en modulos de cierre durante el estado especial inicial |
 | Port | 8001 | 8000 | 8000 |
 | Mutex | independiente del usuario del equipo | por usuario del equipo | por usuario del equipo |
-| Ejecutable | `CajaSuperAdmin.exe` | `CajaJDW.exe` | `CajaJDW.exe` |
+| Ejecutable | `admin.exe` | `usuario.exe` | `especial.exe` |
 | Spec de empaquetado | `CajaSuperAdmin.spec` | `CajaJDW.spec` | `CajaJDW.spec` |
 
 ### `main`

@@ -11,7 +11,7 @@ if not exist ".venv\Scripts\python.exe" (
   exit /b 1
 )
 
-powershell -ExecutionPolicy Bypass -File ".\scripts\build_windows_exe.ps1"
+powershell -ExecutionPolicy Bypass -File ".\scripts\build_super_admin_exe.ps1"
 
 echo.
 pause
