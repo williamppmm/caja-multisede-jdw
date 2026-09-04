@@ -9,8 +9,8 @@ La app sigue usando Excel como fuente de verdad operativa, pero ya centraliza ca
 | Rama | Rol principal | Ejecutable | Launcher | Spec versionado en esa rama |
 |---|---|---|---|---|
 | `main` | super admin / multisede | `admin.exe` | `launcher_super_admin.py` | `CajaSuperAdmin.spec` |
-| `version-usuario` | operacion diaria por sede | `CajaJDW.exe` | `launcher.py` | `CajaJDW.spec` |
-| `respaldo-version-especial` | variante operativa con arranque en `ayer()` | `CajaJDW.exe` | `launcher.py` | `CajaJDW.spec` |
+| `version-usuario` | operacion diaria por sede | `usuario.exe` | `launcher.py` | `CajaJDW.spec` |
+| `respaldo-version-especial` | variante operativa con arranque en `ayer()` | `especial.exe` | `launcher.py` | `CajaJDW.spec` |
 
 La convencion actual es mantener un solo `.spec` y un solo `.exe` final por rama.
 
@@ -273,10 +273,15 @@ El `.spec` forma parte del proceso oficial de empaquetado y debe existir en la r
 - [CajaSuperAdmin.spec](CajaSuperAdmin.spec)
 - build esperado: `admin.exe`
 
-### En `version-usuario` y `respaldo-version-especial`
+### En `version-usuario`
 
 - `CajaJDW.spec`
-- build esperado: `CajaJDW.exe`
+- build esperado: `usuario.exe`
+
+### En `respaldo-version-especial`
+
+- `CajaJDW.spec`
+- build esperado: `especial.exe`
 
 ## Instalacion y desarrollo
 

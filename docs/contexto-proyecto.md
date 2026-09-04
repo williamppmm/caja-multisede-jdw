@@ -20,8 +20,8 @@ Excel sigue siendo la fuente de verdad, pero la operación ya ocurre sobre la ap
 | Rama | Ejecutable final | Propósito |
 |---|---|---|
 | `main` | `admin.exe` | supervisión, auditoría, multisede, respaldos |
-| `version-usuario` | `CajaJDW.exe` | captura operativa diaria |
-| `respaldo-version-especial` | `CajaJDW.exe` | misma base de usuario, pero modulos de cierre arrancan en `ayer()` durante el estado especial inicial |
+| `version-usuario` | `usuario.exe` | captura operativa diaria |
+| `respaldo-version-especial` | `especial.exe` | misma base de usuario, pero modulos de cierre arrancan en `ayer()` durante el estado especial inicial |
 
 Cada rama es una versión de producción activa, no una feature branch temporal. Tienen su propio ejecutable, su propio `.spec` y su propio ciclo de vida.
 
